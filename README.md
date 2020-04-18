@@ -44,7 +44,7 @@ By default the crate is a standalone project and builds a static libray and exec
 To be used with the companion Julia package it is necessary to build a dynamic library.
 This can be done by just uncommenting (i.e get rid of the #) in file Cargo.toml the line:
 
-*#crate-type = ["dylib"]*
+*#crate-type = ["cdylib"]*
 
 and rerun the command: cargo build --release.
 

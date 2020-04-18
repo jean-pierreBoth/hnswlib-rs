@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
@@ -24,7 +24,7 @@ opt-level = 3
 # if we want to avoid specifying in advance crate-type 
 lib = "hnswlib"
 path = "src/lib.rs"
-#crate-type = ["dylib"]
+#crate-type = ["cdylib"]
 
 
 [[examples]]
@@ -53,8 +53,6 @@ serde_derive={ version = "1.0", doc = false}
 
 
 # for //
-crossbeam-utils = "0.7"
-crossbeam-channel = "0.4"
 parking_lot = "0.9"
 rayon = {version = "0.9.0",  doc = false}
 num_cpus = {version = "1.8.0", doc = false}
