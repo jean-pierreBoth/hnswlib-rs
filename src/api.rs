@@ -90,6 +90,7 @@ macro_rules! mapdist_t(
     ("DistHamming")  => (crate::dist::DistHamming);
     ("DistJaccard")  => (crate::dist::DistJaccard);
     ("DistPtr")      => (crate::dist::DistPtr);
+    ("DistLevenshtein") => (crate::dist::DistLevenshtein);
 );
 
 
