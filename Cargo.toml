@@ -41,6 +41,11 @@ path = "examples/ann-glove25-angular.rs"
 name = "ann-mnist"
 path = "examples/ann-mnist-784-euclidean.rs"
 
+
+[[examples]]
+name = "levenshtein"
+path = "examples/levensthein.rs"
+
 #[[example]]
 
 [dependencies]
