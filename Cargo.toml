@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"

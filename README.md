@@ -25,6 +25,8 @@ The crate provides:
 * Hellinger and Jeffreys distances between probability distributions (f32 and f64). It must be noted that the Jeffreys distance
 (a symetrized Kullback-Leibler divergence) do not satisfy the triangle inequality. (Neither Cosine distance !).
 
+* Levenshtein distance on u16.
+
 * A structure to enable the user to implement its own distances. It takes as data, vectors of types T:Copy+Clone+Send+Sync.
 
 * An interface towards C and more specifically to the [Julia](https://julialang.org/) language.
@@ -95,3 +97,7 @@ It is possible in these examples to change from parallel searches to serial sear
 or modify parameters to see the impact on performance.
 
 For example on the fashion-mnist-784-euclidean benchmark search requests run at 12791 req/s with a recall rate of 0.9765 on a laptop with 4 i7 cores at 2.7Ghz
+
+## Contributions
+
+Petter Egesund added Levenshtein distance.
