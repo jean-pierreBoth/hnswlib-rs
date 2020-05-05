@@ -3,3 +3,4 @@ Runs
 Cargo.lock
 rls*
 dumpreloadtest*
+.idea/

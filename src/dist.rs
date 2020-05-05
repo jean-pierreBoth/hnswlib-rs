@@ -42,6 +42,7 @@ enum DistKind {
     DistJeffreys(String),
     /// To store a distance defined by a C pointer function
     DistPtr(String),
+    DistLevenshtein(String)
 }
 
 
@@ -581,6 +582,61 @@ implementJaccardDistance!(u16);
 implementJaccardDistance!(u32);
 
 
+#[derive(TypeName, Default)]
+pub struct DistLevenshtein;
+impl Distance<u16> for DistLevenshtein {
+    fn eval(&self, a: &[u16], b: &[u16]) -> f32 {
+        let len_a = a.len();
+        let len_b = b.len();
+        if len_a < len_b {
+            return self.eval(b, a);
+        }
+        // handle special case of 0 length
+        if len_a == 0 {
+            return len_b as f32;
+        } else if len_b == 0 {
+            return len_a as f32;
+        }
+
+        let len_b = len_b + 1;
+
+        let mut pre;
+        let mut tmp;
+        let mut cur = vec![0; len_b];
+
+        // initialize string b
+        for i in 1..len_b {
+            cur[i] = i;
+        }
+
+        // calculate edit distance
+        for (i, ca) in a.iter().enumerate() {
+            // get first column for this row
+            pre = cur[0];
+            cur[0] = i + 1;
+            for (j, cb) in b.iter().enumerate() {
+                tmp = cur[j + 1];
+                cur[j + 1] = std::cmp::min(
+                    // deletion
+                    tmp + 1, std::cmp::min(
+                        // insertion
+                        cur[j] + 1,
+                        // match or substitution
+                        pre + if ca == cb { 0 } else { 1 }));
+                pre = tmp;
+            }
+        }
+        let res = cur[len_b - 1] as f32;
+        return res;
+    }
+}
+
+
+
+
+
+
+
 //=======================================================================================
 //   Case of function pointers (cover Trait Fn , FnOnce ...)
 // The book (Function item types):  " There is a coercion from function items to function pointers with the same signature  "
@@ -759,6 +815,32 @@ fn test_jaccard_u16() {
     println!("dist jaccard = {:?}", dist);
     assert_eq!(dist, 1. - 11./16.);
 } // end of test_jaccard
+
+#[test]
+    fn test_levenshtein() {
+        let mut v1: Vec<u16> = vec![1,2,3,4];
+        let mut v2: Vec<u16> = vec![1,2,3,3];
+        let mut dist = DistLevenshtein.eval(&v1, &v2);
+        println!("dist levenshtein = {:?}", dist);
+        assert_eq!(dist, 1.0);
+        v1 = vec![1,2,3,4];
+        v2 = vec![1,2,3,4];
+        dist = DistLevenshtein.eval(&v1, &v2);
+        println!("dist levenshtein = {:?}", dist);
+        assert_eq!(dist, 0.0);
+        v1 = vec![1,1,1,4];
+        v2 = vec![1,2,3,4];
+        dist = DistLevenshtein.eval(&v1, &v2);
+        println!("dist levenshtein = {:?}", dist);
+        assert_eq!(dist, 2.0);
+        v2 = vec![1,1,1,4];
+        v1 = vec![1,2,3,4];
+        dist = DistLevenshtein.eval(&v1, &v2);
+        println!("dist levenshtein = {:?}", dist);
+        assert_eq!(dist, 2.0);
+
+
+} // end of test_levenshtein
 
 
 
