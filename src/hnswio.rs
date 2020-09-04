@@ -627,7 +627,6 @@ use rand::distributions::{Distribution, Uniform};
 
 fn test_dump_reload() {
     println!("\n\n test_dump_reload");
-    let _res = simple_logger::init();
     // generate a random test
     let mut rng = rand::thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);

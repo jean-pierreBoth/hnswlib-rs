@@ -258,7 +258,7 @@ macro_rules! generate_loadhnsw(
     ($function_name:ident, $api_name:ty, $type_val:ty) => (
         #[no_mangle]
         pub extern "C" fn $function_name(flen : usize, name : *const u8)  -> *const $api_name {
-            let _res = simple_logger::init();
+            let _res = env_logger::Builder::from_default_env().init();
             let  slice = unsafe { std::slice::from_raw_parts(name, flen)} ;
             let filename = String::from_utf8_lossy(slice).into_owned(); 
             //
@@ -294,7 +294,7 @@ generate_loadhnsw!(load_hnswdump_u8, HnswApiu8, u8);
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_f32(max_nb_conn : usize, ef_const:usize, namelen: usize,  cdistname : *const u8) -> *const HnswApif32 {
-    let _res = simple_logger::init();
+    env_logger::Builder::from_default_env().init();
     log::info!("entering init_hnsw_f32");
     let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
     let dname = String::from_utf8_lossy(slice).into_owned();
@@ -338,7 +338,6 @@ pub extern "C" fn init_hnsw_f32(max_nb_conn : usize, ef_const:usize, namelen: us
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_f32(max_nb_conn : usize, ef_const:usize, c_func : extern "C" fn(*const f32, *const f32, u64) -> f32 ) -> *const HnswApif32 {
-    let _res = simple_logger::init();
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<f32>::new(c_func);
     let h = Hnsw::<f32, DistCFFI<f32> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -440,7 +439,6 @@ generate_file_dump!(file_dump_f32, HnswApif32, f32);
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_i32(max_nb_conn : usize, ef_const:usize, namelen: usize,  cdistname : *const u8) -> *const HnswApii32 {
-    let _res = simple_logger::init();
     log::info!("entering init_hnsw_i32");
     let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
     let dname = String::from_utf8_lossy(slice);
@@ -466,7 +464,6 @@ pub extern "C" fn init_hnsw_i32(max_nb_conn : usize, ef_const:usize, namelen: us
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_i32(max_nb_conn : usize, ef_const:usize, 
                 c_func : extern "C" fn(*const i32, *const i32, u64) -> f32 ) -> *const HnswApii32 {
-    let _res = simple_logger::init();
     log::debug!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<i32>::new(c_func);
     let h = Hnsw::<i32, DistCFFI<i32> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -490,7 +487,6 @@ generate_file_dump!(file_dump_i32, HnswApii32, i32);
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_u32(max_nb_conn : usize, ef_const:usize, namelen: usize,  cdistname : *const u8) -> *const HnswApiu32 {
-    let _res = simple_logger::init();
     log::debug!("entering init_hnsw_u32");
     let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
     let dname = String::from_utf8_lossy(slice);
@@ -520,7 +516,6 @@ pub extern "C" fn init_hnsw_u32(max_nb_conn : usize, ef_const:usize, namelen: us
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_u32(max_nb_conn : usize, ef_const:usize, 
                 c_func : extern "C" fn(*const u32, *const u32, u64) -> f32 ) -> *const HnswApiu32 {
-    let _res = simple_logger::init();
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u32>::new(c_func);
     let h = Hnsw::<u32, DistCFFI<u32> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -546,7 +541,6 @@ super::declare_myapi_type!(HnswApiu16, u16);
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_u16(max_nb_conn : usize, ef_const:usize, namelen: usize,  cdistname : *const u8) -> *const HnswApiu16 {
-    let _res = simple_logger::init();
     log::info!("entering init_hnsw_u16");
     let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
     let dname = String::from_utf8_lossy(slice);
@@ -581,7 +575,6 @@ pub extern "C" fn init_hnsw_u16(max_nb_conn : usize, ef_const:usize, namelen: us
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_u16(max_nb_conn : usize, ef_const:usize, 
                 c_func : extern "C" fn(*const u16, *const u16, u64) -> f32 ) -> *const HnswApiu16 {
-    let _res = simple_logger::init();
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u16>::new(c_func);
     let h = Hnsw::<u16, DistCFFI<u16> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -605,7 +598,6 @@ super::declare_myapi_type!(HnswApiu8, u8);
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_u8(max_nb_conn : usize, ef_const:usize, namelen: usize,  cdistname : *const u8) -> *const HnswApiu8 {
-    let _res = simple_logger::init();
     log::debug!("entering init_hnsw_u8");
     let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
     let dname = String::from_utf8_lossy(slice);
@@ -640,7 +632,6 @@ pub extern "C" fn init_hnsw_u8(max_nb_conn : usize, ef_const:usize, namelen: usi
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_u8(max_nb_conn : usize, ef_const:usize, 
                 c_func : extern "C" fn(*const u8, *const u8, u64) -> f32 ) -> *const HnswApiu8 {
-    let _res = simple_logger::init();
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u8>::new(c_func);
     let h = Hnsw::<u8, DistCFFI<u8> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);

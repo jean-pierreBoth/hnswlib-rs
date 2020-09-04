@@ -38,7 +38,7 @@ pub struct AnnBenchmarkData {
 
 impl AnnBenchmarkData {
     pub fn new(fname: String) ->  Result<AnnBenchmarkData> {
-        let res = hdf5::File::open(fname.clone(), "r");
+        let res = hdf5::File::open(fname.clone());
         if res.is_err() {
             println!("you must download file {:?}", fname);
             panic!("download benchmark file some where and modify examples source file accordingly");
@@ -205,7 +205,7 @@ use super::*;
 #[test]
 
 fn test_load_hdf5() {
-    let _res = simple_logger::init();
+    env_logger::Builder::from_default_env().init();
     //
     let fname = String::from("/home.2/Data/ANN/glove-25-angular.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);

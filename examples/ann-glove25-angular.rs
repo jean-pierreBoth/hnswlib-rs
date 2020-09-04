@@ -41,8 +41,6 @@ use hnsw_rs::prelude::*;
 
 
 pub fn main() {
-
-    let _res = simple_logger::init();
     let parallel = true;
     //
     let fname = String::from("/home.2/Data/ANN/glove-25-angular.hdf5");

@@ -104,7 +104,6 @@ use dist::l2_normalize;
 #[test]
 fn test_serial() {
     //
-    let _res = simple_logger::init();
     //
     let nb_elem = 1000;
     let dim = 10;
@@ -202,8 +201,6 @@ fn test_serial() {
 
 #[test]
 fn test_parallel() {
-    //
-    let _res = simple_logger::init();
     //
     let nb_elem = 1000;
     let dim = 25;

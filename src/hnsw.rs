@@ -1251,7 +1251,6 @@ use cpu_time::ProcessTime;
 #[test]
 
 fn test_iter_point() {
-    let _res = simple_logger::init();
     //
     println!("\n\n test_iter_point");
     //

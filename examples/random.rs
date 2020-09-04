@@ -15,7 +15,7 @@ use hnsw_rs::test::*;
 
 
 fn main() {
-    let _res = simple_logger::init();
+    env_logger::Builder::from_default_env().init();
     //
     let nb_elem = 500000;
     let dim = 25;
