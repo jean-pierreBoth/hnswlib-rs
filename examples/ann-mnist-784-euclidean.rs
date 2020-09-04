@@ -16,8 +16,6 @@ use hnsw_rs::prelude::*;
 
 
 pub fn main() {
-
-    let _res = simple_logger::init();
     let mut parallel = true;
     //
     let fname = String::from("/home.2/Data/ANN/fashion-mnist-784-euclidean.hdf5");
