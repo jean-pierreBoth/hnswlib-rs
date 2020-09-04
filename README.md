@@ -104,6 +104,6 @@ Petter Egesund added the DistLevenshtein distance.
 
 ## Notes
 
-1. Upgrade of many dependencies. Change from simple_logger to env_logger. The logger is initialized one for all in lib.rs and cannot be intialized twice. The level of log can be modulated by the RUST_LOG env variable on module basis or switched off. See the *env_logger* crate doc.
+1. Upgrade of many dependencies. Change from simple_logger to env_logger. The logger is initialized one for all in file src/lib.rs and cannot be intialized twice. The level of log can be modulated by the RUST_LOG env variable on a module basis or switched off. See the *env_logger* crate doc.
 2. A rust crate *edlib_rs* provides an interface to the edlib C++ library  [(Cf edlib)](https://github.com/Martinsos/edlib) can be found at [edlib_rs](https://github.com/jean-pierreBoth/edlib-rs) or on crate.io. The algorithm is based on Myers algorithm.  
-It can be used to define a user adhoc distance with normal, prefix or infix mode (which is useful in genomics alignment).
+It can be used to define a user adhoc distance on &[u8] with normal, prefix or infix mode (which is useful in genomics alignment).

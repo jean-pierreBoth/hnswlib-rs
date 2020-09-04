@@ -1,12 +1,13 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.4"
+version = "0.1.6"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
 readme = "README.md"
 keywords = ["algorithms", "ann", "hnsw"]
 repository = "https://github.com/jean-pierreBoth/hnswlib-rs"
+documentation = "https://docs.rs"
 edition= "2018"
 
 [features]
@@ -71,7 +72,7 @@ ndarray = {version = "0.13", doc = false}
 clap = {version = "2.29", doc = false}
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
 hashbrown = {version = "0.9", doc = false}
-skiplist= {version = "0.2.10", doc=false}
+skiplist= {version = "0.3", doc=false}
 
 rand = {version = "0.7", doc = false}
 lazy_static = { version = "1.4", doc = false}
