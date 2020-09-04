@@ -100,4 +100,10 @@ For example on the fashion-mnist-784-euclidean benchmark search requests run at 
 
 ## Contributions
 
-Petter Egesund added Levenshtein distance.
+Petter Egesund added the DistLevenshtein distance.
+
+## Notes
+
+1. Upgrade of many dependencies. Change from simple_logger to env_logger. The logger is initialized one for all in lib.rs and cannot be intialized twice. The level of log can be modulated by the RUST_LOG env variable on module basis or switched off. See the *env_logger* crate doc.
+2. A rust crate *edlib_rs* provides an interface to the edlib C++ library  [(Cf edlib)](https://github.com/Martinsos/edlib) can be found at [edlib_rs](https://github.com/jean-pierreBoth/edlib-rs) or on crate.io. The algorithm is based on Myers algorithm.  
+It can be used to define a user adhoc distance with normal, prefix or infix mode (which is useful in genomics alignment).
