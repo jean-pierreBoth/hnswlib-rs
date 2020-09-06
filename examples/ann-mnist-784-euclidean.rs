@@ -60,7 +60,7 @@ pub fn main() {
     let mut nb_returned = Vec::<usize>::with_capacity(nb_elem);
     let mut last_distances_ratio = Vec::<f32>::with_capacity(nb_elem);
     let mut knn_neighbours_for_tests = Vec::<Vec<Neighbour>>::with_capacity(nb_elem);
-    hnsw.set_searching_mode(false);
+    hnsw.set_searching_mode(true);
     let knbn = 10;
     let ef_c = max_nb_connection;
     println!("\n searching with ef : {:?}", ef_c);

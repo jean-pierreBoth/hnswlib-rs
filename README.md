@@ -32,6 +32,8 @@ The crate provides:
 * An interface towards C and more specifically to the [Julia](https://julialang.org/) language.
 See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.jl) and the building paragraph for some help for Julia users.
 
+* Multithreaded insertion and search requests.
+  
 * Dump and reload functions (Cf module hnswio) to store the graph once it is built. As the time necessary to compute the graph can be important it can be useful to store it for future use.
 
 ## Implementation
@@ -98,6 +100,33 @@ or modify parameters to see the impact on performance.
 
 For example on the fashion-mnist-784-euclidean benchmark search requests run at 12791 req/s with a recall rate of 0.9765 on a laptop with 4 i7 cores at 2.7Ghz
 
+Some lines extracted from this benchmark show how it works for f32 and L2 norm
+
+```rust
+    //  reading data
+    let anndata = AnnBenchmarkData::new(fname).unwrap();
+    let nb_elem = anndata.train_data.len();
+    let max_nb_connection = 24;
+    let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
+    let ef_c = 400;
+    // allocating network
+    let mut hnsw =  Hnsw::<f32, DistL2>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistL2{});
+    hnsw.set_extend_candidates(false);
+    // parallel insertion of train data
+    let data_for_par_insertion = anndata.train_data.iter().map( |x| (&x.0, x.1)).collect();
+    hnsw.parallel_insert(&data_for_par_insertion);
+    //
+    hnsw.dump_layer_info();
+    //  Now the bench with 10 neighbours
+    let mut knn_neighbours_for_tests = Vec::<Vec<Neighbour>>::with_capacity(nb_elem);
+    hnsw.set_searching_mode(true);
+    let knbn = 10;
+    let ef_c = max_nb_connection;
+    // search 10 nearest neighbours for test data
+    knn_neighbours_for_tests = hnsw.parallel_search(&anndata.test_data, knbn, ef_c);
+    ....
+```
+
 ## Contributions
 
 Petter Egesund added the DistLevenshtein distance.
@@ -105,5 +134,4 @@ Petter Egesund added the DistLevenshtein distance.
 ## Notes
 
 1. Upgrade of many dependencies. Change from simple_logger to env_logger. The logger is initialized one for all in file src/lib.rs and cannot be intialized twice. The level of log can be modulated by the RUST_LOG env variable on a module basis or switched off. See the *env_logger* crate doc.
-2. A rust crate *edlib_rs* provides an interface to the edlib C++ library  [(Cf edlib)](https://github.com/Martinsos/edlib) can be found at [edlib_rs](https://github.com/jean-pierreBoth/edlib-rs) or on crate.io. The algorithm is based on Myers algorithm.  
-It can be used to define a user adhoc distance on &[u8] with normal, prefix or infix mode (which is useful in genomics alignment).
+2. A rust crate *edlib_rs* provides an interface to the *excellent* edlib C++ library  [(Cf edlib)](https://github.com/Martinsos/edlib) can be found at [edlib_rs](https://github.com/jean-pierreBoth/edlib-rs) or on crate.io. It can be used to define a user adhoc distance on &[u8] with normal, prefix or infix mode (which is useful in genomics alignment).
