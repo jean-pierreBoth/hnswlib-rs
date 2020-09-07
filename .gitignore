@@ -3,4 +3,6 @@ Runs
 Cargo.lock
 rls*
 dumpreloadtest*
+*.pdf
+*.html
 .idea/
