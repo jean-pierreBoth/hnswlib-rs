@@ -427,8 +427,8 @@ impl  Distance<f32> for  DistHellinger {
 
 ///
 /// A structure to compute Jeffreys divergence between probalilities.
-/// If p and q 2 probability distributions
-/// the distance is computed as:
+/// If p and q are 2 probability distributions
+/// the "distance" is computed as:
 ///   sum (p[i] - q[i]) * ln(p[i]/q[i])
 /// 
 /// To take care of null probabilities in the formula we use  max(x[i],1.E-30) 
@@ -521,10 +521,10 @@ impl  Distance<f32> for  DistJeffreys {
 //=======================================================================================
 
 
-/// Jense-Shannon distance.  
+/// Jensen-Shannon distance.  
 /// It is defined as the **square root** of the  Jensen–Shannon divergence and is a metric.
 /// Vector must be >= 0 and normalized to 1!
-/// The distance computation does not check that 
+/// The distance computation does not check that. 
 #[derive(TypeName, Default)]
 pub struct DistJensenShannon;
 
