@@ -546,7 +546,7 @@ macro_rules! implementDistJensenShannon (
                         dist += vb[i] * (vb[i]/mean_ab).ln();
                     }
                 }
-                dist.sqrt() as f32
+                (0.5 * dist).sqrt() as f32
             } // end eval
         }  // end impl Distance<$ty>
     )  // end of pattern matching on ty
