@@ -40,6 +40,7 @@ enum DistKind {
     DistJaccard(String),
     DistHellinger(String),
     DistJeffreys(String),
+    DistJensenShannon(String),
     /// To store a distance defined by a C pointer function
     DistPtr(String),
     DistLevenshtein(String)
@@ -520,6 +521,41 @@ impl  Distance<f32> for  DistJeffreys {
 //=======================================================================================
 
 
+/// Jense-Shannon distance.  
+/// It is defined as the **square root** of the  Jensen–Shannon divergence and is a metric.
+/// Vector must be >= 0 and normalized to 1!
+/// The distance computation does not check that 
+#[derive(TypeName, Default)]
+pub struct DistJensenShannon;
+
+macro_rules! implementDistJensenShannon (
+
+    ($ty:ty) => (
+        impl Distance<$ty> for DistJensenShannon {
+            fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
+                let mut dist = 0.;
+                //
+                assert_eq!(va.len(), vb.len());
+                //
+                for i in 0..va.len() {
+                    let mean_ab = 0.5 * (va[i] + vb[i]);
+                    if va[i] > 0. {
+                        dist += va[i] * (va[i]/mean_ab).ln();
+                    }
+                    if vb[i] > 0. {
+                        dist += vb[i] * (vb[i]/mean_ab).ln();
+                    }
+                }
+                dist.sqrt() as f32
+            } // end eval
+        }  // end impl Distance<$ty>
+    )  // end of pattern matching on ty
+);
+
+implementDistJensenShannon!(f64);
+implementDistJensenShannon!(f32);
+
+
 
 //=======================================================================================
 
@@ -930,7 +966,7 @@ fn test_hellinger() {
 #[test]
 
 fn test_jeffreys() {
-
+    // this essentially test av2 implementation for f32
     let length = 19; 
     let mut p_data : Vec<f32> = Vec::with_capacity(length);
     let mut q_data : Vec<f32> = Vec::with_capacity(length);
@@ -953,5 +989,27 @@ fn test_jeffreys() {
     assert!(dist_test >= 0.);
     assert!((dist_eval-dist_test).abs() < 1.0e-5 );
 }
+
+#[test]
+fn test_jensenshannon() {
+    let length = 19; 
+    let mut p_data : Vec<f32> = Vec::with_capacity(length);
+    let mut q_data : Vec<f32> = Vec::with_capacity(length);
+    for _ in 0..length {
+        p_data.push(1./length as f32);
+        q_data.push(1./length as f32);
+    }
+    p_data[0] -= 1./(2*length) as f32;
+    p_data[1] += 1./(2*length) as f32;
+    q_data[10] += 1./(2*length) as f32;
+    p_data[12] = 0.;
+    q_data[12] = 0.;
+    //
+    let dist_eval = DistJensenShannon.eval(&p_data, &q_data);
+    //
+    log::info!("dist eval {:?} ", dist_eval);
+    println!("dist eval  {:?} ", dist_eval);
+}
+
 
 } // end of module tests

@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
@@ -54,29 +54,29 @@ path = "examples/levensthein.rs"
 # cargo doc --no-deps avoid dependencies doc generation
 #
 
-serde= {version = "1.0", doc = false}
-serde_derive={ version = "1.0", doc = false}
+serde= {version = "1.0"}
+serde_derive={ version = "1.0"}
 
 
 # for //
 parking_lot = "0.11"
-rayon = {version = "0.9.0",  doc = false}
-num_cpus = {version = "1.8.0", doc = false}
-simdeez = {version = "1.0", doc = false}
+rayon = {version = "0.9.0"}
+num_cpus = {version = "1.8.0"}
+simdeez = {version = "1.0"}
 
-cpu-time = {version = "1.0", doc = false}
-time = {version = "0.2",  doc = false}
+cpu-time = {version = "1.0"}
+time = {version = "0.2"}
 
-ndarray = {version = "0.13", doc = false}
+ndarray = {version = "0.13"}
 
-clap = {version = "2.29", doc = false}
+clap = {version = "2.29"}
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
-hashbrown = {version = "0.9", doc = false}
-skiplist= {version = "0.3", doc=false}
+hashbrown = {version = "0.9"}
+skiplist= {version = "0.3"}
 
-rand = {version = "0.7", doc = false}
-lazy_static = { version = "1.4", doc = false}
-typename = {version = "0.1", doc = false}
+rand = {version = "0.7"}
+lazy_static = { version = "1.4"}
+typename = {version = "0.1"}
 # for benchmark reading
 hdf5 = {version="0.7", doc = false}
 # decreasing order of log for debug build : (max_level_)trace debug info warn error off

@@ -22,8 +22,10 @@ The crate provides:
 
 * usual distances as L1, L2, Cosine, Jaccard, Hamming for vectors of standard numeric types.
 
-* Hellinger and Jeffreys distances between probability distributions (f32 and f64). It must be noted that the Jeffreys distance
+* Hellinger distance and Jeffreys divergence between probability distributions (f32 and f64). It must be noted that the Jeffreys divergence
 (a symetrized Kullback-Leibler divergence) do not satisfy the triangle inequality. (Neither Cosine distance !).
+
+* Jensen-Shannon distance between probability distributions (f32 and f64). It is defined as the **square root** of the Jensen-Shannon divergence and is a bounded metric. See [Nielsen F. in Entropy 2019, 21(5), 485](https://doi.org/10.3390/e21050485)
 
 * Levenshtein distance on u16.
 
