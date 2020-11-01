@@ -1,7 +1,7 @@
-//! some testing utilities
-//! run with to get output statistics : cargo test --release -- --nocapture --test test_parallel
+//! some testing utilities.  
+//! run with to get output statistics : cargo test --release -- --nocapture --test test_parallel.  
 //! serial test corresponds to random-10nn-euclidean(k=10)
-//! par test corresponds to random data in 25 dimensions k = 10, dist Cosine
+//! parallel test corresponds to random data in 25 dimensions k = 10, dist Cosine
 
 #![allow(dead_code)]
 use rand::distributions::{Uniform};

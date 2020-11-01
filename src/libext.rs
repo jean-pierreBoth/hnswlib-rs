@@ -1,6 +1,6 @@
 //! This file contains lib to call hnsw from julia (or any language providing a C api)
-//! The AnnT trait is implemented with macros for u32, u16, u8, f32, f64 and i32.
-//! an declare_myapi_type! and procudes struct HnswApif32 and so on.
+//! The AnnT trait is implemented with macros for u32, u16, u8, f32, f64 and i32.  
+//! The macro declare_myapi_type!  produces struct HnswApif32 and so on.
 //! 
 
 use std::ptr;
@@ -323,6 +323,11 @@ pub extern "C" fn init_hnsw_f32(max_nb_conn : usize, ef_const:usize, namelen: us
     }
     "DistJeffreys" =>  {
         let h = Hnsw::<f32, DistJeffreys>::new(max_nb_conn, 10000, 16, ef_const, DistJeffreys{});
+        let api = HnswApif32{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));        
+    }
+    "DistJensenShannon" =>  {
+        let h = Hnsw::<f32, DistJensenShannon>::new(max_nb_conn, 10000, 16, ef_const, DistJensenShannon{});
         let api = HnswApif32{opaque: Box::new(h)};
         return Box::into_raw(Box::new(api));        
     }
