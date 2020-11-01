@@ -425,7 +425,7 @@ impl  Distance<f32> for  DistHellinger {
 
 
 ///
-/// A structure to compute Jeffreys distance between probalilities.
+/// A structure to compute Jeffreys divergence between probalilities.
 /// If p and q 2 probability distributions
 /// the distance is computed as:
 ///   sum (p[i] - q[i]) * ln(p[i]/q[i])
@@ -482,6 +482,7 @@ unsafe fn distance_jeffreys_f32<S: Simd> (va:&[f32], vb: &[f32]) -> f32 {
         }
         let prod_s = delta * S::loadu_ps(&logslice.as_slice()[0]);
         dist += S::horizontal_add_ps(prod_s);
+        logslice.clear();
         //
         i += S::VF32_WIDTH;
     }
@@ -514,6 +515,10 @@ impl  Distance<f32> for  DistJeffreys {
          }
     }
 }
+
+
+//=======================================================================================
+
 
 
 //=======================================================================================
@@ -926,7 +931,7 @@ fn test_hellinger() {
 
 fn test_jeffreys() {
 
-    let length = 9; 
+    let length = 19; 
     let mut p_data : Vec<f32> = Vec::with_capacity(length);
     let mut q_data : Vec<f32> = Vec::with_capacity(length);
     for _ in 0..length {
@@ -935,6 +940,7 @@ fn test_jeffreys() {
     }
     p_data[0] -= 1./(2*length) as f32;
     p_data[1] += 1./(2*length) as f32;
+    q_data[10] += 1./(2*length) as f32;
     //
     let dist_eval = DistJeffreys.eval(&p_data, &q_data);
     let mut dist_test = 0.;
