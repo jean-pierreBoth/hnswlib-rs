@@ -733,12 +733,12 @@ impl <T:Copy+Clone+Sized+Send+Sync> Distance<T> for DistCFFI<T>  {
 /// This structure is to let user define their own distance with closures.
 #[derive(TypeName)]
 pub struct DistFn<T:Copy+Clone+Sized+Send+Sync> {
-    dist_function : Box<dyn Fn(&[T], &[T]) -> f32>,
+    dist_function : Box<dyn Fn(&[T], &[T]) -> f32 + Send + Sync>,
 }
 
 impl <T:Copy+Clone+Sized+Send+Sync> DistFn<T> {
     /// construction of a DistFn
-    pub fn new(f : Box<dyn Fn(&[T], &[T]) -> f32>) -> Self {
+    pub fn new(f : Box<dyn Fn(&[T], &[T]) -> f32 + Send + Sync>) -> Self {
         DistFn{ dist_function : f }
     }
 
@@ -756,7 +756,7 @@ impl <T:Copy+Clone+Sized+Send+Sync> Distance<T> for DistFn<T> {
 
 mod tests {
 use super::*;
-
+use crate::hnsw::*;
 
 #[test]
 fn test_access_to_dist_l1() {
@@ -935,6 +935,9 @@ fn test_my_closure() {
     let vb : Vec::<f32> = vec! [2. , 2., 4.];   
     let dist = my_boxed_dist.eval(&va, &vb);
     println!("test_my_closure computed : {:?}", dist);
+    // try allocation Hnsw
+    let _hnsw = Hnsw::<f32, DistFn<f32> >::new(10, 3, 100, 16, my_boxed_dist);
+    //
     assert_eq!(dist, 0.2);
    
 }

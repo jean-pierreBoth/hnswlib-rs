@@ -1,12 +1,11 @@
-
-//
 //! This file provides io dump/ reload of computed graph.
-///
-/// The main structure to dump (or reload) is PointIndexation.
-/// 
-/// a dump is constituted of 2 files. One dumps jut the graph (or topology)
-///     with id of points and another file dumps the ids and vector in point.
-///     The graph file is suffixed hnsw.graph the other is suffixed hnsw.data
+//!
+//! A dump is constituted of 2 files. 
+//! One file stores just the graph (or topology) with id of points.  
+//! The other file stores the ids and vector in point.
+//! The graph file is suffixed by "hnsw.graph" the other is suffixed by "hnsw.data"
+//! 
+//! An example of dump and reload of structure Hnsw is given in the tests (see test_dump_reload)
 /// 
 /// 
 // datafile
@@ -514,6 +513,9 @@ fn load_point_indexation<T:Copy+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read,
 //
 
 impl <T:Copy+Clone+Sized+Send+Sync+TypeName, D: Distance<T>+TypeName+Send+Sync> HnswIO for Hnsw<T, D> {
+    /// The dump method for hnsw.  
+    /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
+    /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
     fn dump<W:Write>(&self, mode : DumpMode, graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
         // dump description , then PointIndexation
         let dumpmode : u8 = match mode {
@@ -648,6 +650,7 @@ fn test_dump_reload() {
     for i in 0..data.len() {
         hnsw.insert((&data[i], i));
     }
+    // some loggin info
     hnsw.dump_layer_info();
     // dump in a file
     let fname = String::from("dumpreloadtest");

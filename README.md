@@ -29,7 +29,8 @@ The crate provides:
 
 * Levenshtein distance on u16.
 
-* A structure to enable the user to implement its own distances. It takes as data, vectors of types T:Copy+Clone+Send+Sync.
+* A Trait to enable the user to implement its own distances.
+  It takes as data slices of types T satisfying T:Copy+Clone+Send+Sync. It is also possible to use C extern functions or closures.
 
 * An interface towards C and more specifically to the [Julia](https://julialang.org/) language.
 See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.jl) and the building paragraph for some help for Julia users.

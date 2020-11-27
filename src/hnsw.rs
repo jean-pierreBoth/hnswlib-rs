@@ -518,7 +518,9 @@ impl<'a,T:Clone+Copy+Send+Sync> IntoIterator for &'a PointIndexation<T> {
 
 // The fields are made pub(crate) to be able to initialize struct from hnswio
 /// The Base structure for hnsw implementation.  
-/// The main useful functions are : new, insert, insert_parallel, search and parallel_search.   
+/// The main useful functions are : new, insert, insert_parallel, search, parallel_search and file_dump
+/// as described in trait AnnT.  
+/// 
 /// Other functions are mainly for others crate to get access to some fields. 
 #[allow(dead_code)]
 pub struct Hnsw<T:Clone+Copy+Send+Sync+TypeName, D: Distance<T>+TypeName > {
@@ -729,8 +731,8 @@ impl <T:Clone+Copy+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<
 
 
     // Hnsw insert.   
-    ///  insert a data vector with its external id as given by the client.  
-    ///  The insertion method will give the point an internal id.
+    ///  Insert a data vector with its external id as given by the client.   
+    ///  The insertion method gives the point an internal id.
    pub fn insert(&self, data_with_id: (&Vec<T>,usize))  {
         //
         let (data , origin_id) = data_with_id;
@@ -828,8 +830,8 @@ impl <T:Clone+Copy+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<
     } // end of insert
 
 
-    /// insert in parallel a slice of Vec<T>. Uses Rayon.
-    /// The number of insertions asked for must be large enough to be efficient.
+    /// Insert in parallel a slice of Vec<T> each associated to its id.    
+    /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
     /// Typically 1000 * the number of threads.
     pub fn parallel_insert(&self, datas: &Vec<(&Vec<T>, usize)> ) {
         datas.par_iter().for_each( |&item| self.insert(item));
@@ -1000,6 +1002,7 @@ impl <T:Clone+Copy+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<
     } // end of select_neighbours
 
 
+    /// A utility to get printed info on how many points there are in each layer.
     pub fn dump_layer_info(&self) {
         self.layer_indexed_points.debug_dump();
     }

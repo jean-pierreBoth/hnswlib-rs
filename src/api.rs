@@ -48,7 +48,8 @@ impl <T,D> AnnT for Hnsw<T,D>  where T:Copy+Clone+Send+Sync+TypeName , D: Distan
    fn parallel_search_neighbours(&self, data: &Vec<Vec<Self::Val>>, knbn : usize, ef_s: usize) -> Vec<Vec<Neighbour>> {
        self.parallel_search(data, knbn, ef_s)
    }
-   /// 
+   /// The main entry point to do a dump.  
+   /// It will generate two files one for the graph part of the data. The other for the real data points of the structure.
    fn file_dump(&self, filename: &String) -> Result<i32, String> {
        let mut graphname = filename.clone();
         graphname.push_str(".hnsw.graph");
