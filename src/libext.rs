@@ -258,7 +258,6 @@ macro_rules! generate_loadhnsw(
     ($function_name:ident, $api_name:ty, $type_val:ty) => (
         #[no_mangle]
         pub extern "C" fn $function_name(flen : usize, name : *const u8)  -> *const $api_name {
-            let _res = env_logger::Builder::from_default_env().init();
             let  slice = unsafe { std::slice::from_raw_parts(name, flen)} ;
             let filename = String::from_utf8_lossy(slice).into_owned(); 
             //
@@ -294,7 +293,6 @@ generate_loadhnsw!(load_hnswdump_u8, HnswApiu8, u8);
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_f32(max_nb_conn : usize, ef_const:usize, namelen: usize,  cdistname : *const u8) -> *const HnswApif32 {
-    env_logger::Builder::from_default_env().init();
     log::info!("entering init_hnsw_f32");
     let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
     let dname = String::from_utf8_lossy(slice).into_owned();
@@ -775,4 +773,10 @@ fn make_readers(basename: &String) -> (BufReader<std::fs::File>, BufReader<std::
 }
 
 
+//============ log initialization ============//
 
+
+#[no_mangle]
+pub extern "C" fn init_rust_log() {
+    let _res = env_logger::Builder::from_default_env().try_init();
+}
