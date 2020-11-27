@@ -1,11 +1,9 @@
-#![allow(dead_code)]
-
-
 //! A rust implementation of Approximate NN search from:
 //! Efficient and robust approximate nearest neighbour search using Hierarchical Navigable
 //! small World graphs. 
 //! Yu. A. Malkov, D.A Yashunin 2016, 2018
 
+#![allow(dead_code)]
 
 use std::cmp::Ordering;
 
@@ -322,7 +320,7 @@ pub struct PointIndexation<T:Clone+Copy+Send+Sync> {
     pub(crate) max_nb_connection: usize, 
     ///
     pub(crate) max_layer: usize,
-    /// needs at least one representation of points. points_by_layers[i] gives the points in layer i
+    /// needs at least one representation of points. points_by_layers\[i\] gives the points in layer i
     pub(crate) points_by_layer: Arc<RwLock<Vec<Vec<Arc<Point<T>> >> >>,
     /// utility to generate a level
     pub(crate) layer_g: LayerGenerator,

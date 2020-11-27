@@ -48,13 +48,14 @@ enum DistKind {
 
 
 /// This is the basic Trait describing a distance. The structure Hnsw can be instantiated by anything
-/// satisfying this Trait. The crate provides for L1, L2 , Cosine, Jaccard, Hamming.
-/// For other distance the structure `struct DistFn<T:Copy+Clone+Sized+Send+Sync>`
-/// can use any closure satisfying the trait Fn(&[T], &[T]) -> f32>
+/// satisfying this Trait. The crate provides implmentations for L1, L2 , Cosine, Jaccard, Hamming.
+/// For other distances implement the trait possibly with the newtype pattern
 pub trait Distance<T:Send+Sync> {
     fn eval(&self, va:&[T], vb: &[T]) -> f32;
 }
 
+
+/// L1 distance : implemented for i32, f64, i64, u32 , u16 , u8 and with Simd avx2 for f32
 #[derive(TypeName, Default)]
 pub struct DistL1;
 
@@ -127,6 +128,7 @@ impl  Distance<f32> for DistL1 {
 }
 //========================================================================
 
+/// L2 distance : implemented for i32, f64, i64, u32 , u16 , u8 and with Simd avx2 for f32
 #[derive(TypeName, Default)]
 pub struct DistL2;
 
@@ -202,6 +204,7 @@ impl  Distance<f32> for DistL2 {
 
 //=========================================================================
 
+/// Cosine distance : implemented for f32, f64, i64, i32 , u16
 #[derive(TypeName, Default)]
 pub struct DistCosine;
 
@@ -242,7 +245,7 @@ implementCosDistance!(u16);
 
 /// This is essentially the Cosine distance but we suppose
 /// all vectors (graph construction and request vectors have been l2 normalized to unity
-/// BEFORE INSERTING in  HNSW!. 
+/// BEFORE INSERTING in  HNSW!.   
 /// No control is made, so it is the user responsability to send normalized vectors
 /// everywhere in inserting and searching.
 /// 
@@ -429,13 +432,13 @@ impl  Distance<f32> for  DistHellinger {
 /// A structure to compute Jeffreys divergence between probalilities.
 /// If p and q are 2 probability distributions
 /// the "distance" is computed as:
-///   sum (p[i] - q[i]) * ln(p[i]/q[i])
+///   sum (p\[i\] - q\[i\]) * ln(p\[i\]/q\[i\])
 /// 
-/// To take care of null probabilities in the formula we use  max(x[i],1.E-30) 
+/// To take care of null probabilities in the formula we use  max(x\[i\],1.E-30) 
 /// for x = p and q in the log compuations
 ///   
-/// Vector must be >= 0 and normalized to 1!
-/// The distance computation does not check that, 
+/// Vector must be >= 0 and normalized to 1!  
+/// The distance computation does not check that. 
 /// The user must enforce these conditions before inserting in the hnws structure, 
 /// otherwise results will be meaningless at best or code will panic!
 /// 
@@ -559,7 +562,7 @@ implementDistJensenShannon!(f32);
 
 //=======================================================================================
 
-
+/// Hamming distance. Implemented for u8, u16, u32, i32 and i16
 #[derive(TypeName, Default)]
 pub struct DistHamming;
 
@@ -582,12 +585,14 @@ macro_rules! implementHammingDistance (
 implementHammingDistance!(u8);
 implementHammingDistance!(u16);
 implementHammingDistance!(u32);
+implementHammingDistance!(i32);
+implementHammingDistance!(i16);
 
 
 //====================================================================================
 //   Jaccard Distance
 
-
+/// Jaccard distance. Implemented for u8, u16 , u32.
 #[derive(TypeName, Default)]
 pub struct DistJaccard;
 
@@ -622,7 +627,7 @@ implementJaccardDistance!(u8);
 implementJaccardDistance!(u16);
 implementJaccardDistance!(u32);
 
-
+/// Levenshtein distance. Implemented for u16
 #[derive(TypeName, Default)]
 pub struct DistLevenshtein;
 impl Distance<u16> for DistLevenshtein {
@@ -726,7 +731,6 @@ impl <T:Copy+Clone+Sized+Send+Sync> Distance<T> for DistCFFI<T>  {
 
 
 /// This structure is to let user define their own distance with closures.
-/// An example is given in tests.
 #[derive(TypeName)]
 pub struct DistFn<T:Copy+Clone+Sized+Send+Sync> {
     dist_function : Box<dyn Fn(&[T], &[T]) -> f32>,
