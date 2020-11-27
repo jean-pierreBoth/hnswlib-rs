@@ -8,7 +8,8 @@ use cpu_time::ProcessTime;
 
 // parallel mode
 //  max_nb_conn   ef_cons    ef_search   scale_factor    extend  keep pruned  recall        req/s      last ratio
-//     12           400         12           1              0          0        0.977        12566       1.005
+//     24           400         24           1              0          0        0.977        12566       1.001
+//     24           400         12           1              0          0        0.947        18425       1.003
 
 extern crate hnsw_rs;
 
