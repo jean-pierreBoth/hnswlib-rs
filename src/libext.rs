@@ -457,6 +457,11 @@ pub extern "C" fn init_hnsw_i32(max_nb_conn : usize, ef_const:usize, namelen: us
         let api = HnswApii32{opaque: Box::new(h)};
         return Box::into_raw(Box::new(api));        
     }
+    else if dname == "DistHamming" {
+        let h = Hnsw::<i32, DistHamming>::new(max_nb_conn, 10000, 16, ef_const, DistHamming{});
+        let api = HnswApii32{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));         
+    } 
     let p = ptr::null::< HnswApii32 >();
     p
 } // end of init_hnsw_i32
@@ -510,6 +515,12 @@ pub extern "C" fn init_hnsw_u32(max_nb_conn : usize, ef_const:usize, namelen: us
         let api = HnswApiu32{opaque: Box::new(h)};
         return Box::into_raw(Box::new(api));         
     }
+    else if dname == "DistHamming" {
+        let h = Hnsw::<u32, DistHamming>::new(max_nb_conn, 10000, 16, ef_const, DistHamming{});
+        let api = HnswApiu32{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));         
+    } 
+    //
     let p = ptr::null::< HnswApiu32 >();
     p
 } // end of init_hnsw_i32
@@ -775,7 +786,7 @@ fn make_readers(basename: &String) -> (BufReader<std::fs::File>, BufReader<std::
 
 //============ log initialization ============//
 
-
+/// to initialize rust logging from Julia
 #[no_mangle]
 pub extern "C" fn init_rust_log() {
     let _res = env_logger::Builder::from_default_env().try_init();
