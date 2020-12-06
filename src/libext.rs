@@ -8,6 +8,8 @@ use std::fs::OpenOptions;
 use std::io::{BufReader};
 use std::path::{PathBuf};
 
+use log;
+
 use crate::api::*;
 use crate::dist::*;
 use crate::hnsw::*;
@@ -255,7 +257,7 @@ macro_rules! generate_file_dump(
 
 #[allow(unused_macros)]
 macro_rules! generate_loadhnsw(
-    ($function_name:ident, $api_name:ty, $type_val:ty) => (
+    ($function_name:ident, $api_name:ty, $type_val:ty, $type_dist : ty) => (
         #[no_mangle]
         pub extern "C" fn $function_name(flen : usize, name : *const u8)  -> *const $api_name {
             let  slice = unsafe { std::slice::from_raw_parts(name, flen)} ;
@@ -267,7 +269,7 @@ macro_rules! generate_loadhnsw(
             // we need to call load_description first to get distance name
             let hnsw_description = load_description(&mut graph_in).unwrap();
                 // here we need a macro to dispatch 
-            let hnsw_loaded_res = load_hnsw::<$type_val, crate::mapdist_t!("DistL1")>(&mut graph_in, &hnsw_description, &mut data_in);
+            let hnsw_loaded_res = load_hnsw::<$type_val, $type_dist>(&mut graph_in, &hnsw_description, &mut data_in);
             if let Ok(hnsw_loaded) = hnsw_loaded_res {
                 let api = <$api_name>::new(Box::new(hnsw_loaded));
                 return Box::into_raw(Box::new(api));  
@@ -280,12 +282,38 @@ macro_rules! generate_loadhnsw(
      )
 );
 
+// here we must generate as many function as there are couples (type, distance) to be accessed from our needs in Julia
 
-generate_loadhnsw!(load_hnswdump_f32, HnswApif32, f32);
-generate_loadhnsw!(load_hnswdump_i32, HnswApii32, i32);
-generate_loadhnsw!(load_hnswdump_u32, HnswApiu32, u32);
-generate_loadhnsw!(load_hnswdump_u16, HnswApiu16, u16);
-generate_loadhnsw!(load_hnswdump_u8, HnswApiu8, u8);
+// f32
+generate_loadhnsw!(load_hnswdump_f32_DistL1, HnswApif32, f32, crate::dist::DistL1);
+generate_loadhnsw!(load_hnswdump_f32_DistL2, HnswApif32, f32, crate::dist::DistL2);
+generate_loadhnsw!(load_hnswdump_f32_DistCosine, HnswApif32, f32, crate::dist::DistCosine);
+generate_loadhnsw!(load_hnswdump_f32_DistDot, HnswApif32, f32, crate::dist::DistDot);
+generate_loadhnsw!(load_hnswdump_f32_DistJensenShannon, HnswApif32, f32, crate::dist::DistJensenShannon);
+generate_loadhnsw!(load_hnswdump_f32_DistJeffreys, HnswApif32, f32, crate::dist::DistJeffreys);
+
+// i32
+generate_loadhnsw!(load_hnswdump_i32_DistL1, HnswApii32, i32, crate::dist::DistL1);
+generate_loadhnsw!(load_hnswdump_i32_DistL2, HnswApii32, i32, crate::dist::DistL2);
+generate_loadhnsw!(load_hnswdump_i32_DistHamming, HnswApii32, i32, crate::dist::DistHamming);
+
+// u32
+generate_loadhnsw!(load_hnswdump_u32_DistL1, HnswApiu32, u32, crate::dist::DistL1);
+generate_loadhnsw!(load_hnswdump_u32_DistL2, HnswApiu32, u32, crate::dist::DistL2);
+generate_loadhnsw!(load_hnswdump_u32_DistHamming, HnswApiu32, u32, crate::dist::DistHamming);
+generate_loadhnsw!(load_hnswdump_u32_DistJaccard, HnswApiu32, u32, crate::dist::DistJaccard);
+
+// u16
+generate_loadhnsw!(load_hnswdump_u16_DistL1, HnswApiu16, u16, crate::dist::DistL1);
+generate_loadhnsw!(load_hnswdump_u16_DistL2, HnswApiu16, u16, crate::dist::DistL2);
+generate_loadhnsw!(load_hnswdump_u16_DistHamming, HnswApiu16, u16, crate::dist::DistHamming);
+generate_loadhnsw!(load_hnswdump_u16_DistLevenshtein, HnswApiu16, u16, crate::dist::DistLevenshtein);
+
+// u8
+generate_loadhnsw!(load_hnswdump_u8_DistL1, HnswApiu8, u8, crate::dist::DistL1);
+generate_loadhnsw!(load_hnswdump_u8_DistL2, HnswApiu8, u8, crate::dist::DistL2);
+generate_loadhnsw!(load_hnswdump_u8_DistHamming, HnswApiu8, u8, crate::dist::DistHamming);
+generate_loadhnsw!(load_hnswdump_u8_DistJaccard, HnswApiu8, u8, crate::dist::DistJaccard);
 
 //=============== implementation for i32
 
@@ -743,12 +771,14 @@ pub extern "C" fn load_hnsw_description(flen : usize, name : *const u8) -> *cons
                 return Box::into_raw(Box::new(ffi_description));
             }
             else {
+                log::error!("could not get descrption of hnsw from file {:?}", fpath.as_os_str());
                 println!("could not get descrption of hnsw from file {:?} ", fpath.as_os_str());
                 return ptr::null();
                 }
             },
         Err(_e) => {
-            println!("could not open file {:?}", fpath.as_os_str());
+            log::error!("load_hnsw_description: could not open file {:?}", fpath.as_os_str());
+            println!("load_hnsw_description: could not open file {:?}", fpath.as_os_str());
             return ptr::null();
         }
     }
@@ -763,8 +793,8 @@ fn make_readers(basename: &String) -> (BufReader<std::fs::File>, BufReader<std::
     let graphpath = PathBuf::from(graphfname);
     let graphfileres = OpenOptions::new().read(true).open(&graphpath);
     if graphfileres.is_err() {
-        println!("could not open file {:?}", graphpath.as_os_str());
-        panic!("could not open file".to_string());            
+        println!("make_readers : could not open file {:?}", graphpath.as_os_str());
+        panic!("make_readers : could not open file".to_string());            
     }
     let graphfile = graphfileres.unwrap();
     //  
@@ -773,8 +803,8 @@ fn make_readers(basename: &String) -> (BufReader<std::fs::File>, BufReader<std::
     let datapath = PathBuf::from(datafname);
     let datafileres = OpenOptions::new().read(true).open(&datapath);
     if datafileres.is_err() {
-        println!("could not open file {:?}", datapath.as_os_str());
-        panic!("could not open file".to_string());            
+        println!("make_readers: could not open file {:?}", datapath.as_os_str());
+        panic!("make_readers: could not open file".to_string());            
     }
     let datafile = datafileres.unwrap();
     //

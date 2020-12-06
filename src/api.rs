@@ -51,13 +51,16 @@ impl <T,D> AnnT for Hnsw<T,D>  where T:Copy+Clone+Send+Sync+TypeName , D: Distan
    /// The main entry point to do a dump.  
    /// It will generate two files one for the graph part of the data. The other for the real data points of the structure.
    fn file_dump(&self, filename: &String) -> Result<i32, String> {
-       let mut graphname = filename.clone();
+        log::debug!("\n in file_dump : {:?}", filename);
+        //
+        let mut graphname = filename.clone();
         graphname.push_str(".hnsw.graph");
         let graphpath = PathBuf::from(graphname);
         let fileres = OpenOptions::new().write(true).create(true).truncate(true).open(&graphpath);
         if fileres.is_err() {
-            println!("could not open file {:?}", graphpath.as_os_str());
-            return Err("could not open file".to_string());            
+            log::error!("api::file_dump could not open file {:?}", graphpath.as_os_str());
+            println!("api::file_dump: could not open file {:?}", graphpath.as_os_str());
+            return Err("api::file_dump could not open file".to_string());            
         }
         let graphfile = fileres.unwrap();
         //
@@ -66,8 +69,8 @@ impl <T,D> AnnT for Hnsw<T,D>  where T:Copy+Clone+Send+Sync+TypeName , D: Distan
         let datapath = PathBuf::from(dataname);
         let fileres = OpenOptions::new().write(true).create(true).truncate(true).open(&datapath);
         if fileres.is_err() {
-            println!("could not open file {:?}", datapath.as_os_str());
-            return Err("could not open file".to_string());            
+            println!("api::file_dumpcould not open file {:?}", datapath.as_os_str());
+            return Err("api::file_dump could not open file".to_string());            
         }
         let datafile = fileres.unwrap();
         let mut graphbufw = BufWriter::with_capacity(10000000 , graphfile);
@@ -92,37 +95,12 @@ macro_rules! mapdist_t(
     ("DistJaccard")  => (crate::dist::DistJaccard);
     ("DistPtr")      => (crate::dist::DistPtr);
     ("DistLevenshtein") => (crate::dist::DistLevenshtein);
-);
-
-
-#[macro_export]
-macro_rules! mapdist_c(
-    ("DistL1")  => (crate::dist::DistL1{});
-);
-
-
-#[macro_export]
-macro_rules! genhnsw(
-    ($val:ty, $dist:tt, $max_nb_conn:tt, $ef_const:tt) => (
-        Hnsw::<$val, mapdist_t!($dist) >::new($max_nb_conn, 10000, 16, $ef_const, mapdist_c!($dist))
-    )
+    ("DistJensenShannon") => (crate::dist::DistJensenShannon);
+    ("DistHellinger") => (crate::dist::DistJensenShannon);
 );
 
 
 
 
 
-//////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(test)]
-mod tests {
-
-use super::*;
-
-
-#[test]
-    fn test_genhnsw() {
-        let h = genhnsw!(f32, "DistL1", 24, 48);
-        println!("test constructed Hnsw with distance : {:?} ", h.get_distance_name());
-    }
-} // end of module test

@@ -25,7 +25,8 @@ use std::mem;
 use parking_lot::{RwLock};
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::path::{PathBuf};
+#[allow(unused_imports)]
+use std::path::PathBuf;
 
 use typename::TypeName;
 
@@ -573,17 +574,19 @@ pub fn load_hnsw<T:Copy+Clone+Sized+Send+Sync+TypeName, D:Distance<T>+TypeName+D
     let distname = description.distname.clone();
     // We must ensure that the distance stored matches the one asked for in loading hnsw
     // for that we check for short names equality stripping 
-    log::debug!("distance = {:?}", distname);
+    log::debug!("distance asked= {:?}", distname);
     let d_type_name = D::type_name();
     let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
     for s in v {
-        log::debug!(" distname part {:?}", s);
+        log::info!(" distname in dump part {:?}", s);
     }
     if d_type_name != distname {
         let mut errmsg = String::from("error in distances : dumped distance is : ");
         errmsg.push_str(&distname);
         errmsg.push_str(" asked distance in loading is : ");
         errmsg.push_str(&d_type_name);
+        log::error!(" distance in dump file : {:?}", d_type_name);
+        log::error!("error , dump is not for distance = {:?}", distname);
         return Err(io::Error::new(io::ErrorKind::Other, errmsg));
     }
     let t_type = description.t_name.clone();
@@ -665,8 +668,8 @@ fn test_dump_reload() {
     let graphpath = PathBuf::from(graphfname);
     let graphfileres = OpenOptions::new().read(true).open(&graphpath);
     if graphfileres.is_err() {
-        println!("could not open file {:?}", graphpath.as_os_str());
-        panic!("could not open file".to_string());            
+        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
+        panic!("test_dump_reload: could not open file".to_string());            
     }
     let graphfile = graphfileres.unwrap();
     //  
@@ -674,8 +677,8 @@ fn test_dump_reload() {
     let datapath = PathBuf::from(datafname);
     let datafileres = OpenOptions::new().read(true).open(&datapath);
     if datafileres.is_err() {
-        println!("could not open file {:?}", datapath.as_os_str());
-        panic!("could not open file".to_string());            
+        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
+        panic!("test_dump_reload : could not open file".to_string());            
     }
     let datafile = datafileres.unwrap();
     //
