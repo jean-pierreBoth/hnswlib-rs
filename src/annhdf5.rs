@@ -2,6 +2,7 @@
 //! This file provides hdf5 utilities to load ann-benchmarks hdf5 data files
 
 use ndarray::{Array2};
+
 use ::hdf5::*;
 
 

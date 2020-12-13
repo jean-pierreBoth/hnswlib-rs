@@ -582,10 +582,59 @@ macro_rules! implementHammingDistance (
 );
 
 
+
+#[target_feature(enable = "avx2")]
+unsafe fn distance_hamming_i32_avx2(va:&[i32], vb: &[i32]) -> f32 {
+    distance_hamming_i32::<Avx2>(va,vb)
+}
+
+
+unsafe fn distance_hamming_i32<S: Simd> (va:&[i32], vb: &[i32]) -> f32 {
+    let mut dist_simd = S::setzero_epi32();
+    //
+    let nb_simd = va.len() / S::VI32_WIDTH;
+    let simd_length = nb_simd * S::VI32_WIDTH;
+    let mut i = 0;
+    while i < simd_length {
+        let a = S::loadu_epi32(&va[i]);
+        let b = S::loadu_epi32(&vb[i]);
+        let delta = S::cmpneq_epi32(a,b);
+        dist_simd = S::add_epi32(dist_simd, delta);
+        //
+        i += S::VI32_WIDTH;
+    }
+    // get the sum of value in dist
+    let mut simd_res : Vec::<i32> = (0..S::VI32_WIDTH).into_iter().map(|_| 0).collect();
+    S::storeu_epi32(&mut simd_res[0] , dist_simd);
+    let mut dist : i32  = simd_res.into_iter().sum();
+    // Beccause simd returns 0xFFFF... when neq true and 0 else
+    dist = -dist;
+    // add the residue
+    for i in simd_length..va.len() {
+        dist = dist + if va[i] != vb[i] { 1 } else {0};
+    }
+    return dist as f32;
+}  // end of distance_hamming_i32
+
+
+
+impl  Distance<i32> for  DistHamming {
+    fn eval(&self, va:&[i32], vb: &[i32]) -> f32 {
+        //
+        if is_x86_feature_detected!("avx2") {
+            unsafe { distance_hamming_i32_avx2(va,vb) }
+        }
+        else {
+            let dist : f32 = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count() as f32;
+            dist
+         }
+    }
+} // end implementation Distance<i32>
+
+// i32 is implmeented by simd
 implementHammingDistance!(u8);
 implementHammingDistance!(u16);
 implementHammingDistance!(u32);
-implementHammingDistance!(i32);
 implementHammingDistance!(i16);
 
 
@@ -626,6 +675,10 @@ macro_rules! implementJaccardDistance (
 implementJaccardDistance!(u8);
 implementJaccardDistance!(u16);
 implementJaccardDistance!(u32);
+
+
+// ==========================================================================================
+
 
 /// Levenshtein distance. Implemented for u16
 #[derive(TypeName, Default)]
@@ -1017,6 +1070,34 @@ fn test_jensenshannon() {
     log::info!("dist eval {:?} ", dist_eval);
     println!("dist eval  {:?} ", dist_eval);
 }
+
+
+use rand::distributions::{Distribution, Uniform};
+
+#[test]
+fn test_simd_hamming_i32() {
+
+    let size_test = 500;
+    let imax = 3;
+    let mut rng = rand::thread_rng();
+    for i in 4..size_test {
+        // generer 2 va et vb s des vecteurs<i32> de taille i  avec des valeurs entre -imax et + imax et controler les resultat
+        let between = Uniform::<i32>::from(-imax..imax);
+        let va : Vec<i32> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
+        let vb : Vec<i32> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
+        let simd_dist = unsafe {distance_hamming_i32::<Avx2>(&va, &vb)} as u32;
+
+        let easy_dist : u32 = va.iter().zip(vb.iter()).map( |(a,b)| if a!=b { 1} else {0}).sum();
+        println!("test size {:?} simd  exact = {:?} {:?}", i, simd_dist, easy_dist);
+        if easy_dist != simd_dist {
+            println!(" jsimd = {:?} , jexact = {:?}", simd_dist, easy_dist);
+            println!("va = {:?}" , va);
+            println!("vb = {:?}" , vb);
+            std::process::exit(1);
+        }
+    }
+}  // end of test test_simd_jaccard_i32
+
 
 
 } // end of module tests

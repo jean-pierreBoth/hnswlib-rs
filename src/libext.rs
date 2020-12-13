@@ -192,7 +192,7 @@ macro_rules! generate_search_neighbours(
 macro_rules! generate_parallel_search_neighbours(
 ($function_name:ident, $api_name:ty, $type_val:ty) => (
         #[no_mangle]
-        /// search nb_vec of size vzc_len. The the searches will be done in // as far as possible.
+        /// search nb_vec of size vec_len. The the searches will be done in // as far as possible.
         pub extern "C" fn $function_name(hnsw_api : *const $api_name, nb_vec : usize, vec_len :i64, 
                             data : *mut *const $type_val, knbn : usize, ef_search : usize) ->  *const Vec_api<Neighbourhood_api> {
             //

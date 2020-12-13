@@ -41,9 +41,9 @@ See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.j
 
 ## Implementation
 
-The graph construction and searches are multithreaded with the **parking_lot** crate (See **parallel_insert_data** and **parallel_search_neighbours** functions and also examples files).
-For the heavily used case (f32) we provide simd avx2 implementation in distance computations
-currently based on the **simdeez** crate.
+The graph construction and searches are multithreaded with the **parking_lot** crate (See **parallel_insert_data** and **parallel_search_neighbours** functions and also examples files).  
+Simd Avx2 implementation, currently based on the **simdeez** crate, is provided for most distances in the **f32** heavily used case 
+and for the Hamming distance for **i32**.
 
 ## Building
 

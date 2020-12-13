@@ -124,7 +124,7 @@ impl Neighbour {
 // neighbours table : one vector by layer so neighbours is allocated to NB_LAYER_MAX
 //
 #[derive(Debug, Clone)]
-pub struct Point<T:Copy+Clone+Send+Sync> {
+pub struct Point<T:Clone+Send+Sync> {
     /// The data of this point, coming from hnsw client and associated to origin_id,
     v: Vec<T>,
    /// an id coming from client using hnsw
@@ -135,7 +135,7 @@ pub struct Point<T:Copy+Clone+Send+Sync> {
     pub(crate) neighbours:Arc<RwLock<Vec<Vec<Arc<PointWithOrder<T>> >> >>,
 }
 
-impl<T:Copy+Clone+Send+Sync> Point<T> {
+impl<T:Clone+Send+Sync> Point<T> {
     pub fn new(v: &Vec<T>, origin_id: usize, p_id:PointId) -> Self {
         let mut neighbours = Vec::with_capacity(NB_LAYER_MAX as usize);
         // CAVEAT, perhaps pass nb layer as arg ?
@@ -205,7 +205,7 @@ impl<T:Copy+Clone+Send+Sync> Point<T> {
 
 /// A structure to store neighbours for of a point.
 #[derive(Debug, Clone)]
-pub(crate) struct  PointWithOrder<T:Copy+Clone+Send+Sync> {
+pub(crate) struct  PointWithOrder<T:Clone+Send+Sync> {
     /// the identificateur of the point for which we store a distance to a point for which 
     ///  we made a request.
     point_ref: Arc<Point<T>>,
@@ -215,7 +215,7 @@ pub(crate) struct  PointWithOrder<T:Copy+Clone+Send+Sync> {
 
 
 
-impl <T:Copy+Clone+Send+Sync> PartialEq for PointWithOrder<T> {
+impl <T:Clone+Send+Sync> PartialEq for PointWithOrder<T> {
     fn eq(&self, other: &PointWithOrder<T>) -> bool {
         return self.dist_to_ref == other.dist_to_ref
     } // end eq
@@ -223,11 +223,11 @@ impl <T:Copy+Clone+Send+Sync> PartialEq for PointWithOrder<T> {
 
 
 
-impl <T:Copy+Clone+Send+Sync> Eq for PointWithOrder<T> {}
+impl <T:Clone+Send+Sync> Eq for PointWithOrder<T> {}
 
 
 // order points by distance to self.
-impl <T:Copy+Clone+Send+Sync> PartialOrd for PointWithOrder<T> {
+impl <T:Clone+Send+Sync> PartialOrd for PointWithOrder<T> {
     fn partial_cmp(&self, other: &PointWithOrder<T>) -> Option<Ordering> {
         self.dist_to_ref.partial_cmp(& other.dist_to_ref)
     } // end cmp
@@ -235,7 +235,7 @@ impl <T:Copy+Clone+Send+Sync> PartialOrd for PointWithOrder<T> {
 
 
 
-impl <T:Copy+Clone+Send+Sync> Ord for PointWithOrder<T> {
+impl <T:Clone+Send+Sync> Ord for PointWithOrder<T> {
     fn cmp(&self, other: &PointWithOrder<T>) -> Ordering {
         if !self.dist_to_ref.is_nan() && !other.dist_to_ref.is_nan() {
             self.dist_to_ref.partial_cmp(& other.dist_to_ref).unwrap()
@@ -247,7 +247,7 @@ impl <T:Copy+Clone+Send+Sync> Ord for PointWithOrder<T> {
 }
 
 
-impl <T:Copy+Clone+Send+Sync> PointWithOrder<T> {
+impl <T:Clone+Send+Sync> PointWithOrder<T> {
     pub fn new(point_ref: &Arc<Point<T>>, dist_to_ref:f32) -> Self {
         PointWithOrder{point_ref: Arc::clone(point_ref),
             dist_to_ref,
@@ -315,7 +315,7 @@ impl LayerGenerator {
 // ====================================================================
 
 /// a structure for indexation of points in layer
-pub struct PointIndexation<T:Clone+Copy+Send+Sync> {
+pub struct PointIndexation<T:Clone+Send+Sync> {
     /// max number of connection for a point at a layer
     pub(crate) max_nb_connection: usize, 
     ///
@@ -331,7 +331,7 @@ pub struct PointIndexation<T:Clone+Copy+Send+Sync> {
 }
 
 
-impl<T:Clone+Copy+Send+Sync> PointIndexation<T> {
+impl<T:Clone+Send+Sync> PointIndexation<T> {
     pub fn new(max_nb_connection: usize, max_layer:usize, max_elements:usize) -> Self {
         let mut points_by_layer = Vec::with_capacity(max_layer);
         for i in 0..max_layer { // recall that range are right extremeity excluded 
@@ -449,13 +449,13 @@ impl<T:Clone+Copy+Send+Sync> PointIndexation<T> {
 /// an iterator on points stored.
 /// The iteration begins at level 0 (most populated level) and goes upward in levels.
 /// Must not be used during parallel insertion.
-pub struct IterPoint<'a,T:Clone+Copy+Send+Sync> {
+pub struct IterPoint<'a,T:Clone+Send+Sync> {
     point_indexation : &'a PointIndexation<T>,
     layer:i64,
     slot_in_layer:i64,
 }
 
-impl <'a, T:Clone+Copy+Send+Sync> IterPoint<'a,T>{
+impl <'a, T:Clone+Send+Sync> IterPoint<'a,T>{
     pub fn new(point_indexation : &'a PointIndexation<T>) -> Self {
         IterPoint{ point_indexation, layer:-1, slot_in_layer : -1 }
     }
@@ -463,7 +463,7 @@ impl <'a, T:Clone+Copy+Send+Sync> IterPoint<'a,T>{
 
 
 /// iterator for layer 0 to upper layer.
-impl <'a,T:Clone+Copy+Send+Sync> Iterator for IterPoint<'a,T> {
+impl <'a,T:Clone+Send+Sync> Iterator for IterPoint<'a,T> {
     type Item = Arc<Point<T>>;
     //
     fn next(&mut self) -> Option<Self::Item>{
@@ -503,7 +503,7 @@ impl <'a,T:Clone+Copy+Send+Sync> Iterator for IterPoint<'a,T> {
 } // end of impl Iterator
 
 
-impl<'a,T:Clone+Copy+Send+Sync> IntoIterator for &'a PointIndexation<T> {
+impl<'a,T:Clone+Send+Sync> IntoIterator for &'a PointIndexation<T> {
     type Item = Arc<Point<T>>;
     type IntoIter = IterPoint<'a,T>;
     //
@@ -523,7 +523,7 @@ impl<'a,T:Clone+Copy+Send+Sync> IntoIterator for &'a PointIndexation<T> {
 /// 
 /// Other functions are mainly for others crate to get access to some fields. 
 #[allow(dead_code)]
-pub struct Hnsw<T:Clone+Copy+Send+Sync+TypeName, D: Distance<T>+TypeName > {
+pub struct Hnsw<T:Clone+Send+Sync+TypeName, D: Distance<T>+TypeName > {
     /// asked number of candidates in search
     pub(crate) ef_construction : usize,
     /// maximum number of connection by layer for a point
@@ -547,7 +547,7 @@ pub struct Hnsw<T:Clone+Copy+Send+Sync+TypeName, D: Distance<T>+TypeName > {
 }  // end of Hnsw
 
 
-impl <T:Clone+Copy+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<T,D>  {
+impl <T:Clone+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<T,D>  {
     /// allocation function  
     /// . max_nb_connection : number of neighbours stored in tables.  
     /// . ef_construction : controls numbers of neighbours explored during construction. See README or paper.  
@@ -1165,7 +1165,7 @@ fn from_negative_binaryheap_to_sorted_vector<T:Send+Sync+Copy>(heap_points : &mu
 // This function takes a binary heap with points declared with a positive distance
 // and returns a binary_heap of points with their correct negative distance to some reference distance
 // 
-fn from_positive_binaryheap_to_negative_binary_heap<T:Send+Sync+Copy>(positive_heap : &mut BinaryHeap<Arc<PointWithOrder<T> >> ) -> BinaryHeap<Arc<PointWithOrder<T> > > {
+fn from_positive_binaryheap_to_negative_binary_heap<T:Send+Sync+Clone>(positive_heap : &mut BinaryHeap<Arc<PointWithOrder<T> >> ) -> BinaryHeap<Arc<PointWithOrder<T> > > {
     let nb_points = positive_heap.len();
     let mut negative_heap = BinaryHeap::<Arc<PointWithOrder<T> >>::with_capacity(nb_points);
     //  

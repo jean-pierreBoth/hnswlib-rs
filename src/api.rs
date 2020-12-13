@@ -31,7 +31,7 @@ pub trait AnnT {
  }
 
 
-impl <T,D> AnnT for Hnsw<T,D>  where T:Copy+Clone+Send+Sync+TypeName , D: Distance<T>+TypeName+Send+Sync {
+impl <T,D> AnnT for Hnsw<T,D>  where T:Clone+Send+Sync+TypeName , D: Distance<T>+TypeName+Send+Sync {
     type Val= T;
     ///
     fn insert_data(&mut self, data: &Vec<Self::Val>, id: usize) {

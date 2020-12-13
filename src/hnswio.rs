@@ -215,7 +215,7 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     ///  2. origin_id as a u64
     ///  3. The vector of data (the length is known from Description)
     
-fn dump_point<T:Copy+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpMode, 
+fn dump_point<T:Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpMode, 
                     graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
     //
     graphout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICPOINT) } ).unwrap();
@@ -370,7 +370,7 @@ fn dump_point_data<T:Copy+Clone+Send+Sync, W:Write>(point : &Point<T>, out : &mu
 // . list of point of layer
 // dump entry point
 // 
-impl <T:Copy+Clone+Send+Sync> HnswIO for PointIndexation<T> {
+impl <T:Clone+Send+Sync> HnswIO for PointIndexation<T> {
     fn dump<W:Write>(&self, mode : DumpMode, graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
         // dump max_layer
         let layers = self.points_by_layer.read();
@@ -513,7 +513,7 @@ fn load_point_indexation<T:Copy+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read,
 //
 //
 
-impl <T:Copy+Clone+Sized+Send+Sync+TypeName, D: Distance<T>+TypeName+Send+Sync> HnswIO for Hnsw<T, D> {
+impl <T:Clone+Sized+Send+Sync+TypeName, D: Distance<T>+TypeName+Send+Sync> HnswIO for Hnsw<T, D> {
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
     /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
@@ -551,8 +551,8 @@ impl <T:Copy+Clone+Sized+Send+Sync+TypeName, D: Distance<T>+TypeName+Send+Sync> 
 
 /// The reload is made in two steps.
 /// First a call to load_description must be used to get basic information
-/// about structure to reload (Typename, distance type, construction parameters).
-/// Cf ```fn load_description(io_in: &mut dyn Read) -> io::Result<Description>```
+/// about structure to reload (Typename, distance type, construction parameters).  
+/// Cf fn load_description(io_in: &mut dyn Read) -> io::Result<Description>
 ///
 pub fn load_hnsw<T:Copy+Clone+Sized+Send+Sync+TypeName, D:Distance<T>+TypeName+Default+Send+Sync>(graph_in: &mut dyn Read, 
                                             description: &Description, 
