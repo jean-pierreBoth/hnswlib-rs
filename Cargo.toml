@@ -1,13 +1,13 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
 readme = "README.md"
 keywords = ["algorithms", "ann", "hnsw"]
 repository = "https://github.com/jean-pierreBoth/hnswlib-rs"
-documentation = "https://docs.rs"
+documentation = "https://docs.rs/hnsw_rs"
 edition= "2018"
 
 [features]
@@ -23,27 +23,26 @@ opt-level = 3
 [lib]
 # cargo rustc --lib -- --crate-type dylib [or staticlib] or rlib (default)
 # if we want to avoid specifying in advance crate-type 
-lib = "hnswlib"
 path = "src/lib.rs"
 #crate-type = ["cdylib"]
 
 
-[[examples]]
+[[example]]
 name = "random"
 path = "examples/random.rs"
 
-[[examples]]
+[[example]]
 name = "ann-glove"
 path = "examples/ann-glove25-angular.rs"
 
 
 
-[[examples]]
+[[example]]
 name = "ann-mnist"
 path = "examples/ann-mnist-784-euclidean.rs"
 
 
-[[examples]]
+[[example]]
 name = "levenshtein"
 path = "examples/levensthein.rs"
 
@@ -78,8 +77,9 @@ rand = {version = "0.7"}
 lazy_static = { version = "1.4"}
 typename = {version = "0.1"}
 # for benchmark reading
-hdf5 = {version="0.7", doc = false}
+hdf5 = {version="0.7"}
 # decreasing order of log for debug build : (max_level_)trace debug info warn error off
 # decreasing order of log for release build (release_max_level_)  .. idem
-log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
+#log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
+log = { version = "0.4"}
 env_logger = { version = "0.7"}
