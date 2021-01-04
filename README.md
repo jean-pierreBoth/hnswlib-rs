@@ -30,7 +30,7 @@ The crate provides:
 * Levenshtein distance on u16.
 
 * A Trait to enable the user to implement its own distances.
-  It takes as data slices of types T satisfying T:Copy+Clone+Send+Sync. It is also possible to use C extern functions or closures.
+  It takes as data slices of types T satisfying T:Clone+Send+Sync. It is also possible to use C extern functions or closures.
 
 * An interface towards C and more specifically to the [Julia](https://julialang.org/) language.
 See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.jl) and the building paragraph for some help for Julia users.
@@ -42,8 +42,7 @@ See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.j
 ## Implementation
 
 The graph construction and searches are multithreaded with the **parking_lot** crate (See **parallel_insert_data** and **parallel_search_neighbours** functions and also examples files).  
-Simd Avx2 implementation, currently based on the **simdeez** crate, is provided for most distances in the **f32** heavily used case 
-and for the Hamming distance for **i32**.
+Simd Avx2 implementation, currently based on the **simdeez** crate, is provided for most distances in the **f32** heavily used case and for the Hamming distance for **i32**.
 
 ## Building
 
