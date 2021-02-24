@@ -2,7 +2,6 @@ use std::time::{Duration, SystemTime};
 use cpu_time::ProcessTime;
 
 
-use typename::TypeName;
 
 
 //    glove 25 // 2.7 Ghz 4 cores 8Mb L3  k = 10
@@ -94,7 +93,7 @@ pub fn main() {
 
 
 pub fn search<Dist>(hnsw: &mut Hnsw<f32, Dist>, knbn : usize, ef_search: usize, anndata : & AnnBenchmarkData) 
-     where Dist : Distance<f32> + Send + Sync + TypeName {
+     where Dist : Distance<f32> + Send + Sync {
 
     println!("\n\n ef_search : {:?} knbn : {:?} ",  ef_search, knbn);
     let parallel = true;

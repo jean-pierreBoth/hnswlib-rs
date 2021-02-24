@@ -7,7 +7,6 @@ use std::fs::OpenOptions;
 use std::io::{BufWriter};
 use std::path::{PathBuf};
 
-use typename::TypeName;
 
 use crate::hnsw::*;
 use crate::hnswio::*;
@@ -31,7 +30,7 @@ pub trait AnnT {
  }
 
 
-impl <T,D> AnnT for Hnsw<T,D>  where T:Clone+Send+Sync+TypeName , D: Distance<T>+TypeName+Send+Sync {
+impl <T,D> AnnT for Hnsw<T,D>  where T:Clone+Send+Sync, D: Distance<T>+Send+Sync {
     type Val= T;
     ///
     fn insert_data(&mut self, data: &Vec<Self::Val>, id: usize) {

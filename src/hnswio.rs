@@ -28,7 +28,7 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use std::path::PathBuf;
 
-use typename::TypeName;
+use std::any::{type_name};
 
 use std::io::prelude::*;
 use crate::hnsw;
@@ -513,7 +513,7 @@ fn load_point_indexation<T:Copy+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read,
 //
 //
 
-impl <T:Clone+Sized+Send+Sync+TypeName, D: Distance<T>+TypeName+Send+Sync> HnswIO for Hnsw<T, D> {
+impl <T:Clone+Sized+Send+Sync, D: Distance<T>+Send+Sync> HnswIO for Hnsw<T, D> {
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
     /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
@@ -534,9 +534,9 @@ impl <T:Clone+Sized+Send+Sync+TypeName, D: Distance<T>+TypeName+Send+Sync> HnswI
             nb_point: self.get_nb_point(),
             dimension : datadim,
             distname : self.get_distance_name(),
-            t_name: T::type_name(),
+            t_name: type_name::<T>().to_string(),
         };
-        log::debug!("dump  obtained typename {:?}", T::type_name());
+        log::debug!("dump  obtained typename {:?}", type_name::<T>());
         description.dump(mode, graphout)?;
         // We must dump a header for dataout.
         dataout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICDATAP) } ).unwrap();
@@ -554,7 +554,7 @@ impl <T:Clone+Sized+Send+Sync+TypeName, D: Distance<T>+TypeName+Send+Sync> HnswI
 /// about structure to reload (Typename, distance type, construction parameters).  
 /// Cf fn load_description(io_in: &mut dyn Read) -> io::Result<Description>
 ///
-pub fn load_hnsw<T:Copy+Clone+Sized+Send+Sync+TypeName, D:Distance<T>+TypeName+Default+Send+Sync>(graph_in: &mut dyn Read, 
+pub fn load_hnsw<T:Copy+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(graph_in: &mut dyn Read, 
                                             description: &Description, 
                                             data_in : &mut dyn Read) -> io::Result<Hnsw<T,D> > {
     //  In datafile , we must read MAGICDATAP and dimension and check
@@ -575,7 +575,7 @@ pub fn load_hnsw<T:Copy+Clone+Sized+Send+Sync+TypeName, D:Distance<T>+TypeName+D
     // We must ensure that the distance stored matches the one asked for in loading hnsw
     // for that we check for short names equality stripping 
     log::debug!("distance asked= {:?}", distname);
-    let d_type_name = D::type_name();
+    let d_type_name = type_name::<D>().to_string();
     let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
     for s in v {
         log::info!(" distname in dump part {:?}", s);

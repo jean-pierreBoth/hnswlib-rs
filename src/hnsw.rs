@@ -12,7 +12,7 @@ use std::sync::Arc;
 use rayon::prelude::*;
 use std::sync::mpsc::channel;
 
-use typename::TypeName;
+use std::any::{type_name};
 
 use hashbrown::HashMap;
 use std::collections::binary_heap::BinaryHeap;
@@ -523,7 +523,7 @@ impl<'a,T:Clone+Send+Sync> IntoIterator for &'a PointIndexation<T> {
 /// 
 /// Other functions are mainly for others crate to get access to some fields. 
 #[allow(dead_code)]
-pub struct Hnsw<T:Clone+Send+Sync+TypeName, D: Distance<T>+TypeName > {
+pub struct Hnsw<T:Clone+Send+Sync, D: Distance<T>> {
     /// asked number of candidates in search
     pub(crate) ef_construction : usize,
     /// maximum number of connection by layer for a point
@@ -547,7 +547,7 @@ pub struct Hnsw<T:Clone+Send+Sync+TypeName, D: Distance<T>+TypeName > {
 }  // end of Hnsw
 
 
-impl <T:Clone+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<T,D>  {
+impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     /// allocation function  
     /// . max_nb_connection : number of neighbours stored in tables.  
     /// . ef_construction : controls numbers of neighbours explored during construction. See README or paper.  
@@ -562,7 +562,7 @@ impl <T:Clone+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<T,D> 
         log::info!("Hnsw max_nb_connection {:?}", max_nb_connection);
         log::info!("Hnsw nb elements {:?}", max_elements);
         log::info!("Hnsw ef_construction {:?}", ef_construction);
-        log::info!("Hnsw distance {:?}", f.type_name_of());
+        log::info!("Hnsw distance {:?}", type_name::<D>());
         log::info!("Hnsw extend candidates {:?}", extend_candidates);
         //
         Hnsw{max_nb_connection,
@@ -606,7 +606,7 @@ impl <T:Clone+Send+Sync+TypeName, D: Distance<T>+Send+Sync+TypeName > Hnsw<T,D> 
     }
     /// get name if distance
     pub fn get_distance_name(&self) -> String {
-        D::type_name().to_string()
+        type_name::<D>().to_string()
     }
     /// set the flag asking to keep pruned vectors by Navarro's heuristic (see Paper).
     pub fn set_keeping_pruned(&mut self, flag: bool) {
@@ -1183,7 +1183,7 @@ fn from_positive_binaryheap_to_negative_binary_heap<T:Send+Sync+Clone>(positive_
 // essentialy to check dump/reload conssistency
 
 pub(crate) fn check_equality<T, D>(hnsw1:&Hnsw<T,D>, hnsw2: &Hnsw<T,D>)
-    where T:Copy+Clone+Send+Sync+TypeName, D:Distance<T>+TypeName+Default+Send+Sync {
+    where T:Copy+Clone+Send+Sync, D:Distance<T>+Default+Send+Sync {
     //
     log::debug!("\n in check_equality");
     //

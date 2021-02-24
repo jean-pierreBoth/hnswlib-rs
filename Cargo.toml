@@ -59,7 +59,7 @@ serde_derive={ version = "1.0"}
 
 # for //
 parking_lot = "0.11"
-rayon = {version = "0.9.0"}
+rayon = {version = "1.5"}
 num_cpus = {version = "1.8.0"}
 simdeez = {version = "1.0"}
 
@@ -73,13 +73,12 @@ clap = {version = "2.29"}
 hashbrown = {version = "0.9"}
 skiplist= {version = "0.3"}
 
-rand = {version = "0.7"}
+rand = {version = "0.8"}
 lazy_static = { version = "1.4"}
-typename = {version = "0.1"}
 # for benchmark reading
 hdf5 = {version="0.7"}
 # decreasing order of log for debug build : (max_level_)trace debug info warn error off
 # decreasing order of log for release build (release_max_level_)  .. idem
 #log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 log = { version = "0.4"}
-env_logger = { version = "0.7"}
+env_logger = { version = "0.8"}
