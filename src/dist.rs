@@ -27,6 +27,9 @@ use simdeez::*;
 
 use std::os::raw::*;
 
+
+
+
 enum DistKind {
     DistL1(String),
     DistL2(String),
@@ -40,7 +43,9 @@ enum DistKind {
     DistJensenShannon(String),
     /// To store a distance defined by a C pointer function
     DistPtr(String),
-    DistLevenshtein(String)
+    DistLevenshtein(String),
+    /// used only with reloading only graph data from a previous dump
+    DistNoDist(String)
 }
 
 
@@ -50,6 +55,23 @@ enum DistKind {
 pub trait Distance<T:Send+Sync> {
     fn eval(&self, va:&[T], vb: &[T]) -> f32;
 }
+
+
+/// Special forbidden computation distance. It is associated to a unit NoData structure
+/// This is a special structure used when we want to only reload the graph from a previous computation
+/// possibly from an foreign language (and we do not have access to the type of data in the foreign language).
+#[derive(Default)]
+pub struct NoDist;
+
+impl <T:Send+Sync> Distance<T> for NoDist {
+    fn eval(&self, _va:&[T], _vb:&[T]) -> f32 {
+        log::error!("panic error : cannot call eval on NoDist");
+        panic!("cannot call distance with NoDist");
+    }
+} // end impl block for NoDist
+
+
+
 
 
 /// L1 distance : implemented for i32, f64, i64, u32 , u16 , u8 and with Simd avx2 for f32
@@ -101,7 +123,7 @@ unsafe fn distance_l1_f32<S: Simd> (va:&[f32], vb: &[f32]) -> f32 {
 }  // end of distance_l1_f32
 
 
- #[target_feature(enable = "avx2")]
+#[target_feature(enable = "avx2")]
 unsafe fn distance_l1_f32_avx2(va:&[f32], vb: &[f32]) -> f32 {
     distance_l1_f32::<Avx2>(va,vb)
 }

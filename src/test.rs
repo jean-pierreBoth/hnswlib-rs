@@ -10,6 +10,8 @@ use rand::prelude::*;
 use ndarray::*;
 use skiplist::OrderedSkipList;
 
+use serde::{Serialize, de::DeserializeOwned};
+
 use crate::hnsw;
 
 #[allow(unused_imports)]    // necessary for rls
@@ -63,7 +65,7 @@ pub fn brute_force_1<T:Send+Sync>(data:&Vec<Vec<T>>, dist: &PointDistance<T> ) -
 }
 
 
-fn brute_force_neighbours<T:Copy+Send+Sync>(nb_neighbours: usize, refdata: &PointIndexation<T>, distance: PointDistance<T>,  data : &Vec<T>) -> OrderedSkipList<PointIdWithOrder> {
+fn brute_force_neighbours<T:Serialize+DeserializeOwned+Copy+Send+Sync>(nb_neighbours: usize, refdata: &PointIndexation<T>, distance: PointDistance<T>,  data : &Vec<T>) -> OrderedSkipList<PointIdWithOrder> {
 
     let mut neighbours = OrderedSkipList::<PointIdWithOrder>::with_capacity(refdata.get_nb_point());
 

@@ -34,6 +34,8 @@ macro_rules! declare_myapi_type(
 );
 
 
+declare_myapi_type!(HnswApiNodata, NoData);
+
 // declare_myapi_type!(HnswApif64, f64);
 // declare_myapi_type!(HnswApif32, f32);
 
@@ -314,6 +316,10 @@ generate_loadhnsw!(load_hnswdump_u8_DistL1, HnswApiu8, u8, crate::dist::DistL1);
 generate_loadhnsw!(load_hnswdump_u8_DistL2, HnswApiu8, u8, crate::dist::DistL2);
 generate_loadhnsw!(load_hnswdump_u8_DistHamming, HnswApiu8, u8, crate::dist::DistHamming);
 generate_loadhnsw!(load_hnswdump_u8_DistJaccard, HnswApiu8, u8, crate::dist::DistJaccard);
+
+
+// Reload only graph
+generate_loadhnsw!(load_hnswdump_NoData_DistNoDist, HnswApiNodata, NoData, crate::dist::NoDist);
 
 //=============== implementation for i32
 
@@ -777,8 +783,8 @@ pub extern "C" fn load_hnsw_description(flen : usize, name : *const u8) -> *cons
                 }
             },
         Err(_e) => {
-            log::error!("load_hnsw_description: could not open file {:?}", fpath.as_os_str());
-            println!("load_hnsw_description: could not open file {:?}", fpath.as_os_str());
+            log::error!("no such file, load_hnsw_description: could not open file {:?}", fpath.as_os_str());
+            println!("no such file, load_hnsw_description: could not open file {:?}", fpath.as_os_str());
             return ptr::null();
         }
     }

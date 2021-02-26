@@ -18,6 +18,8 @@
 // In the data file the point dump consist in the triplet: (MAGICDATAP, origin_id , array of values.)
 //
 
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
+
 
 use std::io;
 use std::mem;
@@ -37,8 +39,10 @@ use crate::dist::Distance;
 
 // magic before each graph point data for each point
 const MAGICPOINT : u32 = 0x000a678f;
-// magic at beginning of description
-const MAGICDESCR : u32 = 0x000a677f;
+// magic at beginning of description format v& of dump
+const MAGICDESCR_1 : u32 = 0x001a677f;
+// magic at beginning of description format v& of dump
+const MAGICDESCR_2 : u32 = 0x002a677f;
 // magic at beginning of a layer dump
 const MAGICLAYER : u32 = 0x000a676f;
 // magic head of data file and before each data vector
@@ -74,6 +78,8 @@ pub struct Description {
     pub ef: usize,
     /// total number of points
     pub nb_point: usize,
+    /// we dump size_of::<T>, this enables reloading do data not knowing the the type T and thus extraction of graph only!
+    pub size_t : usize,
     /// data dimension
     pub dimension : usize,
     /// name of distance
@@ -84,7 +90,7 @@ pub struct Description {
 
 impl Description {
     /// The dump of Description consists in :
-    /// . The value MAGICDESCR as a u32 (4 u8)
+    /// . The value MAGICDESCR_1 as a u32 (4 u8)
     /// . The type of dump as u8
     /// . max_nb_connection as u8
     /// . ef (search parameter used in construction) as usize
@@ -93,7 +99,7 @@ impl Description {
     /// 
     fn dump<W:Write>(&self, argmode : DumpMode, out : &mut io::BufWriter<W>) -> Result<i32, String> {
         log::info!("in dump of description");
-        out.write(unsafe { &mem::transmute::<u32, [u8; std::mem::size_of::<u32>()]>(MAGICDESCR) } ).unwrap();
+        out.write(unsafe { &mem::transmute::<u32, [u8; std::mem::size_of::<u32>()]>(MAGICDESCR_2) } ).unwrap();
         let mode : u8 = match argmode {
             DumpMode::Full => 1,
             _              => 0,
@@ -110,6 +116,10 @@ impl Description {
         log::info!("dumping nb point {:?}", self.nb_point);
         // 
         out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.nb_point) } ).unwrap();
+        //
+        log::info!("dumping size of type T of data {:?}", self.size_t);
+        out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.size_t) } ).unwrap();
+        //
         log::info!("dumping dimension of data {:?}", self.dimension);
         out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.dimension) } ).unwrap();
         // dump of distance name
@@ -135,12 +145,14 @@ impl Description {
 pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     //
     let mut descr = Description{ dumpmode: 0, max_nb_connection: 0, nb_layer: 0, 
-                                ef: 0, nb_point: 0, dimension : 0, distname: String::from(""), t_name : String::from("")};
+                                ef: 0, nb_point: 0, size_t : 0, dimension : 0, 
+                                distname: String::from(""), t_name : String::from("")};
     let magic : u32 = 0;
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&magic as *const u32) as *mut u8, ::std::mem::size_of::<u32>() )};
     io_in.read_exact(it_slice)?;
     log::debug!(" magic {:X} ", magic);
-    if magic !=  MAGICDESCR {
+    if magic !=  MAGICDESCR_1 && magic !=  MAGICDESCR_2 {
+        log::info!("bad magic");
         return Err(io::Error::new(io::ErrorKind::Other, "bad magic at descr beginning"));
     }  
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.dumpmode as *const u8) as *mut u8, ::std::mem::size_of::<u8>() )};
@@ -159,15 +171,22 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     // nb_point
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.nb_point as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
     io_in.read_exact(it_slice)?;
+    if magic == MAGICDESCR_2 {
+        // in version 2 of format we have to read size of type that was dumped
+        let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.size_t as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
+        io_in.read_exact(it_slice)?;  
+    }
+    // read dimension
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.dimension as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
     io_in.read_exact(it_slice)?;    
-    log::info!("nb_point {:?} dimension {:?}", descr.nb_point, descr.dimension);
+    log::info!("nb_point {:?} dimension {:?} size of type {:?} ", descr.nb_point, descr.dimension, descr.size_t);    
     // distance name
     let len : usize = 0;
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&len as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
     io_in.read_exact(it_slice)?;
     log::debug!("length of distance name {:?} ", len);
     if len > 256 {
+        log::info!(" length of distance name > 256");
         println!(" length of distance name should not exceed 256");
         return Err(io::Error::new(io::ErrorKind::Other, "bad lenght for distance name"));
     }
@@ -215,7 +234,7 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     ///  2. origin_id as a u64
     ///  3. The vector of data (the length is known from Description)
     
-fn dump_point<T:Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpMode, 
+fn dump_point<'a, T:Serialize+Deserialize<'a>+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpMode, 
                     graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
     //
     graphout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICPOINT) } ).unwrap();
@@ -246,9 +265,14 @@ fn dump_point<T:Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpM
     // now we dump data vector!
     dataout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICDATAP) } ).unwrap();
     dataout.write(unsafe { &mem::transmute::<u64, [u8;8]>(point.get_origin_id() as u64) } ).unwrap();
-    let ref_v = point.get_v();
-    let v_as_u8 = unsafe { std::slice::from_raw_parts(ref_v.as_ptr() as *const u8, mem::size_of::<T>() *  ref_v.len() )};
-    dataout.write_all(v_as_u8).unwrap();
+    //
+    let serialized : Vec<u8> = bincode::serialize(point.get_v()).unwrap();
+    log::debug!("serializing len {:?}", serialized.len());
+    dataout.write(unsafe { &mem::transmute::<u64, [u8;8]>(serialized.len() as u64) } ).unwrap();
+    dataout.write_all(&serialized).unwrap();
+    // let ref_v = point.get_v();
+    // let v_as_u8 = unsafe { std::slice::from_raw_parts(ref_v.as_ptr() as *const u8, mem::size_of::<T>() *  ref_v.len() )};
+    // dataout.write_all(v_as_u8).unwrap();
     //
     return Ok(1);
 } // end of dump for Point<T>
@@ -261,7 +285,7 @@ fn dump_point<T:Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpM
 //  The graph part is loaded from graph_in file
 // the data vector itself is loaded from data_in
 // 
-fn load_point<T:Copy+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, descr: &Description, 
+fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, descr: &Description, 
                                                 data_in: &mut dyn Read) -> io::Result<(Arc<Point<T>>, Vec<Vec<Neighbour> >) > {
     //
     // read and check magic
@@ -336,10 +360,34 @@ fn load_point<T:Copy+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, descr: &Des
     let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&origin_id_data as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
     data_in.read_exact(it_slice)?;
     assert_eq!(origin_id, origin_id_data, "origin_id incoherent between graph and data");
-    // now read data
-    let mut v : Vec<T> = Vec::with_capacity(descr.dimension);
-    data_in.read_exact(unsafe { ::std::slice::from_raw_parts_mut(v.as_mut_ptr() as *mut u8, ::std::mem::size_of::<T>() * descr.dimension)})?;
-    unsafe { v.set_len(descr.dimension);};
+    // now read data. we use size_t that is in description, to take care of the casewhere we reload
+    // the data with T == NoData used in reloading only the graph with no information on T!
+    //let mut v = Vec::with_capacity(descr.dimension);
+    //
+    // assert!(descr.size_t > 0);
+    // data_in.read_exact(unsafe { ::std::slice::from_raw_parts_mut(v.as_mut_ptr() as *mut u8, descr.size_t * descr.dimension)})?;
+    // unsafe { v.set_len(descr.dimension);};
+    // if std::any::TypeId::of::<T>() == std::any::TypeId::of::<NoData>() {
+    //     // if no data we store an empty vector in Point (and so free memory of loaded v)
+    //     log::debug!("asked type is NoData, resetting v to null length");
+    //     v = Vec::<T>::new();
+    // }
+    //
+    let serialized_len : u64 = 0;
+    let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&serialized_len as *const u64) as *mut u8, ::std::mem::size_of::<u64>() )};
+    data_in.read_exact(it_slice)?; 
+//    log::debug!("serialized len to reload {:?}", serialized_len);
+    // could do allocation with_capacity() and then using unsafe set_len() which avoid explicit initialization
+    let mut v_serialized = Vec::<u8>::new();
+    v_serialized.resize(serialized_len as usize, 0);
+    data_in.read_exact(&mut v_serialized)?;
+    let v : Vec<T>;
+    if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
+        v = bincode::deserialize(&v_serialized).unwrap();
+    }
+    else {
+        v = Vec::<T>::new();
+    }
     let point = Point::<T>::new(&v, origin_id as usize, p_id);
     log::trace!("load_point  origin {:?} allocated size {:?}, dim {:?}", origin_id, point.get_v().len(), descr.dimension);
     //
@@ -370,7 +418,7 @@ fn dump_point_data<T:Copy+Clone+Send+Sync, W:Write>(point : &Point<T>, out : &mu
 // . list of point of layer
 // dump entry point
 // 
-impl <T:Clone+Send+Sync> HnswIO for PointIndexation<T> {
+impl <T:Serialize+DeserializeOwned+Clone+Send+Sync> HnswIO for PointIndexation<T> {
     fn dump<W:Write>(&self, mode : DumpMode, graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
         // dump max_layer
         let layers = self.points_by_layer.read();
@@ -404,11 +452,18 @@ impl <T:Clone+Send+Sync> HnswIO for PointIndexation<T> {
 } // end of impl HnswIO
 
 
-fn load_point_indexation<T:Copy+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, 
+fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, 
                 descr : &Description, 
                 data_in:  &mut dyn Read) -> io::Result<PointIndexation<T> > {
     //
     log::debug!(" in load_point_indexation");
+    //
+    // now we check that except for the case NoData, the typename are the sames.
+    if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() && std::any::type_name::<T>() != descr.t_name {
+        log::error!("size of T in description {:?} do not correspond to mem::size_of::<T> {:?}", descr.size_t, mem::size_of::<T>());
+        panic!("incohrent size of T in description");
+    }
+    //
     let mut points_by_layer : Vec<Vec<Arc<Point<T>> > >= Vec::with_capacity(NB_LAYER_MAX as usize);
     let mut neighbourhood_map : HashMap<PointId, Vec<Vec<Neighbour>> > =  HashMap::new();
     // load max layer
@@ -513,7 +568,7 @@ fn load_point_indexation<T:Copy+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read,
 //
 //
 
-impl <T:Clone+Sized+Send+Sync, D: Distance<T>+Send+Sync> HnswIO for Hnsw<T, D> {
+impl <T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sync> HnswIO for Hnsw<T, D> {
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
     /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
@@ -532,6 +587,7 @@ impl <T:Clone+Sized+Send+Sync, D: Distance<T>+Send+Sync> HnswIO for Hnsw<T, D> {
             nb_layer : self.get_max_level() as u8,
             ef: self.get_ef_construction(),
             nb_point: self.get_nb_point(),
+            size_t : mem::size_of::<T>(),
             dimension : datadim,
             distname : self.get_distance_name(),
             t_name: type_name::<T>().to_string(),
@@ -554,7 +610,7 @@ impl <T:Clone+Sized+Send+Sync, D: Distance<T>+Send+Sync> HnswIO for Hnsw<T, D> {
 /// about structure to reload (Typename, distance type, construction parameters).  
 /// Cf fn load_description(io_in: &mut dyn Read) -> io::Result<Description>
 ///
-pub fn load_hnsw<T:Copy+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(graph_in: &mut dyn Read, 
+pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(graph_in: &mut dyn Read, 
                                             description: &Description, 
                                             data_in : &mut dyn Read) -> io::Result<Hnsw<T,D> > {
     //  In datafile , we must read MAGICDATAP and dimension and check
@@ -574,23 +630,24 @@ pub fn load_hnsw<T:Copy+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(
     let distname = description.distname.clone();
     // We must ensure that the distance stored matches the one asked for in loading hnsw
     // for that we check for short names equality stripping 
-    log::debug!("distance asked= {:?}", distname);
+    log::debug!("distance in description = {:?}", distname);
     let d_type_name = type_name::<D>().to_string();
     let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
     for s in v {
-        log::info!(" distname in dump part {:?}", s);
+        log::info!(" distname in generic type argument {:?}", s);
     }
-    if d_type_name != distname {
+    if (std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>())  &&  (d_type_name != distname) {
+        // for all types except NoData , distance asked in reload declaration and distance in dump must be equal!
         let mut errmsg = String::from("error in distances : dumped distance is : ");
         errmsg.push_str(&distname);
         errmsg.push_str(" asked distance in loading is : ");
         errmsg.push_str(&d_type_name);
-        log::error!(" distance in dump file : {:?}", d_type_name);
-        log::error!("error , dump is not for distance = {:?}", distname);
+        log::error!(" distance in type argument : {:?}", d_type_name);
+        log::error!("error , dump is for distance = {:?}", distname);
         return Err(io::Error::new(io::ErrorKind::Other, errmsg));
     }
     let t_type = description.t_name.clone();
-    log::debug!("T type name = {:?}", t_type);
+    log::debug!("T type name in dump = {:?}", t_type);
     let layer_point_indexation = load_point_indexation(graph_in, &description, data_in)?;
     let data_dim = layer_point_indexation.get_data_dimension();
     //
@@ -628,13 +685,22 @@ pub use crate::dist::*;
 pub use crate::api::AnnT;
 
 use rand::distributions::{Distribution, Uniform};
-#[test]
 
+
+fn log_init_test() {
+    let _ = env_logger::builder().is_test(true).try_init();
+}
+
+
+
+#[test]
 fn test_dump_reload() {
     println!("\n\n test_dump_reload");
+    log_init_test();
     // generate a random test
     let mut rng = rand::thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
+    // 1000 vectors of size 10 f32
     let nbcolumn = 1000;
     let nbrow = 10;
     let mut xsi;
@@ -690,5 +756,29 @@ fn test_dump_reload() {
     // test equality
     check_equality(&hnsw_loaded, &hnsw);
 }  // end of test_dump_reload
+
+
+#[test]
+fn test_bincode() {
+    let mut rng = rand::thread_rng();
+    let unif =  Uniform::<f32>::new(0.,1.);
+    let size = 10;
+    let mut xsi;
+    let mut data = Vec::with_capacity(size);
+    for _ in 0..size {
+         xsi = unif.sample(&mut rng);
+         println!("xsi = {:?}", xsi);
+        data.push(xsi);
+    } 
+    println!("to serialized {:?}", data);
+
+    let v_serialized : Vec<u8> = bincode::serialize(&data).unwrap();
+    log::debug!("serializing len {:?}", v_serialized.len());
+    let v_deserialized : Vec<f32> = bincode::deserialize(&v_serialized).unwrap();
+    println!("deserialized {:?}", v_deserialized);
+
+}
+
+
 
 }  // end module tests
