@@ -14,7 +14,7 @@ Licensed under either of
 
 at your option.
 
-This software was written on my own while working at [CEA](http://www.cea.fr/), [CEA-LIST](http://www-list.cea.fr/en/)
+This software was written on my own while working at [CEA](http://www.cea.fr/).
 
 ## Functionalities
 
@@ -30,14 +30,17 @@ The crate provides:
 * Levenshtein distance on u16.
 
 * A Trait to enable the user to implement its own distances.
-  It takes as data slices of types T satisfying T:Clone+Send+Sync. It is also possible to use C extern functions or closures.
+  It takes as data slices of types T satisfying T:Serialize+Clone+Send+Sync. It is also possible to use C extern functions or closures.
 
 * An interface towards C and more specifically to the [Julia](https://julialang.org/) language.
 See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.jl) and the building paragraph for some help for Julia users.
 
 * Multithreaded insertion and search requests.
   
-* Dump and reload functions (Cf module hnswio) to store the graph once it is built. As the time necessary to compute the graph can be important it can be useful to store it for future use.
+* Dump and reload functions (*See module hnswio*) to store the data and the graph once it is built. These facilities rely partly on Serde so T needs to implement Serialize and Deserialized as derived by Serde.
+  It is also possible to reload only the graph and not the data themselves. A specific type (struct NoData, associated to the NoDist distance is dedicated to this functionality.
+
+* A flattening conversion of the Hnsw structure to keep only neighborhood relationships between points (without their internal data) internal to the Hnsw structure (*see module flatten.rs, FlatPoint and FlatNeighborhood*). It is thus possible to keep some topology information with low memory usage.
 
 ## Implementation
 

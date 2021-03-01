@@ -16,6 +16,7 @@ pub mod test;
 pub mod prelude;
 pub mod api;
 pub mod libext;
+pub mod flatten;
 
 lazy_static! {
     #[allow(dead_code)]

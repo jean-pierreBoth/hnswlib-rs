@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use serde::{Serialize, Deserialize};
 
 use std::cmp::Ordering;
 
@@ -31,7 +31,10 @@ pub use crate::dist::Distance;
 
 /// basic data in nodes
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+/// This unit structure provides the type to instanciate Hnsw with, in hnswio::load_hnsw function
+/// to get reload of graph only in the the structure. It must be associated to the unit structure dist::NoDist
+/// for the distance type to provide. 
+#[derive(Default, Clone, Copy, Serialize, Deserialize)]
 pub struct NoData;
 
 /// maximum number of layers
@@ -43,8 +46,8 @@ pub struct PointId(pub u8, pub i32);
 
 
 /// this type is for an identificateur of each data vector, given by client.
-/// can be the rank of data in an array, a hash value or anything that permits
-/// retrieving the data
+/// Can be the rank of data in an array, a hash value or anything that permits
+/// retrieving the data.
 pub type DataId = usize;
 
 
@@ -102,7 +105,7 @@ impl PointIdWithOrder {
 /// This structure is exported to other language API.
 /// First field is origin id of the request point, second field is distance to request point
 #[repr(C)]
-#[derive(Debug, Copy, Clone, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Neighbour {
     /// identification of data vector as given in initializing hnsw
     pub d_id : DataId, 
@@ -130,8 +133,8 @@ impl Neighbour {
 pub struct Point<T:Clone+Send+Sync> {
     /// The data of this point, coming from hnsw client and associated to origin_id,
     v: Vec<T>,
-   /// an id coming from client using hnsw
-    origin_id : usize,
+    /// an id coming from client using hnsw, should identify point uniquely
+    origin_id : DataId,
     /// a point id identifying point as stored in our structure
     p_id: PointId, 
     /// neighbours info
@@ -318,7 +321,7 @@ impl LayerGenerator {
 // ====================================================================
 
 /// a structure for indexation of points in layer
-pub struct PointIndexation<T:Serialize+DeserializeOwned+Clone+Send+Sync> {
+pub struct PointIndexation<T:Clone+Send+Sync> {
     /// max number of connection for a point at a layer
     pub(crate) max_nb_connection: usize, 
     ///
@@ -334,7 +337,7 @@ pub struct PointIndexation<T:Serialize+DeserializeOwned+Clone+Send+Sync> {
 }
 
 
-impl<T:Serialize+DeserializeOwned+Clone+Send+Sync> PointIndexation<T> {
+impl<T:Clone+Send+Sync> PointIndexation<T> {
     pub fn new(max_nb_connection: usize, max_layer:usize, max_elements:usize) -> Self {
         let mut points_by_layer = Vec::with_capacity(max_layer);
         for i in 0..max_layer { // recall that range are right extremeity excluded 
@@ -452,13 +455,13 @@ impl<T:Serialize+DeserializeOwned+Clone+Send+Sync> PointIndexation<T> {
 /// an iterator on points stored.
 /// The iteration begins at level 0 (most populated level) and goes upward in levels.
 /// Must not be used during parallel insertion.
-pub struct IterPoint<'a,T:Serialize+DeserializeOwned+Clone+Send+Sync> {
+pub struct IterPoint<'a,T:Clone+Send+Sync> {
     point_indexation : &'a PointIndexation<T>,
     layer:i64,
     slot_in_layer:i64,
 }
 
-impl <'a, T:Serialize+DeserializeOwned+Clone+Send+Sync> IterPoint<'a,T>{
+impl <'a, T:Clone+Send+Sync> IterPoint<'a,T>{
     pub fn new(point_indexation : &'a PointIndexation<T>) -> Self {
         IterPoint{ point_indexation, layer:-1, slot_in_layer : -1 }
     }
@@ -466,7 +469,7 @@ impl <'a, T:Serialize+DeserializeOwned+Clone+Send+Sync> IterPoint<'a,T>{
 
 
 /// iterator for layer 0 to upper layer.
-impl <'a,T:Serialize+DeserializeOwned+Clone+Send+Sync> Iterator for IterPoint<'a,T> {
+impl <'a,T:Clone+Send+Sync> Iterator for IterPoint<'a,T> {
     type Item = Arc<Point<T>>;
     //
     fn next(&mut self) -> Option<Self::Item>{
@@ -506,7 +509,7 @@ impl <'a,T:Serialize+DeserializeOwned+Clone+Send+Sync> Iterator for IterPoint<'a
 } // end of impl Iterator
 
 
-impl<'a,T:Serialize+DeserializeOwned+Clone+Send+Sync> IntoIterator for &'a PointIndexation<T> {
+impl<'a,T:Clone+Send+Sync> IntoIterator for &'a PointIndexation<T> {
     type Item = Arc<Point<T>>;
     type IntoIter = IterPoint<'a,T>;
     //
@@ -526,7 +529,7 @@ impl<'a,T:Serialize+DeserializeOwned+Clone+Send+Sync> IntoIterator for &'a Point
 /// 
 /// Other functions are mainly for others crate to get access to some fields. 
 #[allow(dead_code)]
-pub struct Hnsw<T:Serialize+DeserializeOwned+Clone+Send+Sync, D: Distance<T>> {
+pub struct Hnsw<T:Clone+Send+Sync, D: Distance<T>> {
     /// asked number of candidates in search
     pub(crate) ef_construction : usize,
     /// maximum number of connection by layer for a point
@@ -550,7 +553,7 @@ pub struct Hnsw<T:Serialize+DeserializeOwned+Clone+Send+Sync, D: Distance<T>> {
 }  // end of Hnsw
 
 
-impl <T:Serialize+DeserializeOwned+Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
+impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     /// allocation function  
     /// . max_nb_connection : number of neighbours stored in tables.  
     /// . ef_construction : controls numbers of neighbours explored during construction. See README or paper.  
@@ -1185,10 +1188,13 @@ fn from_positive_binaryheap_to_negative_binary_heap<T:Send+Sync+Clone>(positive_
 
 // essentialy to check dump/reload conssistency
 // in fact checks only equality of graph
-pub(crate) fn check_equality<T, D>(hnsw1:&Hnsw<T,D>, hnsw2: &Hnsw<T,D>)
-    where T:Serialize+DeserializeOwned+Copy+Clone+Send+Sync, D:Distance<T>+Default+Send+Sync {
+pub(crate) fn check_graph_equality<T1, D1, T2, D2>(hnsw1:&Hnsw<T1,D1>, hnsw2: &Hnsw<T2,D2>)
+    where   T1:Copy+Clone+Send+Sync, 
+            D1:Distance<T1>+Default+Send+Sync, 
+            T2:Copy+Clone+Send+Sync, 
+            D2:Distance<T2>+Default+Send+Sync {
     //
-    log::debug!("\n in check_equality");
+    log::debug!("\n in check_graph_equality");
     //
     assert_eq!(hnsw1.get_nb_point(), hnsw2.get_nb_point());
     // check for entry point
@@ -1200,7 +1206,6 @@ pub(crate) fn check_equality<T, D>(hnsw1:&Hnsw<T,D>, hnsw2: &Hnsw<T,D>)
     let ep2 = ep2_read.as_ref().unwrap();
     assert_eq!(ep1.origin_id, ep2.origin_id, "different entry points {:?} {:?}", ep1.origin_id, ep2.origin_id);
     assert_eq!(ep1.p_id, ep2.p_id, "origin id {:?} ", ep1.origin_id);
-    assert_eq!(ep1.v.len(), ep2.v.len(), "different length {:?} {:?}", ep1.v.len(), ep2.v.len());
     // check layers
     let layers_1 = hnsw1.layer_indexed_points.points_by_layer.read();
     let layers_2 = hnsw2.layer_indexed_points.points_by_layer.read();

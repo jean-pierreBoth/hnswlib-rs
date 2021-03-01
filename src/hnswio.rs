@@ -18,7 +18,7 @@
 // In the data file the point dump consist in the triplet: (MAGICDATAP, origin_id , array of values.)
 //
 
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 
 
 use std::io;
@@ -78,8 +78,6 @@ pub struct Description {
     pub ef: usize,
     /// total number of points
     pub nb_point: usize,
-    /// we dump size_of::<T>, this enables reloading do data not knowing the the type T and thus extraction of graph only!
-    pub size_t : usize,
     /// data dimension
     pub dimension : usize,
     /// name of distance
@@ -117,9 +115,6 @@ impl Description {
         // 
         out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.nb_point) } ).unwrap();
         //
-        log::info!("dumping size of type T of data {:?}", self.size_t);
-        out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.size_t) } ).unwrap();
-        //
         log::info!("dumping dimension of data {:?}", self.dimension);
         out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.dimension) } ).unwrap();
         // dump of distance name
@@ -145,7 +140,7 @@ impl Description {
 pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     //
     let mut descr = Description{ dumpmode: 0, max_nb_connection: 0, nb_layer: 0, 
-                                ef: 0, nb_point: 0, size_t : 0, dimension : 0, 
+                                ef: 0, nb_point: 0, dimension : 0, 
                                 distname: String::from(""), t_name : String::from("")};
     let magic : u32 = 0;
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&magic as *const u32) as *mut u8, ::std::mem::size_of::<u32>() )};
@@ -154,7 +149,12 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     if magic !=  MAGICDESCR_1 && magic !=  MAGICDESCR_2 {
         log::info!("bad magic");
         return Err(io::Error::new(io::ErrorKind::Other, "bad magic at descr beginning"));
-    }  
+    }
+    else if magic ==  MAGICDESCR_1 {
+        log::info!("old version of dump..., exiting");
+        println!("old version of dump");
+        return Err(io::Error::new(io::ErrorKind::Other, "old format of dump"));
+    }
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.dumpmode as *const u8) as *mut u8, ::std::mem::size_of::<u8>() )};
     io_in.read_exact(it_slice)?;
     log::info!(" dumpmode {:?} ", descr.dumpmode);
@@ -171,15 +171,10 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     // nb_point
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.nb_point as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
     io_in.read_exact(it_slice)?;
-    if magic == MAGICDESCR_2 {
-        // in version 2 of format we have to read size of type that was dumped
-        let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.size_t as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-        io_in.read_exact(it_slice)?;  
-    }
     // read dimension
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.dimension as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
     io_in.read_exact(it_slice)?;    
-    log::info!("nb_point {:?} dimension {:?} size of type {:?} ", descr.nb_point, descr.dimension, descr.size_t);    
+    log::info!("nb_point {:?} dimension {:?} ", descr.nb_point, descr.dimension);    
     // distance name
     let len : usize = 0;
     let it_slice = unsafe {::std::slice::from_raw_parts_mut((&len as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
@@ -234,7 +229,7 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     ///  2. origin_id as a u64
     ///  3. The vector of data (the length is known from Description)
     
-fn dump_point<'a, T:Serialize+Deserialize<'a>+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpMode, 
+fn dump_point<'a, T:Serialize+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpMode, 
                     graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
     //
     graphout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICPOINT) } ).unwrap();
@@ -267,7 +262,7 @@ fn dump_point<'a, T:Serialize+Deserialize<'a>+Clone+Sized+Send+Sync, W:Write>(po
     dataout.write(unsafe { &mem::transmute::<u64, [u8;8]>(point.get_origin_id() as u64) } ).unwrap();
     //
     let serialized : Vec<u8> = bincode::serialize(point.get_v()).unwrap();
-    log::debug!("serializing len {:?}", serialized.len());
+//    log::debug!("serializing len {:?}", serialized.len());
     dataout.write(unsafe { &mem::transmute::<u64, [u8;8]>(serialized.len() as u64) } ).unwrap();
     dataout.write_all(&serialized).unwrap();
     // let ref_v = point.get_v();
@@ -460,7 +455,8 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
     //
     // now we check that except for the case NoData, the typename are the sames.
     if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() && std::any::type_name::<T>() != descr.t_name {
-        log::error!("size of T in description {:?} do not correspond to mem::size_of::<T> {:?}", descr.size_t, mem::size_of::<T>());
+        log::error!("typename loaded in  description {:?} do not correspond to instanciation type {:?}", 
+                            descr.t_name,std::any::type_name::<T>() );
         panic!("incohrent size of T in description");
     }
     //
@@ -587,7 +583,6 @@ impl <T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sy
             nb_layer : self.get_max_level() as u8,
             ef: self.get_ef_construction(),
             nb_point: self.get_nb_point(),
-            size_t : mem::size_of::<T>(),
             dimension : datadim,
             distname : self.get_distance_name(),
             t_name: type_name::<T>().to_string(),
@@ -681,6 +676,8 @@ use crate::dist;
 
 use std::fs::OpenOptions;
 use std::io::{BufReader};
+use std::path::PathBuf;
+
 pub use crate::dist::*;
 pub use crate::api::AnnT;
 
@@ -694,8 +691,8 @@ fn log_init_test() {
 
 
 #[test]
-fn test_dump_reload() {
-    println!("\n\n test_dump_reload");
+fn test_dump_reload_1() {
+    println!("\n\n test_dump_reload_1");
     log_init_test();
     // generate a random test
     let mut rng = rand::thread_rng();
@@ -721,8 +718,8 @@ fn test_dump_reload() {
     }
     // some loggin info
     hnsw.dump_layer_info();
-    // dump in a file
-    let fname = String::from("dumpreloadtest");
+    // dump in a file.  Must take care of name as tests runs in // !!!
+    let fname = String::from("dumpreloadtest1");
     let _res = hnsw.file_dump(&fname);
     // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
     //
@@ -730,7 +727,7 @@ fn test_dump_reload() {
     log::debug!("\n\n  hnsw reload");
     // we will need a procedural macro to get from distance name to its instanciation. 
     // from now on we test with DistL1
-    let graphfname = String::from("dumpreloadtest.hnsw.graph");
+    let graphfname = String::from("dumpreloadtest1.hnsw.graph");
     let graphpath = PathBuf::from(graphfname);
     let graphfileres = OpenOptions::new().read(true).open(&graphpath);
     if graphfileres.is_err() {
@@ -739,7 +736,7 @@ fn test_dump_reload() {
     }
     let graphfile = graphfileres.unwrap();
     //  
-    let datafname = String::from("dumpreloadtest.hnsw.data");
+    let datafname = String::from("dumpreloadtest1.hnsw.data");
     let datapath = PathBuf::from(datafname);
     let datafileres = OpenOptions::new().read(true).open(&datapath);
     if datafileres.is_err() {
@@ -754,8 +751,76 @@ fn test_dump_reload() {
     let hnsw_description = load_description(&mut graph_in).unwrap();
     let hnsw_loaded : Hnsw<f32,DistL1>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
     // test equality
-    check_equality(&hnsw_loaded, &hnsw);
+    check_graph_equality(&hnsw_loaded, &hnsw);
 }  // end of test_dump_reload
+
+
+
+
+#[test]
+fn test_dump_reload_graph_only() {
+    println!("\n\n test_dump_reload_graph_only");
+    log_init_test();
+    // generate a random test
+    let mut rng = rand::thread_rng();
+    let unif =  Uniform::<f32>::new(0.,1.);
+    // 1000 vectors of size 10 f32
+    let nbcolumn = 1000;
+    let nbrow = 10;
+    let mut xsi;
+    let mut data = Vec::with_capacity(nbcolumn);
+    for j in 0..nbcolumn {
+        data.push(Vec::with_capacity(nbrow));
+        for _ in 0..nbrow {
+            xsi = unif.sample(&mut rng);
+            data[j].push(xsi);
+        }
+    } 
+    // define hnsw
+    let ef_construct= 25;
+    let nb_connection = 10;
+    let hnsw = Hnsw::<f32, dist::DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, dist::DistL1{});
+    for i in 0..data.len() {
+        hnsw.insert((&data[i], i));
+    }
+    // some loggin info
+    hnsw.dump_layer_info();
+    // dump in a file. Must take care of name as tests runs in // !!!
+    let fname = String::from("dumpreloadtestgraph");
+    let _res = hnsw.file_dump(&fname);
+    // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
+    //
+    // reload
+    log::debug!("\n\n  hnsw reload");
+    // we will need a procedural macro to get from distance name to its instanciation. 
+    // from now on we test with DistL1
+    let graphfname = String::from("dumpreloadtestgraph.hnsw.graph");
+    let graphpath = PathBuf::from(graphfname);
+    let graphfileres = OpenOptions::new().read(true).open(&graphpath);
+    if graphfileres.is_err() {
+        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
+        panic!("test_dump_reload: could not open file".to_string());            
+    }
+    let graphfile = graphfileres.unwrap();
+    //  
+    let datafname = String::from("dumpreloadtestgraph.hnsw.data");
+    let datapath = PathBuf::from(datafname);
+    let datafileres = OpenOptions::new().read(true).open(&datapath);
+    if datafileres.is_err() {
+        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
+        panic!("test_dump_reload : could not open file".to_string());            
+    }
+    let datafile = datafileres.unwrap();
+    //
+    let mut graph_in = BufReader::new(graphfile);
+    let mut data_in = BufReader::new(datafile);
+    // we need to call load_description first to get distance name
+    let hnsw_description = load_description(&mut graph_in).unwrap();
+    let hnsw_loaded : Hnsw<NoData,NoDist>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+    // test equality
+    check_graph_equality(&hnsw_loaded, &hnsw);
+}  // end of test_dump_reload
+
 
 
 #[test]

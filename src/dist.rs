@@ -59,7 +59,7 @@ pub trait Distance<T:Send+Sync> {
 
 /// Special forbidden computation distance. It is associated to a unit NoData structure
 /// This is a special structure used when we want to only reload the graph from a previous computation
-/// possibly from an foreign language (and we do not have access to the type of data in the foreign language).
+/// possibly from an foreign language (and we do not have access to the original type of data from the foreign language).
 #[derive(Default)]
 pub struct NoDist;
 
