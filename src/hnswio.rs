@@ -265,9 +265,6 @@ fn dump_point<'a, T:Serialize+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> 
 //    log::debug!("serializing len {:?}", serialized.len());
     dataout.write(unsafe { &mem::transmute::<u64, [u8;8]>(serialized.len() as u64) } ).unwrap();
     dataout.write_all(&serialized).unwrap();
-    // let ref_v = point.get_v();
-    // let v_as_u8 = unsafe { std::slice::from_raw_parts(ref_v.as_ptr() as *const u8, mem::size_of::<T>() *  ref_v.len() )};
-    // dataout.write_all(v_as_u8).unwrap();
     //
     return Ok(1);
 } // end of dump for Point<T>
@@ -356,18 +353,6 @@ fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut d
     data_in.read_exact(it_slice)?;
     assert_eq!(origin_id, origin_id_data, "origin_id incoherent between graph and data");
     // now read data. we use size_t that is in description, to take care of the casewhere we reload
-    // the data with T == NoData used in reloading only the graph with no information on T!
-    //let mut v = Vec::with_capacity(descr.dimension);
-    //
-    // assert!(descr.size_t > 0);
-    // data_in.read_exact(unsafe { ::std::slice::from_raw_parts_mut(v.as_mut_ptr() as *mut u8, descr.size_t * descr.dimension)})?;
-    // unsafe { v.set_len(descr.dimension);};
-    // if std::any::TypeId::of::<T>() == std::any::TypeId::of::<NoData>() {
-    //     // if no data we store an empty vector in Point (and so free memory of loaded v)
-    //     log::debug!("asked type is NoData, resetting v to null length");
-    //     v = Vec::<T>::new();
-    // }
-    //
     let serialized_len : u64 = 0;
     let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&serialized_len as *const u64) as *mut u8, ::std::mem::size_of::<u64>() )};
     data_in.read_exact(it_slice)?; 
@@ -389,17 +374,6 @@ fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut d
     return Ok((Arc::new(point), neighborhood));
 }  // end of load_point
 
-
-
-// a dump of id and data vector of point in file suffixed by hnsw.data
-#[allow(unused)]
-fn dump_point_data<T:Copy+Clone+Send+Sync, W:Write>(point : &Point<T>, out : &mut io::BufWriter<W>)  {
-        out.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICDATAP) } ).unwrap();
-        out.write(unsafe { &mem::transmute::<u64, [u8;8]>(point.get_origin_id() as u64) } ).unwrap();
-        let ref_v = point.get_v();
-        let v_as_u8 = unsafe { std::slice::from_raw_parts(ref_v.as_ptr() as *const u8, mem::size_of::<T>() * ref_v.len()) };
-        out.write_all(v_as_u8).unwrap();
-} // end of dump_point_data
 
 
 //

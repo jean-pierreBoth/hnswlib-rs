@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.9"
+version = "0.1.10"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
@@ -54,7 +54,6 @@ path = "examples/levensthein.rs"
 #
 
 serde= {version = "1.0", features = ["derive"] }
-serde_derive={ version = "1.0"}
 bincode = {version = "1.3"}
 
 
