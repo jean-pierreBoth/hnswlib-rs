@@ -1,4 +1,4 @@
-//! A rust implementation of Approximate NN search from:
+//! A rust implementation of Approximate NN search from:  
 //! Efficient and robust approximate nearest neighbour search using Hierarchical Navigable
 //! small World graphs. 
 //! Yu. A. Malkov, D.A Yashunin 2016, 2018
@@ -29,7 +29,7 @@ pub use crate::dist::Distance;
 // Profiling.
 
 
-/// basic data in nodes
+
 
 /// This unit structure provides the type to instanciate Hnsw with, in hnswio::load_hnsw function
 /// to get reload of graph only in the the structure. It must be associated to the unit structure dist::NoDist

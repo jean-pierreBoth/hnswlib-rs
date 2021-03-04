@@ -1,6 +1,6 @@
-//! This module provides conversion of Hnsw into a HashTable of point and neighbourhood
-//! It can be used when reloading only the graph part of the data to have knowledge
-//! of relaitve proximity of points as described just by their DataId
+//! This module provides conversion of Hnsw into a HashTable of point and neighbourhood.  
+//! It can be used, for example, when reloading only the graph part of the data to have knowledge
+//! of relative proximity of points as described just by their DataId
 //! 
 
 use hashbrown::HashMap;
