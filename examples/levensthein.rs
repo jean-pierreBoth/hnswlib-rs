@@ -1,6 +1,6 @@
 extern crate hnsw_rs;
 
-use hnsw_rs::test::*;
+use hnsw_rs::prelude::*;
 use hnsw_rs::dist::{DistLevenshtein};
 
 

@@ -12,7 +12,6 @@ pub mod hnsw;
 pub mod dist;
 pub mod annhdf5;
 pub mod hnswio;
-pub mod test;
 pub mod prelude;
 pub mod api;
 pub mod libext;

@@ -7,7 +7,6 @@
 use rand::distributions::{Uniform};
 use rand::prelude::*;
 
-use ndarray::*;
 use skiplist::OrderedSkipList;
 
 use serde::{Serialize, de::DeserializeOwned};
@@ -23,11 +22,7 @@ pub use self::hnsw::*;
 pub fn gen_random_vector_f32(nbrow :usize) -> Vec<f32> {
     let mut rng = thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
-    let mut vec = Vec::<f32>::with_capacity(nbrow);
-    for _ in 0..nbrow {
-        let xsi = rng.sample(unif);
-        vec.push(xsi);
-    }
+    let vec = (0..nbrow).into_iter().map(|_| rng.sample(unif)).collect::<Vec<f32>>();
     vec
 }
 
@@ -37,32 +32,14 @@ pub fn gen_random_vector_f32(nbrow :usize) -> Vec<f32> {
 pub fn gen_random_matrix_f32(nbrow:usize, nbcolumn:usize) -> Vec<Vec<f32>> {
     let mut rng = thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
-
-    let mut xsi;
     let mut data = Vec::with_capacity(nbcolumn);
-    for j in 0..nbcolumn {
-        data.push(Vec::with_capacity(nbrow));
-        for _ in 0..nbrow {
-            xsi = rng.sample(unif);
-            data[j].push(xsi);
-        }
+    for _ in 0..nbcolumn {
+        let column = (0..nbrow).into_iter().map(|_| rng.sample(unif)).collect::<Vec<f32>>();
+        data.push(column);
     }
     return data;
 }
 
-/// return brute force distance matrix 
-pub fn brute_force_1<T:Send+Sync>(data:&Vec<Vec<T>>, dist: &PointDistance<T> ) ->  Array2<f32> {
-   let nbelem = data.len();
-   
-   let mut dist_matrix = Array2::<f32>::zeros((nbelem, nbelem));
-
-   for i in 0..nbelem {
-       for j in 0..i {
-           dist_matrix[[i,j] ] =  dist.eval(&data[i], &data[j]);
-       }
-   }
-   dist_matrix
-}
 
 
 fn brute_force_neighbours<T:Serialize+DeserializeOwned+Copy+Send+Sync>(nb_neighbours: usize, refdata: &PointIndexation<T>, distance: PointDistance<T>,  data : &Vec<T>) -> OrderedSkipList<PointIdWithOrder> {

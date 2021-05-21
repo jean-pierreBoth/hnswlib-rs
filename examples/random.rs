@@ -8,9 +8,6 @@ use rand::prelude::*;
 
 use hnsw_rs::prelude::*;
 
-//use crate::point::*;
-
-use hnsw_rs::test::*;
 
 
 
@@ -19,7 +16,15 @@ fn main() {
     //
     let nb_elem = 500000;
     let dim = 25;
-    let data = gen_random_matrix_f32(dim, nb_elem);
+    // generate nb_elem colmuns vectors of dimension dim
+    let mut rng = thread_rng();
+    let unif =  Uniform::<f32>::new(0.,1.);
+    let mut data = Vec::with_capacity(nb_elem);
+    for _ in 0..nb_elem {
+        let column = (0..dim).into_iter().map(|_| rng.sample(unif)).collect::<Vec<f32>>();
+        data.push(column);
+    }
+    // give an id to each data
     let data_with_id = data.iter().zip(0..data.len()).collect();
 
     let ef_c = 200;
