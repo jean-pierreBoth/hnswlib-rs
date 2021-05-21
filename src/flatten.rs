@@ -1,4 +1,7 @@
-//! This module provides conversion of Hnsw into a HashTable of point and neighbourhood.  
+//! This module provides conversion of a Point structure to a FlatPoint containing just the Id of a point 
+//! and those of its neighbours.
+//! The whole Hnsw structure is then flattened into a Hashtable associating the data ID of a point to
+//! its corresponding FlatPoint.   
 //! It can be used, for example, when reloading only the graph part of the data to have knowledge
 //! of relative proximity of points as described just by their DataId
 //! 

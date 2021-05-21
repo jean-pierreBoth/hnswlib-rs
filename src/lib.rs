@@ -10,7 +10,6 @@ extern crate lazy_static;
 
 pub mod hnsw;
 pub mod dist;
-pub mod annhdf5;
 pub mod hnswio;
 pub mod prelude;
 pub mod api;
