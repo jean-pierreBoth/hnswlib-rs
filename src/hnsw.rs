@@ -31,9 +31,9 @@ pub use crate::dist::Distance;
 
 
 
-/// This unit structure provides the type to instanciate Hnsw with, in hnswio::load_hnsw function
-/// to get reload of graph only in the the structure. It must be associated to the unit structure dist::NoDist
-/// for the distance type to provide. 
+/// This unit structure provides the type to instanciate Hnsw with,
+/// to get reload of graph only in the the structure. 
+/// It must be associated to the unit structure dist::NoDist for the distance type to provide. 
 #[derive(Default, Clone, Copy, Serialize, Deserialize)]
 pub struct NoData;
 
@@ -119,6 +119,10 @@ impl Neighbour {
         pub fn new(d_id : DataId, distance: f32, p_id: PointId) -> Neighbour {
             Neighbour{d_id, distance, p_id}
         }
+        /// retrieves original id of neighbour as given in hnsw initialization
+        pub fn get_origin_id(&self) -> DataId {
+            self.d_id
+        }
 }
 
 //=======================================================================================
@@ -167,8 +171,8 @@ impl<T:Clone+Send+Sync> Point<T> {
         self.origin_id
     }
 
-    // returns for each layer, a vector Neighbour of a point, one vector by layer
-    //  
+    /// returns for each layer, a vector Neighbour of a point, one vector by layer
+    /// useful for extern crate only as it reallocates vectors
     pub fn get_neighborhood_id(&self) -> Vec<Vec<Neighbour>> {
         let ref_neighbours = self.neighbours.read();
         let nb_layer = ref_neighbours.len();

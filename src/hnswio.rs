@@ -706,7 +706,7 @@ fn test_dump_reload_1() {
     let graphfileres = OpenOptions::new().read(true).open(&graphpath);
     if graphfileres.is_err() {
         println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
-        panic!("test_dump_reload: could not open file".to_string());            
+        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
     }
     let graphfile = graphfileres.unwrap();
     //  
@@ -715,7 +715,7 @@ fn test_dump_reload_1() {
     let datafileres = OpenOptions::new().read(true).open(&datapath);
     if datafileres.is_err() {
         println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-        panic!("test_dump_reload : could not open file".to_string());            
+        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
     }
     let datafile = datafileres.unwrap();
     //
@@ -773,7 +773,7 @@ fn test_dump_reload_graph_only() {
     let graphfileres = OpenOptions::new().read(true).open(&graphpath);
     if graphfileres.is_err() {
         println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
-        panic!("test_dump_reload: could not open file".to_string());            
+        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
     }
     let graphfile = graphfileres.unwrap();
     //  
@@ -782,7 +782,7 @@ fn test_dump_reload_graph_only() {
     let datafileres = OpenOptions::new().read(true).open(&datapath);
     if datafileres.is_err() {
         println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-        panic!("test_dump_reload : could not open file".to_string());            
+        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
     }
     let datafile = datafileres.unwrap();
     //

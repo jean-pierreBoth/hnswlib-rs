@@ -96,7 +96,7 @@ macro_rules! mapdist_t(
     ("DistPtr")      => (crate::dist::DistPtr);
     ("DistLevenshtein") => (crate::dist::DistLevenshtein);
     ("DistJensenShannon") => (crate::dist::DistJensenShannon);
-    ("DistHellinger") => (crate::dist::DistJensenShannon);
+    ("DistHellinger") => (crate::dist::DistHellinger);
 );
 
 

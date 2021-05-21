@@ -800,7 +800,7 @@ fn make_readers(basename: &String) -> (BufReader<std::fs::File>, BufReader<std::
     let graphfileres = OpenOptions::new().read(true).open(&graphpath);
     if graphfileres.is_err() {
         println!("make_readers : could not open file {:?}", graphpath.as_os_str());
-        panic!("make_readers : could not open file".to_string());            
+        std::panic::panic_any("make_readers : could not open file".to_string());            
     }
     let graphfile = graphfileres.unwrap();
     //  
@@ -810,7 +810,7 @@ fn make_readers(basename: &String) -> (BufReader<std::fs::File>, BufReader<std::
     let datafileres = OpenOptions::new().read(true).open(&datapath);
     if datafileres.is_err() {
         println!("make_readers: could not open file {:?}", datapath.as_os_str());
-        panic!("make_readers: could not open file".to_string());            
+        std::panic::panic_any("make_readers: could not open file".to_string());            
     }
     let datafile = datafileres.unwrap();
     //
