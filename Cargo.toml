@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.10"
+version = "0.1.11"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
@@ -10,7 +10,8 @@ repository = "https://github.com/jean-pierreBoth/hnswlib-rs"
 documentation = "https://docs.rs/hnsw_rs"
 edition= "2018"
 
-[features]
+
+
 
 # declare a feature with no dependancy to get some modulated debug print
 # to be run with cargo build --features verbose_1
@@ -31,16 +32,15 @@ path = "src/lib.rs"
 name = "random"
 path = "examples/random.rs"
 
+
 [[example]]
 name = "ann-glove"
-path = "examples/ann-glove25-angular.rs"
-
+path = "examples/ann-glove/ann-glove25-angular.rs"
 
 
 [[example]]
 name = "ann-mnist"
-path = "examples/ann-mnist-784-euclidean.rs"
-
+path = "examples/ann-mnist/ann-mnist-784-euclidean.rs"
 
 [[example]]
 name = "levenshtein"
@@ -66,7 +66,6 @@ simdeez = {version = "1.0"}
 cpu-time = {version = "1.0"}
 time = {version = "0.2"}
 
-ndarray = {version = "0.13"}
 
 clap = {version = "2.29"}
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
@@ -81,5 +80,10 @@ lazy_static = { version = "1.4"}
 #log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 log = { version = "0.4"}
 env_logger = { version = "0.8"}
-# for benchmark reading
-hdf5 = {version="0.7"}
+
+
+# for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
+[dev-dependencies]
+hdf5 = {version = "0.7"}
+ndarray = {version = "0.13"}
+

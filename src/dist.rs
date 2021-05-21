@@ -2,8 +2,6 @@
 //! and a structure to enable the user to implement its own distances.
 //! For the heavily used case (f32) we provide simd avx2 implementation.
 
-#![allow(dead_code)]
-#![allow(unused_macros)]
 
 
 extern crate simdeez;
@@ -29,7 +27,7 @@ use std::os::raw::*;
 
 
 
-
+#[allow(unused)]
 enum DistKind {
     DistL1(String),
     DistL2(String),
@@ -278,7 +276,7 @@ implementCosDistance!(u16);
 pub struct DistDot;
 
 
-
+#[allow(unused)]
 macro_rules! implementDotDistance(
     ($ty:ty) => (
      impl Distance<$ty> for DistDot  {
