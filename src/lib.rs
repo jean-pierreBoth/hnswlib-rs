@@ -1,7 +1,5 @@
-extern crate rand;
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
-extern crate log;
 use env_logger::{Builder};
 
 #[macro_use]
@@ -17,7 +15,6 @@ pub mod libext;
 pub mod flatten;
 
 lazy_static! {
-    #[allow(dead_code)]
     static ref LOG: u64 = {
         let res = init_log();
         res
