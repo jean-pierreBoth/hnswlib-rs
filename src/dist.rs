@@ -4,7 +4,6 @@
 
 
 
-extern crate simdeez;
 use simdeez::avx2::*;
 use simdeez::sse2::*;
 use simdeez::*;

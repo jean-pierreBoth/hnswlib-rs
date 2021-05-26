@@ -3,7 +3,6 @@
 //! small World graphs. 
 //! Yu. A. Malkov, D.A Yashunin 2016, 2018
 
-#![allow(dead_code)]
 
 use serde::{Serialize, Deserialize};
 
@@ -192,7 +191,7 @@ impl<T:Clone+Send+Sync> Point<T> {
         neighborhood
     }
 
-
+    /// prints minimal information on neighbours of point.
     pub fn debug_dump(&self) {
         println!(" \n dump of point id : {:?}", self.p_id);
         println!("\n origin id : {:?} ", self.origin_id);
@@ -325,6 +324,7 @@ impl LayerGenerator {
 // ====================================================================
 
 /// a structure for indexation of points in layer
+#[allow(unused)]
 pub struct PointIndexation<T:Clone+Send+Sync> {
     /// max number of connection for a point at a layer
     pub(crate) max_nb_connection: usize, 
@@ -361,7 +361,6 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
         }
     }  // end of new
 
-    ///
     fn get_max_level_observed(&self) -> u8 {
         let opt = self.entry_point.read();
         match opt.as_ref() {
@@ -377,6 +376,7 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
         for l in 0..=max_level_observed as usize {
             println!(" layer {} : length : {} ", l, self.points_by_layer.read()[l].len());
         }
+        println!(" debug dump of PointIndexation end");
     }
 
 
@@ -532,7 +532,6 @@ impl<'a,T:Clone+Send+Sync> IntoIterator for &'a PointIndexation<T> {
 /// as described in trait AnnT.  
 /// 
 /// Other functions are mainly for others crate to get access to some fields. 
-#[allow(dead_code)]
 pub struct Hnsw<T:Clone+Send+Sync, D: Distance<T>> {
     /// asked number of candidates in search
     pub(crate) ef_construction : usize,
@@ -549,6 +548,7 @@ pub struct Hnsw<T:Clone+Send+Sync, D: Distance<T>> {
     /// The global table containing points
     pub(crate) layer_indexed_points: PointIndexation<T>, 
     /// dimension data stored in points
+    #[allow(unused)]
     pub(crate) data_dimension : usize,
     /// distance between points. initialized at first insertion
     pub(crate) dist_f : D,
@@ -591,14 +591,16 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     pub fn get_ef_construction(&self) -> usize {
         self.ef_construction
     }
-    /// 
+    /// returns the maximum layer authorized in construction
     pub fn get_max_level(&self) -> usize {
         self.max_layer
     }
+
+    /// return the maximum level reached in the layers.
     pub fn get_max_level_observed(&self) -> u8 {
         self.layer_indexed_points.get_max_level_observed() as u8
     }
-    ///
+    /// returns the maximum of links between a point and others points in each layer
     pub fn get_max_nb_connection(&self) -> u8 {
         self.max_nb_connection as u8
     }
@@ -619,6 +621,8 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         type_name::<D>().to_string()
     }
     /// set the flag asking to keep pruned vectors by Navarro's heuristic (see Paper).
+    /// It can be useful for small datasets where the pruning can make it difficult
+    /// to get the exact number of neighbours asked for.
     pub fn set_keeping_pruned(&mut self, flag: bool) {
         self.keep_pruned = flag;
     }
@@ -634,6 +638,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     // multiplicative factor applied to default scale. Must between 0.5 and 1.
     // more  than 1. gives more occupied layers. This is just to experiment
     // parameters variations on the algorithm but not general use.
+    #[allow(unused)]
     fn set_scale_modification(&mut self, scale_modification : f64) {
         println!("\n scale modification factor {:?}, scale value : {:?} (factor must be between 0.5 and 2.)", 
                     scale_modification, self.layer_indexed_points.layer_g.scale);
@@ -1022,6 +1027,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     // This function return Vec<Arc<PointWithOrder<T> >>
     // The parameter ef controls the width of the search in the lowest level, it must be greater
     // than number of neighbours asked. A rule of thumb could be between knbn and max_nb_connection.
+    #[allow(unused)]
     fn search_general(&self, data :&Vec<T> , knbn:usize, ef_arg:usize) -> Vec<Neighbour> {
         //
         let mut entry_point;
@@ -1157,6 +1163,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
 // This function takes a binary heap with points declared with a negative distance
 // and returns a vector of points with their correct positive distance to some reference distance
 // The vector is sorted by construction
+#[allow(unused)]
 fn from_negative_binaryheap_to_sorted_vector<T:Send+Sync+Copy>(heap_points : &mut BinaryHeap<Arc<PointWithOrder<T> >> ) -> Vec<Arc<PointWithOrder<T> > > {
     let nb_points = heap_points.len();
     let mut vec_points = Vec::<Arc<PointWithOrder<T> >>::with_capacity(nb_points);
@@ -1192,6 +1199,7 @@ fn from_positive_binaryheap_to_negative_binary_heap<T:Send+Sync+Clone>(positive_
 
 // essentialy to check dump/reload conssistency
 // in fact checks only equality of graph
+#[allow(unused)]
 pub(crate) fn check_graph_equality<T1, D1, T2, D2>(hnsw1:&Hnsw<T1,D1>, hnsw2: &Hnsw<T2,D2>)
     where   T1:Copy+Clone+Send+Sync, 
             D1:Distance<T1>+Default+Send+Sync, 

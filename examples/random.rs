@@ -1,4 +1,3 @@
-extern crate hnsw_rs;
 
 
 use std::time::{Duration, SystemTime};
