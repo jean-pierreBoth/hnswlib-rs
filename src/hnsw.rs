@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 
 use std::cmp::Ordering;
 
-use parking_lot::{RwLock, Mutex};
+use parking_lot::{RwLock, Mutex, RwLockReadGuard};
 use std::sync::Arc;
 use rayon::prelude::*;
 use std::sync::mpsc::channel;
@@ -323,6 +323,9 @@ impl LayerGenerator {
 
 // ====================================================================
 
+/// A short-hand for points in a layer
+type Layer<T> = Vec<Arc<Point<T>>>;
+
 /// a structure for indexation of points in layer
 #[allow(unused)]
 pub struct PointIndexation<T:Clone+Send+Sync> {
@@ -331,7 +334,7 @@ pub struct PointIndexation<T:Clone+Send+Sync> {
     ///
     pub(crate) max_layer: usize,
     /// needs at least one representation of points. points_by_layers\[i\] gives the points in layer i
-    pub(crate) points_by_layer: Arc<RwLock<Vec<Vec<Arc<Point<T>> >> >>,
+    pub(crate) points_by_layer: Arc<RwLock<Vec< Layer<T> > >>,
     /// utility to generate a level
     pub(crate) layer_g: LayerGenerator,
     /// number of points in indexed structure
@@ -441,6 +444,18 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
         *self.nb_point.read()
     }
 
+    /// returns the number of points in a given layer, 0 on a bad layer num
+    pub fn get_layer_nb_point(&self, layer : usize) -> usize {
+        let nb_layer = self.points_by_layer.read().len();
+        if layer < nb_layer {
+            self.points_by_layer.read()[layer].len()
+        }
+        else {
+            0
+        }
+    } // end of get_layer_nb_point
+
+
     /// returns the size of data vector in graph if any, else return 0
     pub fn get_data_dimension(&self) -> usize {
         let ep = self.entry_point.read();
@@ -450,6 +465,11 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
             };
         dim
     }
+
+    /// get an iterator on the points stored in a given layer
+    pub fn get_layer_iterator(&self, layer : usize) -> IterPointLayer<T> {
+        IterPointLayer::new(&self, layer)
+    }  // end of get_layer_iterator
 }  // end of impl PointIndexation
 
 
@@ -458,16 +478,18 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
 
 /// an iterator on points stored.
 /// The iteration begins at level 0 (most populated level) and goes upward in levels.
-/// Must not be used during parallel insertion.
+/// The iterator takes a ReadGuard on the PointIndexation structure
 pub struct IterPoint<'a,T:Clone+Send+Sync> {
     point_indexation : &'a PointIndexation<T>,
+    pi_guard :  RwLockReadGuard<'a, Vec<Layer<T>> >,
     layer:i64,
     slot_in_layer:i64,
 }
 
 impl <'a, T:Clone+Send+Sync> IterPoint<'a,T>{
     pub fn new(point_indexation : &'a PointIndexation<T>) -> Self {
-        IterPoint{ point_indexation, layer:-1, slot_in_layer : -1 }
+        let pi_guard : RwLockReadGuard<Vec<Layer<T>> > = point_indexation.points_by_layer.read();
+        IterPoint{ point_indexation, pi_guard, layer:-1, slot_in_layer : -1 }
     }
 }  // end of block impl IterPoint
 
@@ -481,10 +503,10 @@ impl <'a,T:Clone+Send+Sync> Iterator for IterPoint<'a,T> {
             self.layer = 0;
             self.slot_in_layer = 0;         
         }
-        if (self.slot_in_layer  as usize) < self.point_indexation.points_by_layer.read()[self.layer as usize].len() {
+        if (self.slot_in_layer  as usize) < self.pi_guard[self.layer as usize].len() {
             let slot = self.slot_in_layer as usize;
             self.slot_in_layer += 1;
-            return Some(self.point_indexation.points_by_layer.read()[self.layer as usize][slot].clone());
+            return Some(self.pi_guard[self.layer as usize][slot].clone());
         }
         else {
             self.slot_in_layer = 0;
@@ -521,7 +543,44 @@ impl<'a,T:Clone+Send+Sync> IntoIterator for &'a PointIndexation<T> {
         IterPoint::new(self)
     }
 
+}  // end of IntoIterator for &'a PointIndexation<T> 
+
+
+
+/// An iterator on points stored in a given layer
+/// The iterator stores a ReadGuard on the structure PointIndexation
+pub struct IterPointLayer<'a,T:Clone+Send+Sync> {
+    _point_indexation : &'a PointIndexation<T>,
+    pi_guard : RwLockReadGuard<'a, Vec<Layer<T>> >,
+    layer:usize,
+    slot_in_layer:usize,
 }
+
+impl <'a, T:Clone+Send+Sync> IterPointLayer<'a,T>{
+    pub fn new(point_indexation : &'a PointIndexation<T>, layer : usize) -> Self {
+        let pi_guard : RwLockReadGuard<Vec<Layer<T>> > = point_indexation.points_by_layer.read();
+        IterPointLayer{ _point_indexation : point_indexation, pi_guard, layer:layer, slot_in_layer : 0 }
+    }
+}  // end of block impl IterPointLayer
+
+
+/// iterator for layer 0 to upper layer.
+impl <'a,T:Clone+Send+Sync> Iterator for IterPointLayer<'a,T> {
+    type Item = Arc<Point<T>>;
+    //
+    fn next(&mut self) -> Option<Self::Item> {
+        if (self.slot_in_layer  as usize) < self.pi_guard[self.layer as usize].len() {
+            let slot = self.slot_in_layer as usize;
+            self.slot_in_layer += 1;
+            return Some(self.pi_guard[self.layer as usize][slot].clone());
+        }
+        else {
+            return None;
+        }
+    }  // end of next
+
+} // end of impl Iterator
+
 
 
 // ============================================================================================
@@ -1315,6 +1374,57 @@ fn test_iter_point() {
     } // end while
     //
     assert_eq!(nb_dumped, nbcolumn);
-} // end of test_insert_iter_point
+} // end of test_iter_point
+
+#[test]
+fn test_iter_layerpoint() {
+    //
+    println!("\n\n test_iter_point");
+    //
+    let mut rng = rand::thread_rng();
+    let unif =  Uniform::<f32>::new(0.,1.);
+    let nbcolumn = 5000;
+    let nbrow = 10;
+    let mut xsi;
+    let mut data = Vec::with_capacity(nbcolumn);
+    for j in 0..nbcolumn {
+        data.push(Vec::with_capacity(nbrow));
+        for _ in 0..nbrow {
+            xsi = rng.sample(unif);
+            data[j].push(xsi);
+        }
+    } 
+    //
+    // check insertion
+    let ef_construct= 25;
+    let nb_connection = 10;
+    let start = ProcessTime::now();
+    let hns = Hnsw::<f32, dist::DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, dist::DistL1{});
+    for i in 0..data.len() {
+        hns.insert((&data[i], i));
+    }
+    let cpu_time = start.elapsed();
+    println!(" test_insert_iter_point time inserting {:?}", cpu_time); 
+
+    hns.dump_layer_info();
+    // now check iteration
+    let layer_num = 0;
+    let nbpl = hns.get_point_indexation().get_layer_nb_point(layer_num);
+    let mut layer_iter = hns.get_point_indexation().get_layer_iterator(layer_num);
+    //
+    let mut nb_dumped = 0;
+    loop {
+        if let Some(_point) = layer_iter.next() {
+        //    println!("point : {:?}", _point.p_id);
+            nb_dumped += 1;
+        }
+        else {
+            break;
+        }
+    } // end while
+    println!("test_iter_layerpoint : nb point in layer {} , nb found {}", nbpl, nb_dumped);
+    //
+    assert_eq!(nb_dumped, nbpl);
+} // end of test_iter_layerpoint
 
 }  // end of module test
