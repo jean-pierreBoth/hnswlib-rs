@@ -711,10 +711,19 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         }
     }  // end of set_scale_modification
 
+
     // here we could pass a point_id_with_order instead of entry_point_id: PointId
     // The efficacity depends on greedy part depends on how near entry point is from point.
     // ef is the number of points to return
     // The method returns a BinaryHeap with positive distances. The caller must transforms it according its need
+    //** NOTE: the entry point is pushed into returned point at the beginning of the function, but in fact entry_point is in a layer
+    //** with higher (one more) index than the argument layer. If the greedy search matches a sufficiently large number of points
+    //** nearer to point searched (arg point) than entry_point it will finally get popped up from the heap of returned points
+    //** but otherwise it will stay in the binary heap and so we can have a point in neighbours that is in fact in a layer
+    //** above the one we search in. 
+    //** The guarantee is that the binary heap will return points in layer 
+    //** with a larger index, although we can expect that most often (at least in densely populated layers) the returned
+    //** points will be found in searched layer 
     ///
     /// Greedy algorithm n° 2 in Malkov paper.
     /// search in a layer (layer) for the ef points nearest a point to be inserted in hnsw.
@@ -722,7 +731,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         //
         trace!("entering search_layer with entry_point_id {:?} layer : {:?} ef {:?} ", entry_point.p_id, layer, ef);
         //
-        // here we allocate a skiplist on values not on reference beccause we want to return
+        // here we allocate a binary_heap on values not on reference beccause we want to return
         // log2(skiplist_size) must be greater than 1.
         let skiplist_size = ef.max(2);
         // we will store positive distances in this one
@@ -745,14 +754,13 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         visited_point_id.insert(entry_point.p_id, Arc::clone(&entry_point));
         //
         let mut candidate_points = BinaryHeap::<Arc<PointWithOrder<T>> >::with_capacity(skiplist_size);
-
         candidate_points.push(Arc::new(PointWithOrder::new(&entry_point, -dist_to_entry_point)));
         return_points.push(Arc::new(PointWithOrder::new(&entry_point, dist_to_entry_point)));
         // at the beginning candidate_points contains point passed as arg in layer entry_point_id.0
         while candidate_points.len() > 0 {
             // get nearest point in candidate_points
             let c = candidate_points.pop().unwrap();
-           // f farthest point to 
+            // f farthest point to 
             let f = return_points.peek().unwrap();
             assert!(f.dist_to_ref >= 0.);
             assert!(c.dist_to_ref <= 0.);
@@ -896,7 +904,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         // new_point has been inserted at the beginning in table
         // so that we can call reverse_update_neighborhoodwe consitently
         // now reverse update of neighbours.
-        self.reverse_update_neighborhood_simple (Arc::clone(&new_point));
+        self.reverse_update_neighborhood_simple(Arc::clone(&new_point));
         //
         self.layer_indexed_points.check_entry_point(&new_point);
         //
@@ -926,7 +934,8 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                     let q_point = &q.point_ref;
                     let mut q_point_neighbours = q_point.neighbours.write();
                     let n_to_add = PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
-                    // must be sure that we add a point at the correct level
+                    // must be sure that we add a point at the correct level. See the comment to search_layer!
+                    // this ensures that reverse updating do not add problems.
                     let l_n = n_to_add.point_ref.p_id.0 as usize;
                     let already = q_point_neighbours[l_n as usize].iter().position(|old| old.point_ref.p_id == new_point.p_id);
                     if already.is_some() {
@@ -937,11 +946,10 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                         continue;
                     }
                     q_point_neighbours[l_n].push(Arc::new(n_to_add));
-                    let nbn_at_l = q_point_neighbours[l_n].len();
-                    
+                    let nbn_at_l = q_point_neighbours[l_n].len();                    
                     //
                     // if l < level, update upward chaining, insert does a sort! t_q has a neighbour not yet in global table of points!
-                    let threshold_shrinking;  // TO DO optimize threshold
+                    let threshold_shrinking;  // TODO optimize threshold
                     if l_n > 0 {
                         threshold_shrinking = self.max_nb_connection;
                     }
