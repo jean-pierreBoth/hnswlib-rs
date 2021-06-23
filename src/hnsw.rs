@@ -855,6 +855,8 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
             // sorted_points = from_positive_binaryheap_to_negative_binary_heap(&mut sorted_points);
             // 
             if let Some(ep) = sorted_points.pop() {
+                // useful for projecting lower layer to upper layer. keep track of points encountered.
+                new_point.neighbours.write()[l as usize].push(Arc::clone(&ep));
                 // get the lowest distance point
                 let tmp_dist = self.dist_f.eval(data , & ep.point_ref.v);
                 if tmp_dist < dist_to_entry {
