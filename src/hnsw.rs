@@ -822,8 +822,8 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
 
     // Hnsw insert.   
     ///  Insert a data slice with its external id as given by the client.   
-    ///  The insertion method gives the point an internal id.
-    ///  The slice insertion makes integration with ndarray than the vector insertion
+    ///  The insertion method gives the point an internal id.  
+    ///  The slice insertion makes integration with ndarray crate easier than the vector insertion
    pub fn insert_slice(&self, data_with_id: (&[T],usize))  {
         //
         let (data , origin_id) = data_with_id;
@@ -931,10 +931,10 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     }  // end of parallel_insert
 
 
-    /// Insert in parallel a slice of [T] each associated to its id.    
+    /// Insert in parallel slices of \[T\] each associated to its id.    
     /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
-    /// Typically 1000 * the number of threads.
-    /// facilitates the use with the ndarray crate as we can extract slices (for data in contiguous order) from Array2.
+    /// Typically 1000 * the number of threads.  
+    /// Facilitates the use with the ndarray crate as we can extract slices (for data in contiguous order) from Array.
     pub fn parallel_insert_slice(&self, datas: &Vec<(&[T], usize)> ) {
         datas.par_iter().for_each( |&item| self.insert_slice(item));
     }  // end of parallel_insert
