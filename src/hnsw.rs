@@ -145,13 +145,13 @@ pub struct Point<T:Clone+Send+Sync> {
 }
 
 impl<T:Clone+Send+Sync> Point<T> {
-    pub fn new(v: &Vec<T>, origin_id: usize, p_id:PointId) -> Self {
+    pub fn new(v: &[T], origin_id: usize, p_id:PointId) -> Self {
         let mut neighbours = Vec::with_capacity(NB_LAYER_MAX as usize);
         // CAVEAT, perhaps pass nb layer as arg ?
         for _ in 0..NB_LAYER_MAX {
             neighbours.push(Vec::<Arc<PointWithOrder<T>> >::new());
         }
-        Point{v:v.clone(), origin_id, p_id, neighbours: Arc::new(RwLock::new(neighbours))}
+        Point{v:v.to_vec(), origin_id, p_id, neighbours: Arc::new(RwLock::new(neighbours))}
     }
 
 
@@ -386,7 +386,7 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
     /// real insertion of point in point indexation
     // generate a new Point/ArcPoint (with neigbourhood info empty) and store it in global table
     // The function is called by Hnsw insert method
-    fn generate_new_point(& self, data : &Vec<T>, origin_id : usize) -> (Arc<Point<T>> , usize) {
+    fn generate_new_point(& self, data : &[T], origin_id : usize) -> (Arc<Point<T>> , usize) {
         // get a write lock at the beginning of the function
         let level = self.layer_g.generate();
         let new_point;
@@ -727,7 +727,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     ///
     /// Greedy algorithm n° 2 in Malkov paper.
     /// search in a layer (layer) for the ef points nearest a point to be inserted in hnsw.
-    fn search_layer(& self, point: &Vec<T>, entry_point: Arc<Point<T>> , ef:usize, layer: u8) -> BinaryHeap<Arc<PointWithOrder<T>> > {
+    fn search_layer(& self, point: &[T], entry_point: Arc<Point<T>> , ef:usize, layer: u8) -> BinaryHeap<Arc<PointWithOrder<T>> > {
         //
         trace!("entering search_layer with entry_point_id {:?} layer : {:?} ef {:?} ", entry_point.p_id, layer, ef);
         //
@@ -812,10 +812,19 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     } // end of search_layer
 
 
-    // Hnsw insert.   
-    ///  Insert a data vector with its external id as given by the client.   
+    /// insert a tuple (&Vec, usize) with its external id as given by the client.
     ///  The insertion method gives the point an internal id.
-   pub fn insert(&self, data_with_id: (&Vec<T>,usize))  {
+    #[inline]
+    pub fn insert(&self, datav_with_id : (&Vec<T>, usize)) {
+        self.insert_slice((&datav_with_id.0.as_slice(), datav_with_id.1))
+    }
+
+
+    // Hnsw insert.   
+    ///  Insert a data slice with its external id as given by the client.   
+    ///  The insertion method gives the point an internal id.
+    ///  The slice insertion makes integration with ndarray than the vector insertion
+   pub fn insert_slice(&self, data_with_id: (&[T],usize))  {
         //
         let (data , origin_id) = data_with_id;
         let keep_pruned = self.keep_pruned;
@@ -922,6 +931,14 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     }  // end of parallel_insert
 
 
+    /// Insert in parallel a slice of [T] each associated to its id.    
+    /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
+    /// Typically 1000 * the number of threads.
+    /// facilitates the use with the ndarray crate as we can extract slices (for data in contiguous order) from Array2.
+    pub fn parallel_insert_slice(&self, datas: &Vec<(&[T], usize)> ) {
+        datas.par_iter().for_each( |&item| self.insert_slice(item));
+    }  // end of parallel_insert
+
 
 
     /// insert new_point in neighbourhood info of point
@@ -976,12 +993,11 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     }  // end of reverse_update_neighborhood_simple
 
 
-
-
-
     pub fn get_point_indexation(&self) -> &PointIndexation<T> {
         &self.layer_indexed_points
     }
+
+    
     // This is best explained in : Navarro. Searching in metric spaces by spatial approximation.
     /// simplest searh neighbours
     // The binary heaps here is with negative distance sorted.
@@ -1143,7 +1159,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     /// The parameter ef controls the width of the search in the lowest level, it must be greater
     /// than number of neighbours asked.  
     /// A rule of thumb could be between knbn and max_nb_connection.
-    pub fn search(&self, data :&Vec<T> , knbn:usize, ef_arg:usize) -> Vec<Neighbour> {
+    pub fn search(&self, data :&[T] , knbn:usize, ef_arg:usize) -> Vec<Neighbour> {
         //
         let entry_point;
         {  // a lock on an option an a Arc<Point>

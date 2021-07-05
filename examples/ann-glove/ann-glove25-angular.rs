@@ -66,15 +66,15 @@ pub fn main() {
     // parallel insertion
     let start = ProcessTime::now();
     let now = SystemTime::now();
-    let data_for_par_insertion = anndata.train_data.iter().map( |x| (&x.0, x.1)).collect();
+    let data_for_par_insertion = anndata.train_data.iter().map( |x| (x.0.as_slice(), x.1)).collect();
     if parallel {
         println!(" \n parallel insertion");
-        hnsw.parallel_insert(&data_for_par_insertion);
+        hnsw.parallel_insert_slice(&data_for_par_insertion);
     }
     else {
         println!(" \n serial insertion");
         for d in data_for_par_insertion {
-            hnsw.insert(d);
+            hnsw.insert_slice(d);
         }
     }
     let cpu_time: Duration = start.elapsed();
