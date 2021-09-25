@@ -1,16 +1,18 @@
 use std::time::{Duration, SystemTime};
 use cpu_time::ProcessTime;
-// search in serial mode
+// search in serial mode i7-core @2.7Ghz
 //  max_nb_conn   ef_cons    ef_search   scale_factor    extend  keep pruned  recall        req/s      last ratio
 //
 //     12           400         12           1              0          0        0.917        6486       1.005
 //     24           400         24           1              1          0        0.9779       3456       1.001
 
-// parallel mode
+// parallel mode 4 i7-core @2.7Ghz
 //  max_nb_conn   ef_cons    ef_search   scale_factor    extend  keep pruned  recall        req/s      last ratio
 //     24           400         24           1              0          0        0.977        12566       1.001
 //     24           400         12           1              0          0        0.947        18425       1.003
 
+// 8 hyperthreaded i7-core @ 2.3 Ghz
+//     24           400         24           1              0          0        0.977       22197        1.001
 
 use hnsw_rs::prelude::*;
 
@@ -21,7 +23,7 @@ use annhdf5::*;
 pub fn main() {
     let mut parallel = true;
     //
-    let fname = String::from("/home.2/Data/ANN/fashion-mnist-784-euclidean.hdf5");
+    let fname = String::from("/home/jpboth/Data/ANN/fashion-mnist-784-euclidean.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
     let anndata = AnnBenchmarkData::new(fname).unwrap();

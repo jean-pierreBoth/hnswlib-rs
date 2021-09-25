@@ -5,6 +5,7 @@ use cpu_time::ProcessTime;
 
 
 //    glove 25 // 2.7 Ghz 4 cores 8Mb L3  k = 10
+//   ============================================
 //
 // max_nb_conn   ef_cons    ef_search   scale_factor    extend  keep pruned  recall        req/s      last ratio
 //  24            800         64            1.           1          0          0.928        4090        1.003
@@ -34,6 +35,12 @@ use cpu_time::ProcessTime;
 //  24            800         48            1            1          0          0.96         2432      1.004
 //  48            800        128            1            1          0          0.979        1626      1.001
 
+// glove 25 // 8 cores 2.3 Ghz 4 cores 8Mb L3  k = 100
+// ==================================================
+
+//  48            800         48            1            1          0          0.936        12783      1.002
+//  48            800        128            1            1          0          0.979         5048      1.002
+
 
 use hnsw_rs::prelude::*;
 
@@ -45,7 +52,7 @@ use annhdf5::*;
 pub fn main() {
     let parallel = true;
     //
-    let fname = String::from("/home.2/Data/ANN/glove-25-angular.hdf5");
+    let fname = String::from("/home/jpboth/Data/ANN/glove-25-angular.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
     let mut anndata = annhdf5::AnnBenchmarkData::new(fname).unwrap();
