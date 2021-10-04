@@ -664,20 +664,22 @@ pub struct DistJaccard;
 
 // contruct a 2-uple accumulator that has sum of max in first component , and sum of min in 2 component
 // stay in integer as long as possible
-
+// Note : summing u32 coming from hash values can overflow! We must go up to u64 for additions!
 macro_rules! implementJaccardDistance (
     ($ty:ty) => (
 
     impl Distance<$ty> for DistJaccard  {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
-            let (max,min) : (u32, u32) = va.iter().zip(vb.iter()).fold((0u32,0u32), |acc, t| if t.0 > t.1 {
-                                (acc.0 + *t.0 as u32, acc.1 + *t.1 as u32) }
+            let (max,min) : (u64, u64) = va.iter().zip(vb.iter()).fold((0u64,0u64), |acc, t| if t.0 > t.1 {
+                                (acc.0 + *t.0 as u64, acc.1 + *t.1 as u64) }
                         else {
-                                (acc.0 + *t.1 as u32 , acc.1 + *t.0 as u32)
+                                (acc.0 + *t.1 as u64 , acc.1 + *t.0 as u64)
                              }
             );
             if max > 0 {
-                 1. - (min  as f32)/ (max as f32)
+                let dist = 1. - (min  as f64)/ (max as f64);
+                assert!(dist >= 0.);
+                dist as f32
             }
             else {
                 0.
