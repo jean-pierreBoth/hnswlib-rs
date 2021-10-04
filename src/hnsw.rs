@@ -122,6 +122,10 @@ impl Neighbour {
         pub fn get_origin_id(&self) -> DataId {
             self.d_id
         }
+        /// return the distance
+        pub fn get_distance(&self) -> f32 {
+            self.distance
+        }
 }
 
 //=======================================================================================
