@@ -578,7 +578,6 @@ implementDistJensenShannon!(f32);
 
 //=======================================================================================
 
-// Possibly check equlity of slices length
 /// Hamming distance. Implemented for u8, u16, u32, i32 and i16
 /// The distance returned is normalized by length of slices, so it is between 0. and 1.
 #[derive(Default)]
