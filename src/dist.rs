@@ -578,7 +578,9 @@ implementDistJensenShannon!(f32);
 
 //=======================================================================================
 
+// Possibly check equlity of slices length
 /// Hamming distance. Implemented for u8, u16, u32, i32 and i16
+/// The distance returned is normalized by length of slices, so it is between 0. and 1.
 #[derive(Default)]
 pub struct DistHamming;
 
@@ -590,8 +592,9 @@ macro_rules! implementHammingDistance (
     impl Distance<$ty> for DistHamming  {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
         // RUSTFLAGS = "-C opt-level=3 -C target-cpu=native"
+            assert_eq!(va.len(), vb.len());
             let norm : f32 = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count() as f32;
-            norm
+            norm / va.len() as f32
         } // end of compute
     } // end of impl block
     )  // end of pattern matching
@@ -606,6 +609,8 @@ unsafe fn distance_hamming_i32_avx2(va:&[i32], vb: &[i32]) -> f32 {
 
 
 unsafe fn distance_hamming_i32<S: Simd> (va:&[i32], vb: &[i32]) -> f32 {
+    assert_eq!(va.len(), vb.len());
+    //
     let mut dist_simd = S::setzero_epi32();
     //
     let nb_simd = va.len() / S::VI32_WIDTH;
@@ -629,7 +634,7 @@ unsafe fn distance_hamming_i32<S: Simd> (va:&[i32], vb: &[i32]) -> f32 {
     for i in simd_length..va.len() {
         dist = dist + if va[i] != vb[i] { 1 } else {0};
     }
-    return dist as f32;
+    return dist as f32 / va.len() as f32;
 }  // end of distance_hamming_i32
 
 
@@ -641,8 +646,9 @@ impl  Distance<i32> for  DistHamming {
             unsafe { distance_hamming_i32_avx2(va,vb) }
         }
         else {
+            assert_eq!(va.len(), vb.len());
             let dist : f32 = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count() as f32;
-            dist
+            dist / va.len() as f32
          }
     }
 } // end implementation Distance<i32>
@@ -1102,11 +1108,12 @@ fn test_simd_hamming_i32() {
         let between = Uniform::<i32>::from(-imax..imax);
         let va : Vec<i32> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
         let vb : Vec<i32> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
-        let simd_dist = unsafe {distance_hamming_i32::<Avx2>(&va, &vb)} as u32;
+        let simd_dist = unsafe {distance_hamming_i32::<Avx2>(&va, &vb)} as f32;
 
         let easy_dist : u32 = va.iter().zip(vb.iter()).map( |(a,b)| if a!=b { 1} else {0}).sum();
+        let easy_dist = easy_dist as f32 / va.len() as f32;
         println!("test size {:?} simd  exact = {:?} {:?}", i, simd_dist, easy_dist);
-        if easy_dist != simd_dist {
+        if (easy_dist - simd_dist).abs() > 1.0e-5 {
             println!(" jsimd = {:?} , jexact = {:?}", simd_dist, easy_dist);
             println!("va = {:?}" , va);
             println!("vb = {:?}" , vb);
