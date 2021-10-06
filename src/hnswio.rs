@@ -463,7 +463,15 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
         let mut vlayer : Vec<Arc<Point<T>>> = Vec::with_capacity(nbpoints);
         for r in 0..nbpoints {
             // load graph and data part of point. Points are dumped in the same order.
-            let load_point_res = load_point(graph_in, descr, data_in)?;
+            let load_point_res = load_point(graph_in, descr, data_in);
+            match load_point_res {
+                Err(other) => {
+                            log::error!("in load_point_indexation, loading of point {} failed", r);
+                            return Err(other);
+                }
+                 _  =>  {},
+            }
+            let load_point_res = load_point_res.unwrap();
             let point = load_point_res.0;
             let p_id = point.get_point_id();
             // some checks
