@@ -22,7 +22,6 @@ use serde::{Serialize, de::DeserializeOwned};
 
 
 use std::io;
-use std::mem;
 
 use parking_lot::{RwLock};
 use std::sync::Arc;
@@ -97,35 +96,39 @@ impl Description {
     /// 
     fn dump<W:Write>(&self, argmode : DumpMode, out : &mut io::BufWriter<W>) -> Result<i32, String> {
         log::info!("in dump of description");
-        out.write(unsafe { &mem::transmute::<u32, [u8; std::mem::size_of::<u32>()]>(MAGICDESCR_2) } ).unwrap();
+        out.write(&MAGICDESCR_2.to_ne_bytes()).unwrap();
         let mode : u8 = match argmode {
             DumpMode::Full => 1,
             _              => 0,
         };
         // CAVEAT should check mode == self.mode
-        out.write(unsafe { &mem::transmute::<u8, [u8;1]>(mode) } ).unwrap();
-        out.write(unsafe { &mem::transmute::<u8, [u8;1]>(self.max_nb_connection) } ).unwrap();
-        out.write(unsafe { &mem::transmute::<u8, [u8;1]>(self.nb_layer) } ).unwrap();
+        out.write(&mode.to_ne_bytes()).unwrap();
+        // dump of max_nb_connection as u8!!
+        out.write(&self.max_nb_connection.to_ne_bytes()).unwrap();
+        out.write(&self.nb_layer.to_ne_bytes()).unwrap();
         if self.nb_layer != NB_LAYER_MAX {
             println!("dump of Description, nb_layer != NB_MAX_LAYER");
             return Err(String::from("dump of Description, nb_layer != NB_MAX_LAYER"));
         }
-        out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.ef) } ).unwrap();
+        //
+        log::info!("dumping ef {:?}", self.ef);
+        out.write(&self.ef.to_ne_bytes()).unwrap();
+        //
         log::info!("dumping nb point {:?}", self.nb_point);
-        // 
-        out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.nb_point) } ).unwrap();
+        out.write(&self.nb_point.to_ne_bytes()).unwrap();
         //
         log::info!("dumping dimension of data {:?}", self.dimension);
-        out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(self.dimension) } ).unwrap();
+        out.write(&self.dimension.to_ne_bytes()).unwrap();
+
         // dump of distance name
         let namelen : usize = self.distname.len();
         log::info!("distance name {:?} ", self.distname);
-        out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(namelen) } ).unwrap();
+        out.write(&namelen.to_ne_bytes()).unwrap();
         out.write(self.distname.as_bytes()).unwrap();
         // dump of T value typename
         let namelen : usize = self.t_name.len();
         log::info!("T name {:?} ", self.t_name);
-        out.write(unsafe { &mem::transmute::<usize, [u8;std::mem::size_of::<usize>()]>(namelen) } ).unwrap();
+        out.write(&namelen.to_ne_bytes()).unwrap();
         out.write(self.t_name.as_bytes()).unwrap();
         //
         return Ok(1);
@@ -142,9 +145,9 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     let mut descr = Description{ dumpmode: 0, max_nb_connection: 0, nb_layer: 0, 
                                 ef: 0, nb_point: 0, dimension : 0, 
                                 distname: String::from(""), t_name : String::from("")};
-    let magic : u32 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&magic as *const u32) as *mut u8, ::std::mem::size_of::<u32>() )};
-    io_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<u32>()];
+    io_in.read_exact(&mut it_slice)?;
+    let magic = u32::from_ne_bytes(it_slice);
     log::debug!(" magic {:X} ", magic);
     if magic !=  MAGICDESCR_1 && magic !=  MAGICDESCR_2 {
         log::info!("bad magic");
@@ -155,30 +158,38 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
         println!("old version of dump");
         return Err(io::Error::new(io::ErrorKind::Other, "old format of dump"));
     }
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.dumpmode as *const u8) as *mut u8, ::std::mem::size_of::<u8>() )};
-    io_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<u8>()];
+    io_in.read_exact(&mut it_slice)?;
+    descr.dumpmode = u8::from_ne_bytes(it_slice);
     log::info!(" dumpmode {:?} ", descr.dumpmode);
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.max_nb_connection as *const u8) as *mut u8, ::std::mem::size_of::<u8>() )};
-    io_in.read_exact(it_slice)?;
+    //
+    let mut it_slice = [0u8; std::mem::size_of::<u8>()];
+    io_in.read_exact(&mut it_slice)?;
+    descr.max_nb_connection = u8::from_ne_bytes(it_slice);
     log::info!(" max_nb_connection {:?} ", descr.max_nb_connection);
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.nb_layer as *const u8) as *mut u8, ::std::mem::size_of::<u8>() )};
-    io_in.read_exact(it_slice)?;
+    //
+    let mut it_slice = [0u8; std::mem::size_of::<u8>()];    
+    io_in.read_exact(&mut it_slice)?;
+    descr.nb_layer = u8::from_ne_bytes(it_slice);
     log::info!("nb_layer  {:?} ", descr.nb_layer);
     // ef 
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.ef as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-    io_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];    
+    io_in.read_exact(&mut it_slice)?;
+    descr.ef = usize::from_ne_bytes(it_slice);
     log::info!("ef  {:?} ", descr.ef);
     // nb_point
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.nb_point as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-    io_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+    io_in.read_exact(&mut it_slice)?;
+    descr.nb_point = usize::from_ne_bytes(it_slice);
     // read dimension
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&descr.dimension as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-    io_in.read_exact(it_slice)?;    
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+    io_in.read_exact(&mut it_slice)?;
+    descr.dimension = usize::from_ne_bytes(it_slice);
     log::info!("nb_point {:?} dimension {:?} ", descr.nb_point, descr.dimension);    
     // distance name
-    let len : usize = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&len as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-    io_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+    io_in.read_exact(&mut it_slice)?;
+    let len : usize = usize::from_ne_bytes(it_slice);
     log::debug!("length of distance name {:?} ", len);
     if len > 256 {
         log::info!(" length of distance name > 256");
@@ -192,9 +203,9 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     log::debug!("distance name {:?} ", distname);
     descr.distname = distname;
     // reload of type name
-    let len : usize = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&len as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-    io_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+    io_in.read_exact(&mut it_slice)?;
+    let len : usize = usize::from_ne_bytes(it_slice);
     log::debug!("length of T  name {:?} ", len);
     if len > 256 {
         println!(" length of T name should not exceed 256");
@@ -232,38 +243,43 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
 fn dump_point<'a, T:Serialize+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> , mode : DumpMode, 
                     graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
     //
-    graphout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICPOINT) } ).unwrap();
+    graphout.write(&MAGICPOINT.to_ne_bytes()).unwrap();
     // dump ext_id: usize , layer : u8 , rank in layer : i32
-    graphout.write(unsafe { &mem::transmute::<usize, [u8;8]>(point.get_origin_id()) } ).unwrap();
+    graphout.write(&point.get_origin_id().to_ne_bytes()).unwrap();
     let p_id = point.get_point_id();
     if mode == DumpMode::Full {
-        graphout.write(unsafe { &mem::transmute::<u8, [u8;1]>(p_id.0) } ).unwrap();
-        graphout.write(unsafe { &mem::transmute::<i32, [u8;4]>(p_id.1) } ).unwrap();
+        graphout.write(&p_id.0.to_ne_bytes()).unwrap();
+        graphout.write(&p_id.1.to_ne_bytes()).unwrap();
     }
-//        log::debug!(" point dump {:?} {:?}  ", p_id, self.get_origin_id());
+    log::trace!(" point dump {:?} {:?}  ", p_id, point.get_origin_id());
     // then dump neighborhood info : nb neighbours : u32 , then list of origin_id, layer, rank_in_layer
     let neighborhood = point.get_neighborhood_id();
     // in any case nb_layers are dumped with possibly 0 neighbours at a layer, but this does not occur by construction
     for l in 0..neighborhood.len() {
         let neighbours_at_l = &neighborhood[l];
-        graphout.write(unsafe { &mem::transmute::<u8, [u8;1]>(neighbours_at_l.len() as u8) } ).unwrap();
+        // Caution : we dump number of neighbours as a usize, even if it cannot be so large!
+        let nbg_l : usize = neighbours_at_l.len();
+        log::trace!("\t dumping nbng : {} at l {}", nbg_l, l);
+        graphout.write(&nbg_l.to_ne_bytes()).unwrap();
         for n in neighbours_at_l { // dump d_id : uszie , distance : f32, layer : u8, rank in layer : i32
-            graphout.write(unsafe { &mem::transmute::<usize, [u8;8]>(n.d_id) } ).unwrap();
+            graphout.write(&n.d_id.to_ne_bytes()).unwrap();
             if mode == DumpMode::Full {
-                graphout.write(unsafe { &mem::transmute::<u8, [u8;1]>(n.p_id.0) } ).unwrap();
-                graphout.write(unsafe { &mem::transmute::<i32, [u8;std::mem::size_of::<i32>()]>(n.p_id.1) } ).unwrap();
+                graphout.write(&n.p_id.0.to_ne_bytes()).unwrap();
+                graphout.write(&n.p_id.1.to_ne_bytes()).unwrap();
             }
-            graphout.write(unsafe { &mem::transmute::<f32, [u8;std::mem::size_of::<f32>()]>(n.distance) } ).unwrap();
+            graphout.write(&n.distance.to_ne_bytes()).unwrap();
 //                log::debug!("        voisins  {:?}  {:?}  {:?}", n.p_id,  n.d_id , n.distance);
         }
     }
     // now we dump data vector!
-    dataout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICDATAP) } ).unwrap();
-    dataout.write(unsafe { &mem::transmute::<u64, [u8;8]>(point.get_origin_id() as u64) } ).unwrap();
+    dataout.write(&MAGICDATAP.to_ne_bytes()).unwrap();
+    let origin_u64 = point.get_origin_id() as u64;
+    dataout.write(&origin_u64.to_ne_bytes()).unwrap();
     //
     let serialized : Vec<u8> = bincode::serialize(point.get_v()).unwrap();
 //    log::debug!("serializing len {:?}", serialized.len());
-    dataout.write(unsafe { &mem::transmute::<u64, [u8;8]>(serialized.len() as u64) } ).unwrap();
+    let len_64 = serialized.len() as u64;
+    dataout.write(&len_64.to_ne_bytes()).unwrap();
     dataout.write_all(&serialized).unwrap();
     //
     return Ok(1);
@@ -281,55 +297,52 @@ fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut d
                                                 data_in: &mut dyn Read) -> io::Result<(Arc<Point<T>>, Vec<Vec<Neighbour> >) > {
     //
     // read and check magic
-    let magic : u32 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&magic as *const u32) as *mut u8, ::std::mem::size_of::<u32>() )};
-    graph_in.read_exact(it_slice)?;
+    let mut it_slice  = [0u8; std::mem::size_of::<u32>()];
+    graph_in.read_exact(&mut it_slice).unwrap();
+    let magic = u32::from_ne_bytes(it_slice);
     if magic != MAGICPOINT {
         log::debug!("got instead of MAGICPOINT {:x}", magic);
         return Err(io::Error::new(io::ErrorKind::Other, "bad magic at point beginning"));
     }
-    let origin_id : DataId = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&origin_id as *const DataId) as *mut u8, 
-                                ::std::mem::size_of::<DataId>())};
-    graph_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<DataId>()];
+    graph_in.read_exact(&mut it_slice).unwrap();
+    let origin_id = DataId::from_ne_bytes(it_slice);
+    // read point_id
+    let mut it_slice = [0u8; std::mem::size_of::<u8>()];
+    graph_in.read_exact(&mut it_slice)?;
+    let layer = u8::from_ne_bytes(it_slice); 
     //
-    let layer : u8 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&layer as *const u8) as *mut u8, 
-                                ::std::mem::size_of::<u8>() )};
-    graph_in.read_exact(it_slice)?;
-    //
-    let rank_in_l : i32 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&rank_in_l as *const i32) as *mut u8, 
-                                ::std::mem::size_of::<i32>() )};
-    graph_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<i32>()];
+    graph_in.read_exact(&mut it_slice)?;
+    let rank_in_l = i32::from_ne_bytes(it_slice);
     let p_id = PointId{0: layer, 1:rank_in_l};
 //    log::debug!(" point load {:?} {:?}  ", p_id, origin_id);
     // Now  for each layer , read neighbours
     let nb_layer = descr.nb_layer;
-    let nb_neighbours : u8 = 0;
     let mut neighborhood = Vec::<Vec<Neighbour> >::with_capacity(NB_LAYER_MAX as usize);
     for _l in 0..nb_layer {
-        let neighbour : Neighbour = Default::default();
-        // read nb_neighbour : u8, then nb_neighbours times identity(depends on Full or Light) distance : f32 
-        let it_slice = unsafe {::std::slice::from_raw_parts_mut((&nb_neighbours as *const u8) as *mut u8, 
-                                        ::std::mem::size_of::<u8>() )};
-        graph_in.read_exact(it_slice)?;
+        let mut neighbour : Neighbour = Default::default();
+        // read nb_neighbour as usize!!! CAUTION, then nb_neighbours times identity(depends on Full or Light) distance : f32 
+        let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+        graph_in.read_exact(&mut it_slice)?;
+        let nb_neighbours = usize::from_ne_bytes(it_slice);
         let mut neighborhood_l : Vec<Neighbour> = Vec::with_capacity(nb_neighbours as usize);
         for _j in 0..nb_neighbours {
-            let it_slice = unsafe {::std::slice::from_raw_parts_mut((&neighbour.d_id as *const DataId) as *mut u8, 
-                                        ::std::mem::size_of::<DataId>() )};
-            graph_in.read_exact(it_slice)?;
+            let mut it_slice = [0u8; std::mem::size_of::<DataId>()];
+            graph_in.read_exact(&mut it_slice)?; 
+            neighbour.d_id = DataId::from_ne_bytes(it_slice);          
             if descr.dumpmode == 1 {
-                let it_slice = unsafe {::std::slice::from_raw_parts_mut((&neighbour.p_id.0 as *const u8) as *mut u8, 
-                                        ::std::mem::size_of::<u8>() )};
-                graph_in.read_exact(it_slice)?;
-                let it_slice = unsafe {::std::slice::from_raw_parts_mut((&neighbour.p_id.1 as *const i32) as *mut u8, 
-                                        ::std::mem::size_of::<i32>() )};
-                graph_in.read_exact(it_slice)?;
+                let mut it_slice = [0u8; std::mem::size_of::<u8>()];
+                graph_in.read_exact(&mut it_slice)?;
+                neighbour.p_id.0 = u8::from_ne_bytes(it_slice);
+                //
+                let mut it_slice = [0u8; std::mem::size_of::<i32>() ];
+                graph_in.read_exact(&mut it_slice)?;
+                neighbour.p_id.1 = i32::from_ne_bytes(it_slice);
             }
-            let it_slice = unsafe {::std::slice::from_raw_parts_mut((&neighbour.distance as *const f32) as *mut u8, 
-                                        ::std::mem::size_of::<f32>() )};
-            graph_in.read_exact(it_slice)?;
+            let mut it_slice = [0u8; std::mem::size_of::<f32>()];
+            graph_in.read_exact(&mut it_slice)?;
+            neighbour.distance = f32::from_ne_bytes(it_slice);
         //  log::debug!("        voisins  load {:?} {:?} {:?} ", neighbour.p_id, neighbour.d_id , neighbour.distance);
             // now we have a new neighbour, we must really fill neighbourhood info, so it means going from Neighbour to PointWithOrder
             neighborhood_l.push(neighbour);
@@ -342,23 +355,22 @@ fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut d
     //
     // construct a point from data_in
     //
-    let magic : u32 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&magic as *const u32) as *mut u8, 
-                                        ::std::mem::size_of::<u32>() )}; 
-    data_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<u32>()];
+    data_in.read_exact(&mut it_slice)?;
+    let magic = u32::from_ne_bytes(it_slice);
     assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in load_point, point_id : {:?} ", origin_id);
     // read origin id
-    let origin_id_data : usize = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&origin_id_data as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-    data_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<u64>()];
+    data_in.read_exact(&mut it_slice)?;
+    let origin_id_data = u64::from_ne_bytes(it_slice) as usize;
     assert_eq!(origin_id, origin_id_data, "origin_id incoherent between graph and data");
     // now read data. we use size_t that is in description, to take care of the casewhere we reload
-    let serialized_len : u64 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&serialized_len as *const u64) as *mut u8, ::std::mem::size_of::<u64>() )};
-    data_in.read_exact(it_slice)?; 
+    let mut it_slice = [0u8; std::mem::size_of::<u64>()];
+    data_in.read_exact(&mut it_slice)?;
+    let serialized_len = u64::from_ne_bytes(it_slice);
 //    log::debug!("serialized len to reload {:?}", serialized_len);
-    // could do allocation with_capacity() and then using unsafe set_len() which avoid explicit initialization
     let mut v_serialized = Vec::<u8>::new();
+    // TODO avoid initialization
     v_serialized.resize(serialized_len as usize, 0);
     data_in.read_exact(&mut v_serialized)?;
     let v : Vec<T>;
@@ -392,13 +404,13 @@ impl <T:Serialize+DeserializeOwned+Clone+Send+Sync> HnswIO for PointIndexation<T
         // dump max_layer
         let layers = self.points_by_layer.read();
         let nb_layer = layers.len() as u8;
-        graphout.write(unsafe { &mem::transmute::<u8, [u8;1]>(nb_layer) } ).unwrap();
+        graphout.write(&nb_layer.to_ne_bytes()).unwrap();
         // dump layers from lower (most populatated to higher level)
         for i in 0..layers.len() {
             let nb_point = layers[i].len();
             log::debug!("dumping layer {:?}, nb_point {:?}", i, nb_point);
-            graphout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICLAYER) } ).unwrap();
-            graphout.write(unsafe { &mem::transmute::<usize, [u8;8]>(nb_point) } ).unwrap();
+            graphout.write(&MAGICLAYER.to_ne_bytes()).unwrap();
+            graphout.write(&nb_point.to_ne_bytes()).unwrap();
             for j in 0..layers[i].len() {
                 assert_eq!(layers[i][j].get_point_id() , PointId{0: i as u8,1:j as i32 });
                 dump_point(&layers[i][j], mode, graphout, dataout)?;
@@ -408,11 +420,11 @@ impl <T:Serialize+DeserializeOwned+Clone+Send+Sync> HnswIO for PointIndexation<T
         let ep_read = self.entry_point.read();
         assert!(ep_read.is_some());
         let ep = ep_read.as_ref().unwrap();
-        graphout.write(unsafe { &mem::transmute::<DataId,[u8; ::std::mem::size_of::<DataId>()] >(ep.get_origin_id()) } ).unwrap();
+        graphout.write(&ep.get_origin_id().to_ne_bytes()).unwrap();
         let p_id = ep.get_point_id();
         if mode == DumpMode::Full {
-            graphout.write(unsafe { &mem::transmute::<u8, [u8;1]>(p_id.0) } ).unwrap();
-            graphout.write(unsafe { &mem::transmute::<i32, [u8;4]>(p_id.1) } ).unwrap();
+            graphout.write(&p_id.0.to_ne_bytes()).unwrap();
+            graphout.write(&p_id.1.to_ne_bytes()).unwrap();
         }
         log::info!("dumped entry_point origin_d {:?}, p_id {:?} ", ep.get_origin_id(), p_id);
         //
@@ -437,9 +449,9 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
     let mut points_by_layer : Vec<Vec<Arc<Point<T>> > >= Vec::with_capacity(NB_LAYER_MAX as usize);
     let mut neighbourhood_map : HashMap<PointId, Vec<Vec<Neighbour>> > =  HashMap::new();
     // load max layer
-    let nb_layer : u8 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&nb_layer as *const u8) as *mut u8, ::std::mem::size_of::<u8>() )};
-    graph_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; ::std::mem::size_of::<u8>() ];
+    graph_in.read_exact(&mut it_slice)?;
+    let nb_layer = u8::from_ne_bytes(it_slice);
     log::debug!("nb layer {:?}", nb_layer);
     if nb_layer > NB_LAYER_MAX {
         return Err(io::Error::new(io::ErrorKind::Other, "inconsistent number of layErrers"));
@@ -450,15 +462,15 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
     for l in 0..nb_layer as usize {
         // read and check magic
         log::debug!("loading layer {:?}", l);
-        let magic : u32 = 0;
-        let it_slice = unsafe {::std::slice::from_raw_parts_mut((&magic as *const u32) as *mut u8, ::std::mem::size_of::<u32>() )};
-        graph_in.read_exact(it_slice)?;
+        let mut it_slice = [0u8; ::std::mem::size_of::<u32>() ];
+        graph_in.read_exact(&mut it_slice)?;
+        let magic = u32::from_ne_bytes(it_slice);
         if magic != MAGICLAYER {
             return Err(io::Error::new(io::ErrorKind::Other, "bad magic at layer beginning"));
         }
-        let nbpoints : usize = 0;
-        let it_slice = unsafe {::std::slice::from_raw_parts_mut((&nbpoints as *const usize) as *mut u8, ::std::mem::size_of::<usize>() )};
-        graph_in.read_exact(it_slice)?;
+        let mut it_slice = [0u8; ::std::mem::size_of::<usize>() ];
+        graph_in.read_exact(&mut it_slice)?;
+        let nbpoints = usize::from_ne_bytes(it_slice);
         log::debug!(" layer {:?} , nb points {:?}", l ,  nbpoints);
         let mut vlayer : Vec<Arc<Point<T>>> = Vec::with_capacity(nbpoints);
         for r in 0..nbpoints {
@@ -508,17 +520,17 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
     // load entry point
     log::info!("\n end of layer loading, allocating PointIndexation, nb points loaded {:?}", nb_points_loaded);
     //
-    let origin_id : usize = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&origin_id as *const DataId) as *mut u8, ::std::mem::size_of::<DataId>() )};
-    graph_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<DataId>()];
+    graph_in.read_exact(&mut it_slice)?;
+    let origin_id = DataId::from_ne_bytes(it_slice);
     //
-    let layer : u8 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&layer as *const u8) as *mut u8, ::std::mem::size_of::<u8>() )};
-    graph_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; ::std::mem::size_of::<u8>()];
+    graph_in.read_exact(&mut it_slice)?;
+    let layer = u8::from_ne_bytes(it_slice);
     //
-    let rank_in_l : i32 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut((&rank_in_l as *const i32) as *mut u8, ::std::mem::size_of::<i32>() )};
-    graph_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<i32>() ];
+    graph_in.read_exact(&mut it_slice)?;
+    let rank_in_l = i32::from_ne_bytes(it_slice);
     //
     log::info!("found entry point, origin_id {:?} , layer {:?}, rank in layer {:?} ", origin_id, layer, rank_in_l);
     let entry_point = Arc::clone(&points_by_layer[layer as usize][rank_in_l as usize]);
@@ -572,8 +584,8 @@ impl <T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sy
         log::debug!("dump  obtained typename {:?}", type_name::<T>());
         description.dump(mode, graphout)?;
         // We must dump a header for dataout.
-        dataout.write(unsafe { &mem::transmute::<u32, [u8;4]>(MAGICDATAP) } ).unwrap();
-        dataout.write(unsafe { &mem::transmute::<usize, [u8;::std::mem::size_of::<usize>()]>(datadim) } ).unwrap();
+        dataout.write(&MAGICDATAP.to_ne_bytes()).unwrap();
+        dataout.write(&datadim.to_ne_bytes()).unwrap();
         //
         self.layer_indexed_points.dump(mode, graphout, dataout)?;
         Ok(1)
@@ -591,15 +603,14 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
                                             description: &Description, 
                                             data_in : &mut dyn Read) -> io::Result<Hnsw<T,D> > {
     //  In datafile , we must read MAGICDATAP and dimension and check
-    let magic : u32 = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&magic as *const u32) as *mut u8, 
-                                        ::std::mem::size_of::<u32>() )}; 
-    data_in.read_exact(it_slice)?;
+    let mut it_slice = [0u8; std::mem::size_of::<u32>()];
+    data_in.read_exact(&mut it_slice)?;
+    let magic = u32::from_ne_bytes(it_slice);
     assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in load_point");
-    let dimension : usize = 0;
-    let it_slice = unsafe {::std::slice::from_raw_parts_mut( (&dimension as *const usize) as *mut u8, 
-        ::std::mem::size_of::<usize>() )};
-    data_in.read_exact(it_slice)?;
+    //
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+    data_in.read_exact(&mut it_slice)?;
+    let dimension = usize::from_ne_bytes(it_slice);
     assert_eq!(dimension, description.dimension, "data dimension incoherent {:?} {:?} ", 
             dimension, description.dimension);
     //
