@@ -73,8 +73,8 @@ impl <T,D> AnnT for Hnsw<T,D>  where T:Serialize+DeserializeOwned+Clone+Send+Syn
             return Err("api::file_dump could not open file".to_string());            
         }
         let datafile = fileres.unwrap();
-        let mut graphbufw = BufWriter::with_capacity(10000000 , graphfile);
-        let mut databufw = BufWriter::with_capacity(10000000 , datafile);
+        let mut graphbufw = BufWriter::with_capacity(50_000_000 , graphfile);
+        let mut databufw = BufWriter::with_capacity(50_000_000 , datafile);
         let res = self.dump(DumpMode::Full, &mut graphbufw, &mut databufw);
         graphbufw.flush().unwrap();
         databufw.flush().unwrap();
