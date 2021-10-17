@@ -622,7 +622,7 @@ pub struct Hnsw<T:Clone+Send+Sync, D: Distance<T>> {
 
 impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     /// allocation function  
-    /// . max_nb_connection : number of neighbours stored in tables.  
+    /// . max_nb_connection : number of neighbours stored, by layer, in tables. Must be less than 256.
     /// . ef_construction : controls numbers of neighbours explored during construction. See README or paper.  
     /// . max_elements : hint to speed up allocation tables. number of elements expected.  
     /// . f : the distance function
@@ -631,6 +631,11 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         let layer_indexed_points = PointIndexation::<T>::new(max_nb_connection, adjusted_max_layer, max_elements);
         let extend_candidates = false;
         let keep_pruned = false;
+        //
+        if max_nb_connection > 256 {
+            println!("error max_nb_connection must be less equal than 256");
+            std::process::exit(1);
+        }
         //
         log::info!("Hnsw max_nb_connection {:?}", max_nb_connection);
         log::info!("Hnsw nb elements {:?}", max_elements);
@@ -869,7 +874,9 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
             // 
             if let Some(ep) = sorted_points.pop() {
                 // useful for projecting lower layer to upper layer. keep track of points encountered.
-                new_point.neighbours.write()[l as usize].push(Arc::clone(&ep));
+                if new_point.neighbours.read()[l as usize].len() < self.get_max_nb_connection() as usize {
+                    new_point.neighbours.write()[l as usize].push(Arc::clone(&ep));
+                }
                 // get the lowest distance point
                 let tmp_dist = self.dist_f.eval(data , & ep.point_ref.v);
                 if tmp_dist < dist_to_entry {

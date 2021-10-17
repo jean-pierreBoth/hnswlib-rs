@@ -656,6 +656,7 @@ impl  Distance<i32> for  DistHamming {
 implementHammingDistance!(u8);
 implementHammingDistance!(u16);
 implementHammingDistance!(u32);
+implementHammingDistance!(u64);
 implementHammingDistance!(i16);
 
 
