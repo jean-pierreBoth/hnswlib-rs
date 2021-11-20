@@ -80,9 +80,14 @@ lazy_static = { version = "1.4"}
 log = { version = "0.4"}
 env_logger = { version = "0.8"}
 
+packed_simd_2 = { version = "0.3", optional = true}
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
 hdf5 = {version = "0.7"}
 ndarray = {version = "0.14"}
 
+
+
+[features]
+packed_simd_f = [ "packed_simd_2"]

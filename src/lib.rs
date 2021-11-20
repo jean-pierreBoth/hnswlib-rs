@@ -1,9 +1,11 @@
+#![feature(portable_simd)]
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
 
 #[macro_use]
 extern crate lazy_static;
+
 
 
 pub mod hnsw;
