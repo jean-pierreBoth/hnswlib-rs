@@ -3,7 +3,7 @@
 //! For the heavily used case (f32) we provide simd avx2 implementation.
 
 
-
+#[cfg(portable_simd)]
 use std::simd::{u32x16, u64x8, i32x16, i64x8};
 
 use simdeez::avx2::*;
@@ -136,13 +136,13 @@ impl  Distance<f32> for DistL1 {
         //
         // assert_eq!(va.len(), vb.len());
         //
-        if is_x86_feature_detected!("avx2") {
-            unsafe {distance_l1_f32_avx2(va,vb)}
-         }
-         else {
-            va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32).abs()).sum()
-         }
-    }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            if is_x86_feature_detected!("avx2") {
+                return unsafe {distance_l1_f32_avx2(va,vb)};
+            }
+        }
+        va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32).abs()).sum()
+    } // end of eval
 
 }
 //========================================================================
@@ -200,7 +200,7 @@ unsafe fn distance_l2_f32<S: Simd> (va:&[f32], vb: &[f32]) -> f32 {
 }  // end of distance_l2_f32
 
 
- #[target_feature(enable = "avx2")]
+#[target_feature(enable = "avx2")]
 unsafe fn distance_l2_f32_avx2(va:&[f32], vb: &[f32]) -> f32 {
     distance_l2_f32::<Avx2>(va,vb)
 }
@@ -210,14 +210,14 @@ unsafe fn distance_l2_f32_avx2(va:&[f32], vb: &[f32]) -> f32 {
 impl  Distance<f32> for DistL2 {
     fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
         //
-        if is_x86_feature_detected!("avx2") {
-            unsafe {distance_l2_f32_avx2(va,vb)}
-         }
-         else {
-            let norm : f32 = va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32) * (*t.0 as f32- *t.1 as f32)).sum();
-            assert!(norm >= 0.);
-            norm.sqrt()
-         }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            if is_x86_feature_detected!("avx2") {
+                return unsafe {distance_l2_f32_avx2(va,vb)};
+            }
+        }
+        let norm : f32 = va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32) * (*t.0 as f32- *t.1 as f32)).sum();
+        assert!(norm >= 0.);
+        norm.sqrt()
     }
 
 }
@@ -337,18 +337,19 @@ unsafe fn distance_dot_f32_sse2(va:&[f32], vb: &[f32]) -> f32 {
 impl  Distance<f32> for DistDot {
     fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
         //
-        if is_x86_feature_detected!("avx2") {
-            unsafe { distance_dot_f32_avx2(va,vb) }
-        }
-        else if  is_x86_feature_detected!("sse2") {
-            unsafe { distance_dot_f32_sse2(va,vb) }
-        }
-        else {
-            let dot = 1. - va.iter().zip(vb.iter()).map(|t| (*t.0 * *t.1) as f32).fold(0., |acc , t| (acc + t));
-            assert!( dot >= 0.);
-            dot
-         }
-    }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            if is_x86_feature_detected!("avx2") {
+                return unsafe { distance_dot_f32_avx2(va,vb) };
+            }
+            else if  is_x86_feature_detected!("sse2") {
+                return unsafe { distance_dot_f32_sse2(va,vb) };
+            }
+        } // end x86
+        //
+        let dot = 1. - va.iter().zip(vb.iter()).map(|t| (*t.0 * *t.1) as f32).fold(0., |acc , t| (acc + t));
+        assert!( dot >= 0.);
+        dot
+    } // end of eval
 }
 
 pub fn l2_normalize(va:&  mut [f32]) {
@@ -433,17 +434,17 @@ unsafe fn distance_hellinger_f32_avx2(va:&[f32], vb: &[f32]) -> f32 {
 impl  Distance<f32> for  DistHellinger {
     fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
         //
-        if is_x86_feature_detected!("avx2") {
-            unsafe { distance_hellinger_f32_avx2(va,vb) }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            if is_x86_feature_detected!("avx2") {
+                return unsafe { distance_hellinger_f32_avx2(va,vb) };
+            }
         }
-        else {
-            let mut dist = va.iter().zip(vb.iter()).map(|t| ((*t.0).sqrt() * (*t.1).sqrt()) as f32).fold(0., |acc , t| (acc + t*t));
-            // if too far away from >= panic else reset!
-            assert!(1. - dist >= -0.000001);
-            dist = (1. - dist).max(0.).sqrt();
-            dist
-         }
-    }
+        let mut dist = va.iter().zip(vb.iter()).map(|t| ((*t.0).sqrt() * (*t.1).sqrt()) as f32).fold(0., |acc , t| (acc + t*t));
+        // if too far away from >= panic else reset!
+        assert!(1. - dist >= -0.000001);
+        dist = (1. - dist).max(0.).sqrt();
+        dist
+    }  // end of eval
 }
 
 
@@ -533,14 +534,14 @@ unsafe fn distance_jeffreys_f32_avx2(va:&[f32], vb: &[f32]) -> f32 {
 impl  Distance<f32> for  DistJeffreys {
     fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
         //
-        if is_x86_feature_detected!("avx2") {
-            unsafe { distance_jeffreys_f32_avx2(va,vb) }
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            if is_x86_feature_detected!("avx2") {
+                return unsafe { distance_jeffreys_f32_avx2(va,vb) };
+            }
         }
-        else {
-            let dist = va.iter().zip(vb.iter()).map(|t| (*t.0 - *t.1) * ((*t.0).max(M_MIN)/ (*t.1).max(M_MIN)).ln() as f32).fold(0., |acc , t| (acc + t*t));
-            dist
-         }
-    }
+        let dist = va.iter().zip(vb.iter()).map(|t| (*t.0 - *t.1) * ((*t.0).max(M_MIN)/ (*t.1).max(M_MIN)).ln() as f32).fold(0., |acc , t| (acc + t*t));
+        dist
+    } // end of eval
 }
 
 
@@ -645,7 +646,7 @@ unsafe fn distance_hamming_i32<S: Simd> (va:&[i32], vb: &[i32]) -> f32 {
 
 
 
-//#[cfg(packed_simd_f)]
+#[cfg(portable_simd)]
 fn distance_jaccard_u32_16_simd(va:&[u32], vb: &[u32]) -> f32 {
     let mut dist_simd = i32x16::splat(0);
     //
@@ -672,6 +673,7 @@ fn distance_jaccard_u32_16_simd(va:&[u32], vb: &[u32]) -> f32 {
 
 
 
+#[cfg(portable_simd)]
 fn distance_jaccard_u64_8_simd(va:&[u64], vb: &[u64]) -> f32 {
     let mut dist_simd = i64x8::splat(0);
     //
@@ -701,43 +703,32 @@ fn distance_jaccard_u64_8_simd(va:&[u64], vb: &[u64]) -> f32 {
 impl  Distance<i32> for  DistHamming {
     fn eval(&self, va:&[i32], vb: &[i32]) -> f32 {
         //
-        if is_x86_feature_detected!("avx2") {
-            unsafe { distance_hamming_i32_avx2(va,vb) }
-        }
-        else {
-            assert_eq!(va.len(), vb.len());
-            let dist : f32 = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count() as f32;
-            dist / va.len() as f32
-         }
-    }
-} // end implementation Distance<i32>
-
-
-
-//#[cfg(packed_simd_f)]
-impl  Distance<u32> for  DistHamming {
-    fn eval(&self, va:&[u32], vb: &[u32]) -> f32 {
-        //
-        if is_x86_feature_detected!("avx512f") {
-            return distance_jaccard_u32_16_simd(va,vb);
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+            if is_x86_feature_detected!("avx2") {
+                return unsafe { distance_hamming_i32_avx2(va,vb) };
+            }
         }
         assert_eq!(va.len(), vb.len());
         let dist : f32 = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count() as f32;
         dist / va.len() as f32
     } // end of eval
+} // end implementation Distance<i32>
+
+
+
+#[cfg(portable_simd)]
+impl  Distance<u32> for  DistHamming {
+    fn eval(&self, va:&[u32], vb: &[u32]) -> f32 {
+        //
+        return distance_jaccard_u32_16_simd(va,vb);
+    } // end of eval
 } // end implementation Distance<u32>
 
 
-
+#[cfg(portable_simd)]
 impl  Distance<u64> for  DistHamming {
     fn eval(&self, va:&[u64], vb: &[u64]) -> f32 {
-        //
-        if is_x86_feature_detected!("avx512f") {
-            return distance_jaccard_u64_8_simd(va,vb);
-        }
-        assert_eq!(va.len(), vb.len());
-        let dist : f32 = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count() as f32;
-        dist / va.len() as f32
+        return distance_jaccard_u64_8_simd(va,vb);
     } // end of eval
 } // end implementation Distance<u64>
 
@@ -747,11 +738,11 @@ impl  Distance<u64> for  DistHamming {
 implementHammingDistance!(u8);
 implementHammingDistance!(u16);
 
-#[cfg(not(packed_simd_f))]
-//implementHammingDistance!(u32);
+#[cfg(not(portable_simd))]
+implementHammingDistance!(u32);
 
-
-//implementHammingDistance!(u64);
+#[cfg(not(portable_simd))]
+implementHammingDistance!(u64);
 
 implementHammingDistance!(i16);
 
@@ -958,36 +949,43 @@ fn test_access_to_dist_l1() {
 
 
 #[test]
-
 fn have_avx2() {
-    if is_x86_feature_detected!("avx2") {
-        println!("I have avx2");
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+        if is_x86_feature_detected!("avx2") {
+            println!("I have avx2");
+        }
+        else {
+            println!(" ************ I DO NOT  have avx2  ***************");
+        }
     }
-    else {
-        println!(" ************ I DO NOT  have avx2  ***************");
-    }
-}
+} // end if
+
 
 #[test]
 fn have_avx512f() {
-    if is_x86_feature_detected!("avx512f") {
-        println!("I have avx512f");
-    }
-    else {
-        println!(" ************ I DO NOT  have avx512f  ***************");
-    }
-}
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+        if is_x86_feature_detected!("avx512f") {
+            println!("I have avx512f");
+        }
+        else {
+            println!(" ************ I DO NOT  have avx512f  ***************");
+        }
+    } // end of have_avx512f
+} 
+
+
 
 #[test]
-
 fn have_sse2() {
-    if is_x86_feature_detected!("sse2") {
-        println!("I have sse2");
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+        if is_x86_feature_detected!("sse2") {
+            println!("I have sse2");
+        }
+        else {
+            println!(" ************ I DO NOT  have SSE2  ***************");
+        }
     }
-    else {
-        println!(" ************ I DO NOT  have SSE2  ***************");
-    }
-}
+} // end of have_sse2
 
 
 #[test]
@@ -1051,6 +1049,8 @@ fn test_jaccard_u16() {
     assert_eq!(dist, 1. - 11./16.);
 } // end of test_jaccard
 
+
+
 #[test]
     fn test_levenshtein() {
         let mut v1: Vec<u16> = vec![1,2,3,4];
@@ -1092,7 +1092,6 @@ extern "C" fn dist_func_float(va : *const f32, vb : *const f32, len : c_ulonglon
 
 
 #[test]
-
 fn test_dist_ext_float() {
     let va : Vec::<f32> = vec! [1. , 2., 3.];
     let vb : Vec::<f32> = vec! [1. , 2., 3.];
@@ -1129,11 +1128,10 @@ fn test_my_closure() {
     let _hnsw = Hnsw::<f32, DistFn<f32> >::new(10, 3, 100, 16, my_boxed_dist);
     //
     assert_eq!(dist, 0.2);
-   
-}
+}  // end of test_my_closure
+
 
 #[test]
-
 fn test_hellinger() {
     let length = 9; 
     let mut p_data = Vec::with_capacity(length);
@@ -1187,6 +1185,7 @@ fn test_jeffreys() {
     assert!((dist_eval-dist_test).abs() < 1.0e-5 );
 }
 
+
 #[test]
 fn test_jensenshannon() {
     init_log();
@@ -1215,7 +1214,10 @@ use rand::distributions::{Distribution, Uniform};
 
 #[test]
 fn test_simd_hamming_i32() {
-
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+    init_log();
+    log::info!("running test_simd_hamming_i32 for avx2");
+    //
     let size_test = 500;
     let imax = 3;
     let mut rng = rand::thread_rng();
@@ -1236,9 +1238,12 @@ fn test_simd_hamming_i32() {
             std::process::exit(1);
         }
     }
+}
 }  // end of test test_simd_jaccard_i32
 
+
 //  to run with cargo test --features packed_simd_f -- dist::tests::test_simd_hamming_u32
+#[cfg(portable_simd)]
 #[test]
 fn test_simd_hamming_u32() {
     init_log();
@@ -1267,6 +1272,7 @@ fn test_simd_hamming_u32() {
 } // end of test_simd_hamming_u32
 
 
+#[cfg(portable_simd)]
 #[test]
 fn test_simd_hamming_u64() {
     init_log();

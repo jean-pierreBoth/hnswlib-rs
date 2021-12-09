@@ -6,3 +6,4 @@ dumpreloadtest*
 *.pdf
 *.html
 .idea/
+.vscode/

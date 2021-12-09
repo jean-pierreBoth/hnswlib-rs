@@ -89,5 +89,5 @@ ndarray = {version = "0.14"}
 
 
 
-[features]
-packed_simd_f = [ "packed_simd_2"]
+#[features]
+#packed_simd_f = [ "packed_simd_2"]
