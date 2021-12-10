@@ -45,9 +45,23 @@ See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.j
 ## Implementation
 
 The graph construction and searches are multithreaded with the **parking_lot** crate (See **parallel_insert_data** and **parallel_search_neighbours** functions and also examples files).  
-Simd Avx2 implementation, currently based on the **simdeez** crate, is provided for most distances in the **f32** heavily used case and for the Hamming distance for **i32**.
+Simd Avx2 implementation, currently based on the **simdeez** crate, is provided for most distances in the **f32** heavily used case and for the Hamming distance for **i32**. See *Building*.
 
 ## Building
+
+### Simd
+
+- The simd provided by the simdeez crate is accessible with the feature "simdeez_f" for x86_64 processors.
+Compile with **cargo build --release --features "simdeez_f"** .... 
+To compile this crate on a M1 chip just do not activate this feature.
+As soon as std::simd lands in rust stable, it will be the default.
+
+- It is nevertheless possible to experiment with std::simd by compiling with the feature stdsimd
+  which activates the transitory crate packed_simd_2. This requires rust nightly and uncommenting the first line of file *lib.rs*.
+  **This is discouraged** as (now) only the Hamming distance with the u32x16 and u64x8 typesis provided.
+
+
+### Julia interface
 
 By default the crate is a standalone project and builds a static libray and executable.
 To be used with the companion Julia package it is necessary to build a dynamic library.
@@ -132,6 +146,8 @@ Some lines extracted from this benchmark show how it works for f32 and L2 norm
     ....
 ```
 
+
+
 ## Contributions
 
 Petter Egesund added the DistLevenshtein distance.
@@ -142,3 +158,4 @@ Petter Egesund added the DistLevenshtein distance.
 2. A rust crate *edlib_rs* provides an interface to the *excellent* edlib C++ library  [(Cf edlib)](https://github.com/Martinsos/edlib) can be found at [edlib_rs](https://github.com/jean-pierreBoth/edlib-rs) or on crate.io. It can be used to define a user adhoc distance on &[u8] with normal, prefix or infix mode (which is useful in genomics alignment).
 3. The library do not depend anymore on hdf5 and ndarray. They are dev-dependancies needed for examples, this simplify compatibility issues.
 4. Added insertion methods for slices for easier use with the ndarray crate.
+5. simd/avx2 requires now the feature "simdeez_f". So by default the crate can compile on M1 chip and transitions to std::simd.

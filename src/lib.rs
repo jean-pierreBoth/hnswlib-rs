@@ -1,4 +1,7 @@
-#![feature(portable_simd)]
+//#![feature(portable_simd)]
+// prededing line to uncomment to get std::simd by using
+// packed_simd_2 = { version = "0.3", optional = true}
+// and compile with cargo [test|build] --features "stdsimd" ...
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
