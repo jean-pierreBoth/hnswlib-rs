@@ -56,9 +56,9 @@ Compile with **cargo build --release --features "simdeez_f"** ....
 To compile this crate on a M1 chip just do not activate this feature.
 As soon as std::simd lands in rust stable, it will be the default.
 
-- It is nevertheless possible to experiment with std::simd by compiling with the feature stdsimd
-  which activates the transitory crate packed_simd_2. This requires rust nightly and uncommenting the first line of file *lib.rs*.
-  **This is discouraged** as (now) only the Hamming distance with the u32x16 and u64x8 typesis provided.
+- It is nevertheless possible to experiment with std::simd. Compiling with the feature stdsimd
+  (**cargo build --release --features "stdsimd"**), activates the transitory crate packed_simd_2. This requires rust nightly and also to uncomment the first line of file *lib.rs*.
+  **This is discouraged** as (now) only the Hamming distance with the u32x16 and u64x8 types is provided.
 
 
 ### Julia interface
