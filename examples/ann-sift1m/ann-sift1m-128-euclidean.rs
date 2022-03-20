@@ -1,79 +1,59 @@
 use std::time::{Duration, SystemTime};
 use cpu_time::ProcessTime;
 
+use env_logger::{Builder};
 
+// search in paralle mode 8 core i7-10875H  @2.3Ghz time 100 neighbours
 
-
-//    glove 25 // 2.7 Ghz 4 cores 8Mb L3  k = 10
-//   ============================================
+//  max_nb_conn   ef_cons    ef_search   scale_factor    extend  keep pruned  recall        req/s      last ratio
 //
-// max_nb_conn   ef_cons    ef_search   scale_factor    extend  keep pruned  recall        req/s      last ratio
-//  24            800         64            1.           1          0          0.928        4090        1.003
-//  24            800         64            1.           1          1          0.927        4594        1.003
-//  24            400,        48            1.           1          0          0.919        6349        1.0044
-//  24            800         48            1            1          1          0.918        5785        1.005
-//  24            400         32            1.           0          0          0.898        8662         
-//  24            400         64            1.           1          0          0.930        4711        1.0027
-//  24            400         64            1.           1          1          0.921        4550        1.0039
-//  24            400         64            0.5          0          0          0.916        4896        1.0046
-//  24           1600         48            1            1          0          0.924        5380        1.0034
+//     64           800         64           1              0          0        0.976        4894       1.001
+//     64           800         128          1              0          0        0.985        3811       1.00064
+//     64           800         128          1              1          0        0.9854       3765       1.0
 
-//  32            400         48            1            1          0          0.93         4706        1.0026
-//  32            800         64            1            1          0          0.94         3780.       1.0015
-//  32            1600        48            1            1          0          0.934        4455        1.0023
-//  48            1600        48            1            1          0          0.945        3253        1.00098
-
-//  24            400         48            1            1          0          0.92         6036.       1.0038
-//  48            800         48            1            1          0          0.935        4018        1.002
-//  48            800         64            1            1          0          0.942        3091        1.0014
-//  48            800         64            0.5          1          0          0.9395       3234        1.00167
-//  48            800         64            1            1          1          0.9435       2640        1.00126
+//     64           1600        64           1              0          0        0.9877       3419.      1.0005
 
 
-// k = 100
+// search in paralle mode 8 core i7-10875H  @2.3Ghz time for 10 neighbours
 
-//  24            800         48            1            1          0          0.96         2432      1.004
-//  48            800        128            1            1          0          0.979        1626      1.001
-
-// glove 25 // 8 cores 2.3 Ghz 4 cores 8Mb L3  k = 100
-// ==================================================
-
-//  48            800         48            1            1          0          0.935        13400      1.002
-//  48            800        128            1            1          0          0.979         5227      1.002
-
+//     64           1600        128           1              0          0        0.9959       3077.      1.0001
+//     64           1600        64            1              0          0        0.9907       6100       1.0004
 
 use hnsw_rs::prelude::*;
 
 mod annhdf5;
-
 use annhdf5::*;
 
 
 pub fn main() {
+    //
+    Builder::from_default_env().init();
+    //
     let parallel = true;
     //
-    let fname = String::from("/home/jpboth/Data/ANN/glove-25-angular.hdf5");
+    let fname = String::from("/home/jpboth/Data/ANN/sift1m-128-euclidean.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
-    let mut anndata = annhdf5::AnnBenchmarkData::new(fname).unwrap();
-    // pre normalisation to use Dot computations instead of Cosine
-    anndata.do_l2_normalization();
+    let anndata = AnnBenchmarkData::new(fname).unwrap();
     // run bench
-    let nb_elem = anndata.train_data.len();
     let knbn_max = anndata.test_distances.dim().1;
+    let nb_elem = anndata.train_data.len();
     log::info!(" train size : {}, test size : {}", nb_elem, anndata.test_data.len());
     log::info!(" nb neighbours answers for test data : {} \n\n", knbn_max);
     //
-    let max_nb_connection = 48;
-    let ef_c = 800;
-    println!(" max_nb_conn : {:?}, ef_construction : {:?} ", max_nb_connection,  ef_c);
+    let max_nb_connection = 64;
     let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
+    let ef_c = 1600;
+    //
     println!(" number of elements to insert {:?} , setting max nb layer to {:?} ef_construction {:?}", nb_elem, nb_layer, ef_c);
-    let nb_search = anndata.test_data.len();
-    println!(" number of search {:?}", nb_search);
-    // Hnsw allocation
-    let mut hnsw =  Hnsw::<f32, DistDot>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistDot{});
-    hnsw.set_extend_candidates(true);
+    println!(" =====================================================================================");
+    //
+    let mut hnsw =  Hnsw::<f32, DistL2>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistL2{});
+    //
+    let extend_flag = false;
+    log::info!("extend flag = {:?} ", extend_flag);
+    hnsw.set_extend_candidates(extend_flag);
+    //
     // parallel insertion
     let start = ProcessTime::now();
     let now = SystemTime::now();
@@ -94,16 +74,12 @@ pub fn main() {
     hnsw.dump_layer_info();
     println!(" hnsw data nb point inserted {:?}", hnsw.get_nb_point());
     //
-    //  Now the bench with 10 neighbours
     //
-    let knbn = 10;
-    let ef_search = 48;
-    search(&mut hnsw, knbn, ef_search, &anndata);
-
-    let knbn = 100;
-    let ef_search = 128;
+    let knbn = 10.min(knbn_max);
+    let ef_search = 64;
     search(&mut hnsw, knbn, ef_search, &anndata);
 }
+
 
 
 pub fn search<Dist>(hnsw: &mut Hnsw<f32, Dist>, knbn : usize, ef_search: usize, anndata : & AnnBenchmarkData) 
@@ -155,4 +131,4 @@ pub fn search<Dist>(hnsw: &mut Hnsw<f32, Dist>, knbn : usize, ef_search: usize, 
     println!("\n mean fraction nb returned by search {:?} ", (nb_returned.iter().sum::<usize>() as f32)/ ((nb_returned.len() * knbn) as f32));
     println!("\n last distances ratio {:?} ", last_distances_ratio.iter().sum::<f32>() / last_distances_ratio.len() as f32);
     println!("\n recall rate for {:?} is {:?} , nb req /s {:?}", anndata.fname, mean_recall, (nb_search as f32) * 1.0e+6_f32/search_sys_time);
-}
+}  // end of search

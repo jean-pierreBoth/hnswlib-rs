@@ -117,7 +117,10 @@ Then run: cargo build --examples --release.
 It is possible in these examples to change from parallel searches to serial searches to check for speeds
 or modify parameters to see the impact on performance.
 
-For example on the fashion-mnist-784-euclidean benchmark search requests run at 22197 req/s with a recall rate of 0.9775 on a laptop with 8 i7-cores at 2.3Ghz
+For example:
+1. On the fashion-mnist-784-euclidean benchmark search requests run at 22197 req/s with a recall rate of 0.9775 on a laptop with 8 i7-cores at 2.3Ghz
+2. On the sift1m benchmark (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 6100 req/s with a recall rate of 0.9907
+
 
 Some lines extracted from this benchmark show how it works for f32 and L2 norm
 

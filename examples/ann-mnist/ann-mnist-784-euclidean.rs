@@ -1,6 +1,7 @@
 use std::time::{Duration, SystemTime};
 use cpu_time::ProcessTime;
-// search in serial mode i7-core @2.7Ghz
+
+// search in serial mode i7-core @2.7Ghz for 10 fist neighbours
 //  max_nb_conn   ef_cons    ef_search   scale_factor    extend  keep pruned  recall        req/s      last ratio
 //
 //     12           400         12           1              0          0        0.917        6486       1.005
@@ -12,7 +13,7 @@ use cpu_time::ProcessTime;
 //     24           400         12           1              0          0        0.947        18425       1.003
 
 // 8 hyperthreaded i7-core @ 2.3 Ghz
-//     24           400         24           1              0          0        0.977       22197        1.001
+//     24           400         24           1              0          0        0.977        22197        1.001
 
 use hnsw_rs::prelude::*;
 
@@ -27,8 +28,11 @@ pub fn main() {
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
     let anndata = AnnBenchmarkData::new(fname).unwrap();
-    // run bench
+    let knbn_max = anndata.test_distances.dim().1;
     let nb_elem = anndata.train_data.len();
+    log::info!(" train size : {}, test size : {}", nb_elem, anndata.test_data.len());
+    log::info!(" nb neighbours answers for test data : {} \n\n", knbn_max);
+    //
     let max_nb_connection = 24;
     let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
     let ef_c = 400;
