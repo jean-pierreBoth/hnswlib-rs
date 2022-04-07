@@ -43,6 +43,10 @@ name = "ann-mnist"
 path = "examples/ann-mnist/ann-mnist-784-euclidean.rs"
 
 [[example]]
+name = "ann-sift1m"
+path = "examples/ann-sift1m/ann-sift1m-128-euclidean.rs"
+
+[[example]]
 name = "levenshtein"
 path = "examples/levensthein.rs"
 
@@ -65,7 +69,6 @@ num_cpus = {version = "1.8.0"}
 cpu-time = {version = "1.0"}
 
 
-clap = {version = "2.29"}
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
 hashbrown = {version = "0.9"}
 skiplist= {version = "0.3"}
