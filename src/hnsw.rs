@@ -369,7 +369,7 @@ impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
             }
         }
 
-        // Start the recursion, if an entry point exists.
+        // If an entry point exists, start the recursion.
         match self.entry_point.write().as_ref() {
             Some(i) => {
                 clear_neighborhoods(i.as_ref().deref(), &mut HashSet::new());
