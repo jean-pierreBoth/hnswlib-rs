@@ -14,9 +14,13 @@ use rayon::prelude::*;
 use std::sync::mpsc::channel;
 
 use std::any::{type_name};
+use std::borrow::Borrow;
 
 use hashbrown::HashMap;
 use std::collections::binary_heap::BinaryHeap;
+use std::collections::HashSet;
+use std::ops::Deref;
+use std::ptr::null;
 
 use log::debug;
 use log::trace;
@@ -347,6 +351,33 @@ pub struct PointIndexation<T:Clone+Send+Sync> {
     pub(crate) entry_point : Arc<RwLock<Option<Arc<Point<T>>  >> >,
 }
 
+// A point indexation may contain circular references. To deallocate these after a point indexation goes out of scope,
+// implement the Drop trait.
+impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
+
+    fn drop(&mut self) {
+        /// For each point in the graph, clear all neighbour references.
+        /// The graph is traversed recursively. Nodes that are visited are stored in the given hash-set.
+        fn clear_neighborhoods<T: Clone+Send+Sync>(init: &Point<T>, visited: &mut HashSet<PointId>) {
+            if visited.insert(init.p_id) {
+                for vcs in init.neighbours.write().as_slice() {
+                    for pt in vcs.as_slice() {
+                        clear_neighborhoods(&pt.point_ref, visited);
+                    }
+                }
+                init.neighbours.write().clear();
+            }
+        }
+
+        // Start the recursion, if an entry point exists.
+        match self.entry_point.write().as_ref() {
+            Some(i) => {
+                clear_neighborhoods(i.as_ref().deref(), &mut HashSet::new());
+            }
+            _ => {}
+        }
+    }
+}
 
 impl<T:Clone+Send+Sync> PointIndexation<T> {
     pub fn new(max_nb_connection: usize, max_layer:usize, max_elements:usize) -> Self {

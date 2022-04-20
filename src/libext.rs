@@ -3,6 +3,7 @@
 //! The macro declare_myapi_type!  produces struct HnswApif32 and so on.
 //! 
 
+use std::alloc::{dealloc, Layout};
 use std::ptr;
 use std::fs::OpenOptions;
 use std::io::{BufReader};
@@ -371,6 +372,15 @@ pub extern "C" fn init_hnsw_f32(max_nb_conn : usize, ef_const:usize, namelen: us
     } // znd match
 } // end of init_hnsw_f32
 
+#[no_mangle]
+pub unsafe extern "C" fn drop_hnsw_f32(p: *const HnswApif32) {
+    let _raw = Box::from_raw(p as *mut HnswApif32);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn drop_hnsw_u16(p: *const HnswApiu16) {
+    let _raw = Box::from_raw(p as *mut HnswApiu16);
+}
 
 
 #[no_mangle]
@@ -559,6 +569,38 @@ pub extern "C" fn init_hnsw_u32(max_nb_conn : usize, ef_const:usize, namelen: us
     p
 } // end of init_hnsw_i32
 
+#[no_mangle]
+pub extern "C" fn new_hnsw_f32(max_nb_conn : usize, ef_const:usize, namelen: usize, cdistname : *const u8, max_elements: usize, max_layer: usize) -> *const HnswApiu32 {
+    log::debug!("entering init_hnsw_u32");
+    let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
+    let dname = String::from_utf8_lossy(slice);
+    // map distname to sthg. This whole block will go to a macro
+    if dname == "DistL1" {
+        log::debug!(" received DistL1");
+        let h = Hnsw::<u32, DistL1 >::new(max_nb_conn, max_elements, max_layer, ef_const, DistL1{});
+        let api = HnswApiu32{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistL2" {
+        let h = Hnsw::<u32, DistL2 >::new(max_nb_conn, max_elements, max_layer, ef_const, DistL2{});
+        let api = HnswApiu32{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistJaccard" {
+        let h = Hnsw::<u32, DistJaccard >::new(max_nb_conn, max_elements, max_layer, ef_const, DistJaccard{});
+        let api = HnswApiu32{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistHamming" {
+        let h = Hnsw::<u32, DistHamming>::new(max_nb_conn, max_elements, max_layer, ef_const, DistHamming{});
+        let api = HnswApiu32{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    //
+    let p = ptr::null::< HnswApiu32 >();
+    p
+} // end of init_hnsw_i32
+
 
 
 #[no_mangle]
@@ -612,7 +654,48 @@ pub extern "C" fn init_hnsw_u16(max_nb_conn : usize, ef_const:usize, namelen: us
     else if dname == "DistJaccard" {
         let h = Hnsw::<u16, DistJaccard >::new(max_nb_conn, 10000, 16, ef_const, DistJaccard{});
         let api = HnswApiu16{opaque: Box::new(h)};
-        return Box::into_raw(Box::new(api));         
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistLevenshtein" {
+        let h = Hnsw::<u16, DistLevenshtein >::new(max_nb_conn, 10000, 16, ef_const, DistLevenshtein{});
+        let api = HnswApiu16{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    let p = ptr::null::< HnswApiu16 >();
+    p
+} // end of init_hnsw_u16
+
+#[no_mangle]
+pub extern "C" fn new_hnsw_u16(max_nb_conn : usize, ef_const:usize, namelen: usize, cdistname : *const u8, max_elements: usize, max_layer: usize) -> *const HnswApiu16 {
+    log::info!("entering init_hnsw_u16");
+    let  slice = unsafe { std::slice::from_raw_parts(cdistname, namelen)} ;
+    let dname = String::from_utf8_lossy(slice);
+    // map distname to sthg. This whole block will go to a macro
+    if dname == "DistL1" {
+        log::info!(" received DistL1");
+        let h = Hnsw::<u16, DistL1 >::new(max_nb_conn, max_elements, max_layer, ef_const, DistL1{});
+        let api = HnswApiu16{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistL2" {
+        let h = Hnsw::<u16, DistL2 >::new(max_nb_conn, max_elements, max_layer, ef_const, DistL2{});
+        let api = HnswApiu16{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistHamming" {
+        let h = Hnsw::<u16, DistHamming >::new(max_nb_conn, max_elements, max_layer, ef_const, DistHamming{});
+        let api = HnswApiu16{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistJaccard" {
+        let h = Hnsw::<u16, DistJaccard >::new(max_nb_conn, max_elements, max_layer, ef_const, DistJaccard{});
+        let api = HnswApiu16{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
+    }
+    else if dname == "DistLevenshtein" {
+        let h = Hnsw::<u16, DistLevenshtein >::new(max_nb_conn, max_elements, max_layer, ef_const, DistLevenshtein{});
+        let api = HnswApiu16{opaque: Box::new(h)};
+        return Box::into_raw(Box::new(api));
     }
     let p = ptr::null::< HnswApiu16 >();
     p
