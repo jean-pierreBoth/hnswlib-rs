@@ -14,13 +14,12 @@ use rayon::prelude::*;
 use std::sync::mpsc::channel;
 
 use std::any::{type_name};
-use std::borrow::Borrow;
 
 use hashbrown::HashMap;
 use std::collections::binary_heap::BinaryHeap;
+#[allow(unused)]
 use std::collections::HashSet;
-use std::ops::Deref;
-use std::ptr::null;
+
 
 use log::debug;
 use log::trace;
@@ -353,31 +352,56 @@ pub struct PointIndexation<T:Clone+Send+Sync> {
 
 // A point indexation may contain circular references. To deallocate these after a point indexation goes out of scope,
 // implement the Drop trait.
+
+
+
+#[cfg(feature = "droppi")]
 impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
 
     fn drop(&mut self) {
-        /// For each point in the graph, clear all neighbour references.
-        /// The graph is traversed recursively. Nodes that are visited are stored in the given hash-set.
+        log::info!("entering PointIndexation drop");
+        let mut dropped = HashSet::<PointId>::with_capacity(self.get_nb_point());
+        // clear_neighborhood. There are no point in neighborhoods that are not referenced directly in layers.
+        // so we cannot loose reference to a point by cleaning neighborhood 
         fn clear_neighborhoods<T: Clone+Send+Sync>(init: &Point<T>, visited: &mut HashSet<PointId>) {
             if visited.insert(init.p_id) {
-                for vcs in init.neighbours.write().as_slice() {
-                    for pt in vcs.as_slice() {
-                        clear_neighborhoods(&pt.point_ref, visited);
-                    }
+                let mut neighbours = init.neighbours.write();
+                let nb_layer = neighbours.len();
+                for l in 0..nb_layer {
+                    neighbours[l].clear();
                 }
-                init.neighbours.write().clear();
+                neighbours.clear();
             }
-        }
-
-        // If an entry point exists, start the recursion.
+        }    
+        // clear entry point
         match self.entry_point.write().as_ref() {
             Some(i) => {
-                clear_neighborhoods(i.as_ref().deref(), &mut HashSet::new());
+                clear_neighborhoods(i.as_ref().deref(), &mut dropped);
             }
             _ => {}
         }
-    }
-}
+        //
+        let nb_level = self.get_max_level_observed();
+        for l in 0..=nb_level {
+            let layer = &mut self.points_by_layer.write()[l as usize];
+            for p in layer {
+                clear_neighborhoods(p, &mut dropped);
+            }
+        }
+        //
+        for l in 0..=nb_level {
+            let layer = &mut self.points_by_layer.write()[l as usize];
+            layer.clear();
+        }
+        self.points_by_layer.write().clear();
+        log::debug!("exiting PointIndexation drop nb dropped : {}", dropped.len());
+    } // end my drop
+
+
+} // end implementation Drop
+
+
+
 
 impl<T:Clone+Send+Sync> PointIndexation<T> {
     pub fn new(max_nb_connection: usize, max_layer:usize, max_elements:usize) -> Self {

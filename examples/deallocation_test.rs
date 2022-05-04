@@ -1,4 +1,5 @@
-use serde::de::Unexpected::Map;
+use env_logger::{Builder};
+
 use hnsw_rs::dist::DistL1;
 use hnsw_rs::hnsw::Hnsw;
 
@@ -6,6 +7,9 @@ use hnsw_rs::hnsw::Hnsw;
 // This program sets up a process that iteratively builds a new model and lets it go out of scope.
 // Since the models go out of scope, the desired behavior is that memory consumption is constant while this program is running.
 fn main() {
+    //
+    Builder::from_default_env().init();
+    //
     let mut counter: usize = 0;
     loop {
         let hnsw: Hnsw<f32, DistL1> = Hnsw::new(
@@ -29,7 +33,7 @@ fn main() {
         hnsw.insert_slice((&s6, 5));
 
         if counter % 1_000_000 == 0 {
-            println!("{}", counter)
+            println!("counter : {}", counter)
         }
         counter = counter + 1;
     }

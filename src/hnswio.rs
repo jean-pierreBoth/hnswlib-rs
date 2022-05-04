@@ -501,6 +501,7 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
         nb_points_loaded += nbpoints;
     }
     // at this step all points are loaded , but without their neighbours fileds are not yet initialized
+    let mut nbp: usize = 0;
     for (p_id , neighbours) in &neighbourhood_map {
         let point = &points_by_layer[p_id.0 as usize][p_id.1 as usize];
         for l in 0..neighbours.len() {
@@ -514,6 +515,10 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
             //  must sort
             point.neighbours.write()[l].sort_unstable();
         } // end of for l
+        nbp += 1;
+        if nbp % 500_000 == 0{
+            log::debug!("reloading nb_points neighbourhood completed : {}", nbp);
+        }
     } // end loop in neighbourhood_map
     // 
     // get id of entry_point
@@ -649,6 +654,8 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
                         dist_f: D::default(),
                         searching : false,
                     } ;
+    //
+    log::debug!("load_hnsw completed");
     //
     Ok(hnsw)
 }  // end of load_hnsw

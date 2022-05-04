@@ -50,7 +50,9 @@ path = "examples/ann-sift1m/ann-sift1m-128-euclidean.rs"
 name = "levenshtein"
 path = "examples/levensthein.rs"
 
-#[[example]]
+[[example]]
+name = "deallocation"
+path = "examples/deallocation_test.rs"
 
 [dependencies]
 # default is version spec is ^ meaning can update up to max non null version number

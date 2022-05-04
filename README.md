@@ -106,7 +106,7 @@ The main parameters occuring in constructing the graph or in searching are:
     modify the search strategy. The interested user should check the paper to see the impact. By default
     the values are as recommended in the paper.
 
-## Examples and Benchmarks
+## Benchmarks and Examples
 
 Some examples are taken from the [ann-benchmarks site](https://github.com/erikbern/ann-benchmarks)
 and recall rates and request/s are given in comments in the examples files for some input parameters.
@@ -120,9 +120,11 @@ or modify parameters to see the impact on performance.
 For example:
 1. On the fashion-mnist-784-euclidean benchmark search requests run at 22197 req/s with a recall rate of 0.9775 on a laptop with 8 i7-cores at 2.3Ghz
 2. On the sift1m benchmark (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 6100 req/s with a recall rate of 0.9907 or at 3077 req/s with a recall rate of 0.9959, depending on the parameters.
+3. A tiny crate at [bigann](https://github.https://github.com/jean-pierreBoth/bigann)
+gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/) benchmark and can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
 
 
-Some lines extracted from this benchmark show how it works for f32 and L2 norm
+Some lines extracted from this Mnist benchmark show how it works for f32 and L2 norm
 
 ```rust
     //  reading data
