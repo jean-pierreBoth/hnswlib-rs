@@ -355,7 +355,6 @@ pub struct PointIndexation<T:Clone+Send+Sync> {
 
 
 
-#[cfg(feature = "droppi")]
 impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
 
     fn drop(&mut self) {
@@ -376,7 +375,7 @@ impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
         // clear entry point
         match self.entry_point.write().as_ref() {
             Some(i) => {
-                clear_neighborhoods(i.as_ref().deref(), &mut dropped);
+                clear_neighborhoods(i.as_ref(), &mut dropped);
             }
             _ => {}
         }
@@ -396,7 +395,6 @@ impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
         self.points_by_layer.write().clear();
         log::debug!("exiting PointIndexation drop nb dropped : {}", dropped.len());
     } // end my drop
-
 
 } // end implementation Drop
 
