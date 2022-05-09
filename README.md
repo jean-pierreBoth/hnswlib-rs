@@ -155,6 +155,7 @@ Some lines extracted from this Mnist benchmark show how it works for f32 and L2 
 
 ## Contributions
 
+[Sannsyn](https://sannsyn.com/en/) contributed to Drop implementation.   
 Petter Egesund added the DistLevenshtein distance.
 
 ## Notes
