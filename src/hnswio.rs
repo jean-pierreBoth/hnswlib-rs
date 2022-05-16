@@ -495,7 +495,7 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
             assert_eq!(r , p_id.1 as usize);
             // store neoghbour info of this point
             neighbourhood_map.insert(p_id, load_point_res.1);
-            vlayer.push(Arc::clone(&point));
+            vlayer.push(point);
         }
         points_by_layer.push(vlayer);
         nb_points_loaded += nbpoints;
@@ -509,7 +509,7 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
                 let n_point = &points_by_layer[n.p_id.0 as usize][n.p_id.1 as usize];
                 // now n_point is the Arc<Point> corresponding to neighbour n of point, 
                 // construct a corresponding PointWithOrder
-                let n_pwo = PointWithOrder::<T>::new(&Arc::clone(&n_point), n.distance);
+                let n_pwo = PointWithOrder::<T>::new(n_point, n.distance);
                 point.neighbours.write()[l].push(Arc::new(n_pwo));
             } // end of for n
             //  must sort

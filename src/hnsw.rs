@@ -6,6 +6,9 @@
 
 use serde::{Serialize, Deserialize};
 
+use std::time::{SystemTime};
+use cpu_time::ProcessTime;
+
 use std::cmp::Ordering;
 
 use parking_lot::{RwLock, Mutex, RwLockReadGuard};
@@ -358,42 +361,43 @@ pub struct PointIndexation<T:Clone+Send+Sync> {
 impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
 
     fn drop(&mut self) {
+        let cpu_start = ProcessTime::now();
+        let sys_now = SystemTime::now(); 
         log::info!("entering PointIndexation drop");
-        let mut dropped = HashSet::<PointId>::with_capacity(self.get_nb_point());
         // clear_neighborhood. There are no point in neighborhoods that are not referenced directly in layers.
         // so we cannot loose reference to a point by cleaning neighborhood 
-        fn clear_neighborhoods<T: Clone+Send+Sync>(init: &Point<T>, visited: &mut HashSet<PointId>) {
-            if visited.insert(init.p_id) {
+        fn clear_neighborhoods<T: Clone+Send+Sync>(init: &Point<T>) {
                 let mut neighbours = init.neighbours.write();
                 let nb_layer = neighbours.len();
                 for l in 0..nb_layer {
                     neighbours[l].clear();
                 }
                 neighbours.clear();
-            }
         }    
         // clear entry point
         match self.entry_point.write().as_ref() {
             Some(i) => {
-                clear_neighborhoods(i.as_ref(), &mut dropped);
+                clear_neighborhoods(i.as_ref());
             }
             _ => {}
         }
         //
         let nb_level = self.get_max_level_observed();
         for l in 0..=nb_level {
+            log::debug!("clearing layer {}", l);
             let layer = &mut self.points_by_layer.write()[l as usize];
-            for p in layer {
-                clear_neighborhoods(p, &mut dropped);
-            }
+            layer.into_par_iter().for_each(|p| clear_neighborhoods(p));
         }
         //
+        log::info!("dropping layers ...");
         for l in 0..=nb_level {
             let layer = &mut self.points_by_layer.write()[l as usize];
-            layer.clear();
+            drop(layer);
         }
-        self.points_by_layer.write().clear();
-        log::debug!("exiting PointIndexation drop nb dropped : {}", dropped.len());
+        log::info!("clearing self.points_by_layer...");
+        drop(self.points_by_layer.write());
+        log::debug!("exiting PointIndexation drop");
+        log::info!(" drop sys time(s) {:?} cpu time {:?}", sys_now.elapsed().unwrap().as_secs(), cpu_start.elapsed().as_secs());
     } // end my drop
 
 } // end implementation Drop
