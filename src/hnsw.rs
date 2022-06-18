@@ -425,7 +425,8 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
         }
     }  // end of new
 
-    fn get_max_level_observed(&self) -> u8 {
+    /// returns the maximum level of layer observed
+    pub fn get_max_level_observed(&self) -> u8 {
         let opt = self.entry_point.read();
         match opt.as_ref() {
             Some(arc_point) => arc_point.p_id.0,
@@ -526,6 +527,46 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
             };
         dim
     }
+
+    /// returns (**by cloning**) the data inside a point given it PointId, or None if PointId is not coherent.  
+    /// Can be useful after reloading from a dump.   
+    /// NOTE : This function should not be called during or before insertion in the structure is terminated as it
+    /// uses read locks to access the inside of Hnsw structure.
+    pub fn get_point_data(&self, p_id : &PointId) -> Option<Vec<T>> {
+        if p_id.1 < 0 {
+            return None;
+        }
+        let p : usize = std::convert::TryFrom::try_from(p_id.1).unwrap();
+        let l = p_id.0 as usize;
+        if p_id.0 <= self.get_max_level_observed() && p < self.get_layer_nb_point(l) {
+            return Some(self.points_by_layer.read()[l][p].get_v().to_vec());
+        }
+        else {
+            return None;
+        }
+    } // end of get_point_data
+
+
+    /// returns (**by Arc::clone**) the point given it PointId, or None if PointId is not coherent.  
+    /// Can be useful after reloading from a dump.   
+    /// NOTE : This function should not be called during or before insertion in the structure is terminated as it
+    /// uses read locks to access the inside of Hnsw structure.
+    pub fn get_point(&self,  p_id : &PointId) -> Option<Arc<Point<T>>> {
+        if p_id.1 < 0 {
+            return None;
+        }
+        let p : usize = std::convert::TryFrom::try_from(p_id.1).unwrap();
+        let l = p_id.0 as usize;
+        if p_id.0 <= self.get_max_level_observed() && p < self.get_layer_nb_point(l) {
+            return Some(self.points_by_layer.read()[l][p].clone());
+        }
+        else {
+            return None;
+        }        
+    }  // end of get_point
+
+
+
 
     /// get an iterator on the points stored in a given layer
     pub fn get_layer_iterator(&self, layer : usize) -> IterPointLayer<T> {
@@ -750,6 +791,11 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     /// to get the exact number of neighbours asked for.
     pub fn set_keeping_pruned(&mut self, flag: bool) {
         self.keep_pruned = flag;
+    }
+
+    /// retrieves the distance used in Hnsw construction
+    pub fn get_distance(&self) -> &D {
+        &self.dist_f
     }
 
     /// set extend_candidates to given flag. By default it is false.  
