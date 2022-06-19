@@ -551,7 +551,8 @@ impl<T:Clone+Send+Sync> PointIndexation<T> {
     /// Can be useful after reloading from a dump.   
     /// NOTE : This function should not be called during or before insertion in the structure is terminated as it
     /// uses read locks to access the inside of Hnsw structure.
-    pub fn get_point(&self,  p_id : &PointId) -> Option<Arc<Point<T>>> {
+#[allow(unused)]
+    pub(crate) fn get_point(&self,  p_id : &PointId) -> Option<Arc<Point<T>>> {
         if p_id.1 < 0 {
             return None;
         }
