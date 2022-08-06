@@ -384,17 +384,17 @@ impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
         //
         let nb_level = self.get_max_level_observed();
         for l in 0..=nb_level {
-            log::debug!("clearing layer {}", l);
+            log::trace!("clearing layer {}", l);
             let layer = &mut self.points_by_layer.write()[l as usize];
             layer.into_par_iter().for_each(|p| clear_neighborhoods(p));
         }
         //
-        log::info!("dropping layers ...");
+        log::trace!("dropping layers ...");
         for l in 0..=nb_level {
             let layer = &mut self.points_by_layer.write()[l as usize];
             drop(layer);
         }
-        log::info!("clearing self.points_by_layer...");
+        log::debug!("clearing self.points_by_layer...");
         drop(self.points_by_layer.write());
         log::debug!("exiting PointIndexation drop");
         log::info!(" drop sys time(s) {:?} cpu time {:?}", sys_now.elapsed().unwrap().as_secs(), cpu_start.elapsed().as_secs());
