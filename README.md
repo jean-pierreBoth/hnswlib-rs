@@ -3,7 +3,7 @@
 This crate provides a Rust implementation of the paper by Yu.A. Malkov and D.A Yashunin:
 
 "Efficient and Robust approximate nearest neighbours using Hierarchical Navigable Small World Graphs" (2016,2018)
-[https://arxiv.org/abs/1603.09320]
+[arxiv](https://arxiv.org/abs/1603.09320)
 
 ## License
 
@@ -120,7 +120,7 @@ or modify parameters to see the impact on performance.
 For example:
 1. On the fashion-mnist-784-euclidean benchmark search requests run at 22197 req/s with a recall rate of 0.9775 on a laptop with 8 i7-cores at 2.3Ghz
 2. On the sift1m benchmark (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 6100 req/s with a recall rate of 0.9907 or at 3077 req/s with a recall rate of 0.9959, depending on the parameters.
-3. A tiny crate at [bigann](https://github.com/jean-pierreBoth/bigann)
+3. A tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
 gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/) benchmark and can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
 
 
