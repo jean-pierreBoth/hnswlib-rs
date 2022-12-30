@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.1.16"
+version = "0.1.17"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
@@ -64,11 +64,12 @@ bincode = {version = "1.3"}
 
 
 # for //
-parking_lot = "0.11"
-rayon = {version = "1.5"}
+parking_lot = "0.12"
+rayon = {version = "1.6"}
 num_cpus = {version = "1.8.0"}
 
 cpu-time = {version = "1.0"}
+num-traits = {version = "0.2"}
 
 
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
@@ -82,7 +83,7 @@ lazy_static = { version = "1.4"}
 # decreasing order of log for release build (release_max_level_)  .. idem
 #log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 log = { version = "0.4"}
-env_logger = { version = "0.9"}
+env_logger = { version = "0.10"}
 
 # x86_64 simd stuff , enabled by  simdeez_f feature 
 simdeez = {version = "1.0", optional = true}

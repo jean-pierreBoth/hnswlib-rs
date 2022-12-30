@@ -29,6 +29,7 @@ use simdeez::*;
 
 use std::os::raw::*;
 
+use num_traits::float::*;
 
 
 #[allow(unused)]
@@ -44,7 +45,11 @@ enum DistKind {
     DistJeffreys(String),
     DistJensenShannon(String),
     /// To store a distance defined by a C pointer function
-    DistPtr(String),
+    DistCFnPtr,
+    /// Distance defined by a closure
+    DistFn,
+    /// Distance defined by a fn Rust pointer
+    DistPtr,
     DistLevenshtein(String),
     /// used only with reloading only graph data from a previous dump
     DistNoDist(String)
@@ -929,6 +934,34 @@ impl <T:Copy+Clone+Sized+Send+Sync> DistFn<T> {
 impl <T:Copy+Clone+Sized+Send+Sync> Distance<T> for DistFn<T> {
     fn eval(&self, va:&[T], vb: &[T]) -> f32 {
         (self.dist_function)(va,vb)
+    }
+}
+
+
+//=======================================================================================
+
+/// This structure uses a Rust function pointer to define the distance.
+/// For commodity it can buid upon a fonction returning a f64.
+/// beware that if F is f64, the distance converted to f32 can overflow!
+
+
+#[derive(Copy, Clone)]
+pub struct DistPtr<T:Copy+Clone+Sized+Send+Sync, F : Float> {
+    dist_function : fn(&[T], &[T]) -> F,
+}
+
+impl <T:Copy+Clone+Sized+Send+Sync, F : Float> DistPtr<T, F> {
+    /// construction of a DistPtr
+    pub fn new(f : fn(&[T], &[T]) -> F) -> Self {
+        DistPtr{ dist_function : f }
+    }
+
+}
+
+/// beware that if F is f64, the distance converted to f32 can overflow!
+impl <T:Copy+Clone+Sized+Send+Sync, F: Float> Distance<T> for DistPtr<T, F> {
+    fn eval(&self, va:&[T], vb: &[T]) -> f32 {
+        (self.dist_function)(va,vb).to_f32().unwrap()
     }
 }
 
