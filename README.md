@@ -51,15 +51,14 @@ Simd Avx2 implementation, currently based on the **simdeez** crate, is provided 
 
 ### Simd
 
-- The simd provided by the simdeez crate is accessible with the feature "simdeez_f" for x86_64 processors.
-Compile with **cargo build --release --features "simdeez_f"** .... 
+* The simd provided by the simdeez crate is accessible with the feature "simdeez_f" for x86_64 processors.
+Compile with **cargo build --release --features "simdeez_f"** ....
 To compile this crate on a M1 chip just do not activate this feature.
 As soon as std::simd lands in rust stable, it will be the default.
 
-- It is nevertheless possible to experiment with std::simd. Compiling with the feature stdsimd
+* It is nevertheless possible to experiment with std::simd. Compiling with the feature stdsimd
   (**cargo build --release --features "stdsimd"**), activates the transitory crate packed_simd_2. This requires rust nightly and also to uncomment the first line of file *lib.rs*.
   **This is discouraged** as (now) only the Hamming distance with the u32x16 and u64x8 types is provided.
-
 
 ### Julia interface
 
@@ -118,11 +117,11 @@ It is possible in these examples to change from parallel searches to serial sear
 or modify parameters to see the impact on performance.
 
 For example:
+
 1. On the fashion-mnist-784-euclidean benchmark search requests run at 22197 req/s with a recall rate of 0.9775 on a laptop with 8 i7-cores at 2.3Ghz
 2. On the sift1m benchmark (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 6100 req/s with a recall rate of 0.9907 or at 3077 req/s with a recall rate of 0.9959, depending on the parameters.
 3. A tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
 gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/) benchmark and can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
-
 
 Some lines extracted from this Mnist benchmark show how it works for f32 and L2 norm
 
@@ -151,11 +150,9 @@ Some lines extracted from this Mnist benchmark show how it works for f32 and L2 
     ....
 ```
 
-
-
 ## Contributions
 
-[Sannsyn](https://sannsyn.com/en/) contributed to Drop implementation.   
+[Sannsyn](https://sannsyn.com/en/) contributed to Drop implementation.
 Petter Egesund added the DistLevenshtein distance.
 
 ## Notes
