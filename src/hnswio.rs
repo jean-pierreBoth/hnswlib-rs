@@ -602,7 +602,7 @@ impl <T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sy
 /// The reload is made in two steps.
 /// First a call to load_description must be used to get basic information
 /// about structure to reload (Typename, distance type, construction parameters).  
-/// Cf fn load_description(io_in: &mut dyn Read) -> io::Result<Description>
+/// Cf fn load_description(io_in: &mut dyn Read) -> io::Result\<Description\>
 ///
 pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(graph_in: &mut dyn Read, 
                                             description: &Description, 

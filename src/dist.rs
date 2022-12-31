@@ -885,7 +885,7 @@ impl Distance<u16> for DistLevenshtein {
 type DistCFnPtr<T> = extern "C" fn(*const T, *const T, len : c_ulong) -> f32;
 
 
-/// A structure to implement Distance Api for type DistCFnPtr<T>, 
+/// A structure to implement Distance Api for type DistCFnPtr\<T\>, 
 /// i.e distance provided by a C function pointer.  
 /// It must be noted that this can be used in Julia via the macro @cfunction
 /// to define interactiveley a distance function , compile it on the fly and sent it 

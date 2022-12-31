@@ -95,15 +95,17 @@ fn flatten_point<T:Clone+Send+Sync>(point :&Point<T>) -> FlatPoint {
 }  // end of flatten_point
 
 
-/// a structure providing access to neighbours of a point in a struct Hnsw
-/// This structure can be obtained by From<&Hnsw<T,D>>
+/// A structure providing neighbourhood information of a point stored in the Hnsw structure given its DataId.  
+/// The structure uses the [FlatPoint] structure.  
+/// This structure can be obtained by FlatNeighborhood::from<&Hnsw<T,D>>
 pub struct FlatNeighborhood {
     hash_t : HashMap<DataId, FlatPoint>
 }
 
 
 impl FlatNeighborhood {
-    /// get neighbour of a point given its id
+    /// get neighbour of a point given its id.  
+    /// The neighbours are sorted in increasing distance from data_id.
     pub fn get_neighbours(&self, p_id : DataId) -> Option<Vec<Neighbour>> {
         let res = match self.hash_t.get(&p_id) {
             Some(point) => Some(point.get_neighbours().clone()),
@@ -117,7 +119,7 @@ impl FlatNeighborhood {
 
 
 impl <T:Clone+Send+Sync,D:Distance<T>+Send+Sync> From<&Hnsw<T,D>> for FlatNeighborhood {
-    /// extract from the Hnsw strucure a hashtable mapping original DataId into a  Point<T> srtructure with its neighbours information
+    /// extract from the Hnsw strucure a hashtable mapping original DataId into a FlatPoint structure gathering its neighbourhood information.  
     /// Useful after reloading from a dump with T=NoData and D = NoDist as points are then reloaded with neighbourhood information only.
     fn from(hnsw : &Hnsw<T,D>) -> Self {
         let mut hash_t = HashMap::new();
