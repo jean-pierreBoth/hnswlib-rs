@@ -940,9 +940,10 @@ impl <T:Copy+Clone+Sized+Send+Sync> Distance<T> for DistFn<T> {
 
 //=======================================================================================
 
+
 /// This structure uses a Rust function pointer to define the distance.
-/// For commodity it can buid upon a fonction returning a f64.
-/// beware that if F is f64, the distance converted to f32 can overflow!
+/// For commodity it can build upon a fonction returning a f64.
+/// Beware that if F is f64, the distance converted to f32 can overflow!
 
 
 #[derive(Copy, Clone)]
@@ -953,10 +954,10 @@ pub struct DistPtr<T:Copy+Clone+Sized+Send+Sync, F : Float> {
 impl <T:Copy+Clone+Sized+Send+Sync, F : Float> DistPtr<T, F> {
     /// construction of a DistPtr
     pub fn new(f : fn(&[T], &[T]) -> F) -> Self {
-        DistPtr{ dist_function : f }
+        DistPtr{ dist_function : f}
     }
-
 }
+
 
 /// beware that if F is f64, the distance converted to f32 can overflow!
 impl <T:Copy+Clone+Sized+Send+Sync, F: Float> Distance<T> for DistPtr<T, F> {
