@@ -661,6 +661,69 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
 }  // end of load_hnsw
 
 
+/// This function makes reload of a Hnsw dump with a given Dist.  
+/// It is dedicated to distance of type  [crate::dist::DistPtr] that cannot implement Defaut.  
+/// **It is the user responsability to reload with the same function as used in the dump**
+/// 
+pub fn load_hnsw_with_dist<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Send+Sync>(graph_in: &mut dyn Read, 
+                                            description: &Description, 
+                                            f : D,
+                                            data_in : &mut dyn Read) -> io::Result<Hnsw<T,D> > {
+    //  In datafile , we must read MAGICDATAP and dimension and check
+    let mut it_slice = [0u8; std::mem::size_of::<u32>()];
+    data_in.read_exact(&mut it_slice)?;
+    let magic = u32::from_ne_bytes(it_slice);
+    assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in load_point");
+    //
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+    data_in.read_exact(&mut it_slice)?;
+    let dimension = usize::from_ne_bytes(it_slice);
+    assert_eq!(dimension, description.dimension, "data dimension incoherent {:?} {:?} ", 
+            dimension, description.dimension);
+    //
+    let _mode = description.dumpmode;
+    let distname = description.distname.clone();
+    // We must ensure that the distance stored matches the one asked for in loading hnsw
+    // for that we check for short names equality stripping 
+    log::debug!("distance in description = {:?}", distname);
+    let d_type_name = type_name::<D>().to_string();
+    let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
+    for s in v {
+        log::info!(" distname in generic type argument {:?}", s);
+    }
+    if (std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>())  &&  (d_type_name != distname) {
+        // for all types except NoData , distance asked in reload declaration and distance in dump must be equal!
+        let mut errmsg = String::from("error in distances : dumped distance is : ");
+        errmsg.push_str(&distname);
+        errmsg.push_str(" asked distance in loading is : ");
+        errmsg.push_str(&d_type_name);
+        log::error!(" distance in type argument : {:?}", d_type_name);
+        log::error!("error , dump is for distance = {:?}", distname);
+        return Err(io::Error::new(io::ErrorKind::Other, errmsg));
+    }
+    let t_type = description.t_name.clone();
+    log::debug!("T type name in dump = {:?}", t_type);
+    let layer_point_indexation = load_point_indexation(graph_in, &description, data_in)?;
+    let data_dim = layer_point_indexation.get_data_dimension();
+    //
+    let hnsw : Hnsw::<T,D> =  Hnsw{  max_nb_connection : description.max_nb_connection as usize,
+                        ef_construction : description.ef, 
+                        extend_candidates : true, 
+                        keep_pruned: false,
+                        max_layer: description.nb_layer as usize, 
+                        layer_indexed_points: layer_point_indexation,
+                        data_dimension : data_dim,
+                        dist_f: f,
+                        searching : false,
+                    } ;
+    //
+    log::debug!("load_hnsw_with_dist completed");
+    // We cannot check that the pointer function was the same as the dump
+    //
+    Ok(hnsw)
+}  // end of load_hnsw_with_dist
+
+
 
 
 //===============================================================================================================
@@ -686,6 +749,12 @@ use rand::distributions::{Distribution, Uniform};
 
 fn log_init_test() {
     let _ = env_logger::builder().is_test(true).try_init();
+}
+
+
+fn my_fn(v1 : &[f32], v2 : &[f32]) -> f32 {
+    let norm_l1 : f32 = v1.iter().zip(v2.iter()).map(|t| (*t.0 - *t.1).abs()).sum();
+    norm_l1 as f32
 }
 
 
@@ -754,6 +823,74 @@ fn test_dump_reload_1() {
     check_graph_equality(&hnsw_loaded, &hnsw);
 }  // end of test_dump_reload
 
+
+
+
+#[test]
+fn test_dump_reload_myfn() {
+    println!("\n\n test_dump_reload_myfn");
+    log_init_test();
+    // generate a random test
+    let mut rng = rand::thread_rng();
+    let unif =  Uniform::<f32>::new(0.,1.);
+    // 1000 vectors of size 10 f32
+    let nbcolumn = 1000;
+    let nbrow = 10;
+    let mut xsi;
+    let mut data = Vec::with_capacity(nbcolumn);
+    for j in 0..nbcolumn {
+        data.push(Vec::with_capacity(nbrow));
+        for _ in 0..nbrow {
+            xsi = unif.sample(&mut rng);
+            data[j].push(xsi);
+        }
+    } 
+    // define hnsw
+    let ef_construct= 25;
+    let nb_connection = 10;
+    let mydist = dist::DistPtr::<f32, f32>::new(my_fn);
+    let hnsw = Hnsw::<f32, dist::DistPtr<f32, f32>>::new(nb_connection, nbcolumn, 16, 
+                    ef_construct, mydist);
+    for i in 0..data.len() {
+        hnsw.insert((&data[i], i));
+    }
+    // some loggin info
+    hnsw.dump_layer_info();
+    // dump in a file.  Must take care of name as tests runs in // !!!
+    let fname = String::from("dumpreloadtest1");
+    let _res = hnsw.file_dump(&fname);
+    // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
+    //
+    // reload
+    log::debug!("\n\n  hnsw reload");
+    // we will need a procedural macro to get from distance name to its instanciation. 
+    // from now on we test with DistL1
+    let graphfname = String::from("dumpreloadtest1.hnsw.graph");
+    let graphpath = PathBuf::from(graphfname);
+    let graphfileres = OpenOptions::new().read(true).open(&graphpath);
+    if graphfileres.is_err() {
+        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
+        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
+    }
+    let graphfile = graphfileres.unwrap();
+    //  
+    let datafname = String::from("dumpreloadtest1.hnsw.data");
+    let datapath = PathBuf::from(datafname);
+    let datafileres = OpenOptions::new().read(true).open(&datapath);
+    if datafileres.is_err() {
+        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
+        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
+    }
+    let datafile = datafileres.unwrap();
+    //
+    let mut graph_in = BufReader::new(graphfile);
+    let mut data_in = BufReader::new(datafile);
+    // we need to call load_description first to get distance name
+    let hnsw_description = load_description(&mut graph_in).unwrap();
+    let mydist = dist::DistPtr::<f32,f32>::new(my_fn);
+    // we reload with the same function, no control (yet?)
+    let _hnsw_loaded : Hnsw<f32,DistPtr<f32,f32>>= load_hnsw_with_dist(&mut graph_in, &hnsw_description, mydist, &mut data_in).unwrap();
+}  // end of test_dump_reload_myfn
 
 
 
