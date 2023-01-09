@@ -1040,7 +1040,8 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
 
     /// Insert in parallel a slice of Vec\<T\> each associated to its id.    
     /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
-    /// Typically 1000 * the number of threads.
+    /// Typically 1000 * the number of threads.  
+    /// Many consecutive parallel_insert can be done, so the size of vector inserted in one insertion can be optimized.
     pub fn parallel_insert(&self, datas: &Vec<(&Vec<T>, usize)> ) {
         datas.par_iter().for_each( |&item| self.insert(item));
     }  // end of parallel_insert

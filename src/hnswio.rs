@@ -662,7 +662,7 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
 
 
 /// This function makes reload of a Hnsw dump with a given Dist.  
-/// It is dedicated to distance of type  [crate::dist::DistPtr] that cannot implement Defaut.  
+/// It is dedicated to distance of type  [crate::dist::DistPtr] that cannot implement Default.  
 /// **It is the user responsability to reload with the same function as used in the dump**
 /// 
 pub fn load_hnsw_with_dist<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Send+Sync>(graph_in: &mut dyn Read, 
