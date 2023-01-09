@@ -162,4 +162,4 @@ Petter Egesund added the DistLevenshtein distance.
 3. The library do not depend anymore on hdf5 and ndarray. They are dev-dependancies needed for examples, this simplify compatibility issues.
 4. Added insertion methods for slices for easier use with the ndarray crate.
 5. simd/avx2 requires now the feature "simdeez_f". So by default the crate can compile on M1 chip and transitions to std::simd.
-6. Added DistPtr and possiblity to dump/reload with this distance type.
+6. Added DistPtr and possiblity to dump/reload with this distance type. (See *load_hnsw_with_dist* function)
