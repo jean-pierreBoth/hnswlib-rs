@@ -840,7 +840,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     ///
     /// Greedy algorithm n° 2 in Malkov paper.
     /// search in a layer (layer) for the ef points nearest a point to be inserted in hnsw.
-    fn search_layer(& self, point: &[T], entry_point: Arc<Point<T>> , ef:usize, layer: u8) -> BinaryHeap<Arc<PointWithOrder<T>> > {
+    fn search_layer(& self, point: &[T], entry_point: Arc<Point<T>> , ef:usize, layer: u8, filter:&Option<Vec<usize>>) -> BinaryHeap<Arc<PointWithOrder<T>> > {
         //
         trace!("entering search_layer with entry_point_id {:?} layer : {:?} ef {:?} ", entry_point.p_id, layer, ef);
         //
@@ -868,6 +868,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         //
         let mut candidate_points = BinaryHeap::<Arc<PointWithOrder<T>> >::with_capacity(skiplist_size);
         candidate_points.push(Arc::new(PointWithOrder::new(&entry_point, -dist_to_entry_point)));
+
         return_points.push(Arc::new(PointWithOrder::new(&entry_point, dist_to_entry_point)));
         // at the beginning candidate_points contains point passed as arg in layer entry_point_id.0
         while candidate_points.len() > 0 {
@@ -911,7 +912,15 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                         // a neighbour of neighbour is better, we insert it into candidate with the distance to point
                         log::trace!("                inserting new candidate {:?}", e_prime.point_ref.p_id);
                         candidate_points.push(Arc::new(PointWithOrder::new(&e.point_ref, -e_dist_to_p)));
-                        return_points.push(Arc::clone(&e_prime));
+                        if filter.is_none() {
+                            return_points.push(Arc::clone(&e_prime));
+                        } else {
+                            let id:&usize = &e_prime.point_ref.get_origin_id();
+                            match filter.as_ref().unwrap().binary_search(&id) {
+                                Ok(_) => return_points.push(Arc::clone(&e_prime)),
+                                _ => ()
+                            } 
+                        }
                         if return_points.len() > ef {
                             return_points.pop();
                         }
@@ -968,7 +977,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         // we go from self.max_level_observed to level+1 included
         for l in ((level+1)..(max_level_observed+1)).rev() {
             // CAVEAT could bypass when layer empty, avoid  allocation..
-            let mut sorted_points = self.search_layer(&data, Arc::clone(enter_point_copy.as_ref().unwrap()), 1, l);
+            let mut sorted_points = self.search_layer(&data, Arc::clone(enter_point_copy.as_ref().unwrap()), 1, l, &None);
             log::trace!("in insert :search_layer layer {:?}, returned {:?} points ", l, sorted_points.len());
             if sorted_points.len() > 1 {
                 panic!("in insert : search_layer layer {:?}, returned {:?} points ", l, sorted_points.len());
@@ -998,7 +1007,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         for l in (0..level+1).rev() {
             let ef = self.ef_construction;
             // when l == level, we cannot get new_point in sorted_points as it is seen only from declared neighbours
-            let mut sorted_points = self.search_layer(&data, Arc::clone(enter_point_copy.as_ref().unwrap()), ef, l);
+            let mut sorted_points = self.search_layer(&data, Arc::clone(enter_point_copy.as_ref().unwrap()), ef, l, &None);
             log::trace!("in insert :search_layer layer {:?}, returned {:?} points ", l, sorted_points.len());
             sorted_points = from_positive_binaryheap_to_negative_binary_heap(&mut sorted_points);
             if sorted_points.len() > 0 {
@@ -1243,7 +1252,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         //
         let mut dist_to_entry = self.dist_f.eval(data , & entry_point.as_ref().v);
         for layer in (1..=entry_point.p_id.0).rev() {
-            let mut neighbours = self.search_layer(data, Arc::clone(&entry_point), 1, layer);
+            let mut neighbours = self.search_layer(data, Arc::clone(&entry_point), 1, layer, &None);
             neighbours = from_positive_binaryheap_to_negative_binary_heap(&mut neighbours);
             if let Some(entry_point_tmp) = neighbours.pop() {
                 // get the lowest  distance point.
@@ -1257,7 +1266,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
         let ef = ef_arg.max(knbn);
         // now search with asked ef in layer 0
-        let neighbours_heap = self.search_layer(data, entry_point, ef, 0);
+        let neighbours_heap = self.search_layer(data, entry_point, ef, 0, &None);
         // go from heap of points with negative dist to a sorted vec of increasing points with > 0 distances.
         let neighbours = neighbours_heap.into_sorted_vec();
         // get the min of K and ef points into a vector.
@@ -1270,11 +1279,14 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     } // end of knn_search
 
 
+
+
+
     /// search the first knbn nearest neigbours of a data and returns a Vector of Neighbour.   
     /// The parameter ef controls the width of the search in the lowest level, it must be greater
     /// than number of neighbours asked.  
     /// A rule of thumb could be between knbn and max_nb_connection.
-    pub fn search(&self, data :&[T] , knbn:usize, ef_arg:usize) -> Vec<Neighbour> {
+    pub fn search_possible_filter(&self, data :&[T] , knbn:usize, ef_arg:usize, filter:Option<Vec<usize>>) -> Vec<Neighbour> {
         //
         let entry_point;
         {  // a lock on an option an a Arc<Point>
@@ -1286,10 +1298,13 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
               entry_point =  Arc::clone((*entry_point_opt_ref).as_ref().unwrap()); 
             }
         }
+
+
         //
         let mut dist_to_entry = self.dist_f.eval(data , & entry_point.as_ref().v);
         let mut pivot = Arc::clone(&entry_point);
         let mut new_pivot = None;
+        
         //
         for layer in (1..=entry_point.p_id.0).rev() {
             let mut has_changed = false;
@@ -1310,10 +1325,15 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                 pivot =  Arc::clone(new_pivot.as_ref().unwrap());
             }
         } // end on for on layers
+
+        if filter.is_none() {
+            let entry_id = pivot.get_origin_id();
+            println!("Entry id: {:?}", entry_id);
+        }
         // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
         let ef = ef_arg.max(knbn);
         // now search with asked ef in layer 0
-        let neighbours_heap = self.search_layer(data, pivot, ef, 0);
+        let neighbours_heap = self.search_layer(data, pivot, ef, 0, &filter);
         // go from heap of points with negative dist to a sorted vec of increasing points with > 0 distances.
         let neighbours = neighbours_heap.into_sorted_vec();
         // get the min of K and ef points into a vector.
@@ -1324,6 +1344,10 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
 
         knn_neighbours
     } // end of knn_search
+
+    pub fn search(&self, data :&[T] , knbn:usize, ef_arg:usize) -> Vec<Neighbour> {
+        self.search_possible_filter(data, knbn, ef_arg, None)
+    }
 
 
 
