@@ -794,8 +794,8 @@ impl  Distance<i32> for  DistHamming {
 
 
 
-/// This implementation is dedicated to SuperMinHash algorithm in crate [probminhash](https://crates.io/crates/probminhash)
-/// Could be made generic with unstabel source as there is implementation of PartialEq for f64
+/// This implementation is dedicated to SuperMinHash algorithm in crate [probminhash](https://crates.io/crates/probminhash).  
+/// Could be made generic with unstable source as there is implementation of PartialEq for f64
 impl  Distance<f64> for  DistHamming {
     fn eval(&self, va:&[f64], vb: &[f64]) -> f32 {
         /*   Tests show that it is slower than basic method!!!     
@@ -817,8 +817,8 @@ impl  Distance<f64> for  DistHamming {
 
 
 
-/// This implementation is dedicated to SuperMinHash algorithm in crate [probminhash](https://crates.io/crates/probminhash)
-/// Could be made generic with unstabel source as there is implementation of PartialEq for f64
+/// This implementation is dedicated to SuperMinHash algorithm in crate [probminhash](https://crates.io/crates/probminhash).  
+/// Could be made generic with unstable source as there is implementation of PartialEq for f32
 impl  Distance<f32> for  DistHamming {
     fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
         // in fact simd comparaison seems slower than simple iter
