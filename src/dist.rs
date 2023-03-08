@@ -670,13 +670,14 @@ unsafe fn distance_hamming_i32<S: Simd> (va:&[i32], vb: &[i32]) -> f32 {
 }  // end of distance_hamming_i32
 
 
-
+#[allow(unused)]
 #[cfg(feature = "simdeez_f")]
 #[target_feature(enable = "avx2")]
 unsafe fn distance_hamming_f64_avx2(va:&[f64], vb: &[f64]) -> f32 {
     distance_hamming_f64::<Avx2>(va,vb)
 }
 
+#[allow(unused)]
 /// special implementation for f64 exclusively in the context of SuperMinHash algorithm
 #[cfg(feature = "simdeez_f")]
 unsafe fn distance_hamming_f64<S: Simd> (va:&[f64], vb: &[f64]) -> f32 {
