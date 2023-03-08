@@ -797,7 +797,7 @@ impl  Distance<i32> for  DistHamming {
 /// Could be made generic with unstabel source as there is implementation of PartialEq for f64
 impl  Distance<f64> for  DistHamming {
     fn eval(&self, va:&[f64], vb: &[f64]) -> f32 {
-        //        
+        /*   Tests show that it is slower than basic method!!!     
         #[cfg(feature = "simdeez_f")] {
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
                 if is_x86_feature_detected!("avx2") {
@@ -806,6 +806,7 @@ impl  Distance<f64> for  DistHamming {
                 }
             }
         }
+        */
         //
         assert_eq!(va.len(), vb.len());
         let dist : usize = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count();
