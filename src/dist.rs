@@ -718,6 +718,9 @@ unsafe fn distance_hamming_f64<S: Simd> (va:&[f64], vb: &[f64]) -> f32 {
 
 
 
+
+
+
 #[cfg(feature = "stdsimd")]
 fn distance_jaccard_u32_16_simd(va:&[u32], vb: &[u32]) -> f32 {
     let mut dist_simd = i32x16::splat(0);
@@ -806,9 +809,22 @@ impl  Distance<f64> for  DistHamming {
         //
         assert_eq!(va.len(), vb.len());
         let dist : usize = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count();
-        (dist / va.len()) as f32
+        (dist as f64 / va.len() as f64) as f32
     } // end of eval
 } // end implementation Distance<f64>
+
+
+
+/// This implementation is dedicated to SuperMinHash algorithm in crate [probminhash](https://crates.io/crates/probminhash)
+/// Could be made generic with unstabel source as there is implementation of PartialEq for f64
+impl  Distance<f32> for  DistHamming {
+    fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
+        // in fact simd comparaison seems slower than simple iter
+        assert_eq!(va.len(), vb.len());
+        let dist : usize = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count();
+        (dist as f64 / va.len() as f64) as f32
+    } // end of eval
+} // end implementation Distance<f32>
 
 
 
@@ -1371,6 +1387,86 @@ fn test_simd_hamming_i32() {
 
 
 
+// to be run with and without simdeez_f
+#[test]
+fn test_hamming_f64() {
+    init_log();
+
+    let size_test = 500;
+    let fmax : f64 = 3.;
+    let mut rng = rand::thread_rng();
+    for i in 300..size_test {
+        // generer 2 va et vb s des vecteurs<i32> de taille i  avec des valeurs entre -imax et + imax et controler les resultat
+        let between = Uniform::<f64>::from(-fmax..fmax);
+        let va : Vec<f64> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
+        let mut vb : Vec<f64> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
+        // reset half of vb to va
+        for i in 0..i/2 {
+            vb[i] = va[i];
+        }
+
+        let easy_dist : u32 = va.iter().zip(vb.iter()).map( |(a,b)| if a!=b { 1} else {0}).sum();
+        let h_dist = DistHamming.eval(&va, &vb);
+        let easy_dist = easy_dist as f32 / va.len() as f32;
+        let j_exact = ((i/2) as f32) / ( i as f32);
+        log::debug!("test size {:?}  HammingDist {:.3e} easy : {:.3e} exact : {:.3e} ", i, h_dist, easy_dist, j_exact);
+        if (easy_dist - h_dist).abs() > 1.0e-5 {
+            println!(" jhamming = {:?} , jexact = {:?}",h_dist , easy_dist);
+            log::debug!("va = {:?}" , va);
+            log::debug!("vb = {:?}" , vb);
+            std::process::exit(1);
+        }
+        if (j_exact - h_dist).abs() > 1. / i as f32 + 1.0E-5 {
+            println!(" jhamming = {:?} , jexact = {:?}, j_easy : {:?}",h_dist , j_exact, easy_dist);
+            log::debug!("va = {:?}" , va);
+            log::debug!("vb = {:?}" , vb);
+            std::process::exit(1);
+        } 
+    }
+} // end of test_hamming_f64
+
+
+
+#[test]
+fn test_hamming_f32() {
+    init_log();
+
+    let size_test = 500;
+    let fmax : f32 = 3.;
+    let mut rng = rand::thread_rng();
+    for i in 300..size_test {
+        // generer 2 va et vb s des vecteurs<i32> de taille i  avec des valeurs entre -imax et + imax et controler les resultat
+        let between = Uniform::<f32>::from(-fmax..fmax);
+        let va : Vec<f32> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
+        let mut vb : Vec<f32> = (0..i).into_iter().map( |_| between.sample(&mut rng)).collect();
+        // reset half of vb to va
+        for i in 0..i/2 {
+            vb[i] = va[i];
+        }
+
+        let easy_dist : u32 = va.iter().zip(vb.iter()).map( |(a,b)| if a!=b { 1} else {0}).sum();
+        let h_dist = DistHamming.eval(&va, &vb);
+        let easy_dist = easy_dist as f32 / va.len() as f32;
+        let j_exact = ((i/2) as f32) / ( i as f32);
+        log::debug!("test size {:?}  HammingDist {:.3e} easy : {:.3e} exact : {:.3e} ", i, h_dist, easy_dist, j_exact);
+        if (easy_dist - h_dist).abs() > 1.0e-5 {
+            println!(" jhamming = {:?} , jexact = {:?}, j_easy : {:?}",h_dist , j_exact, easy_dist);
+            log::debug!("va = {:?}" , va);
+            log::debug!("vb = {:?}" , vb);
+            std::process::exit(1);
+        }
+        if (j_exact - h_dist).abs() > 1. / i as f32 + 1.0E-5 {
+            println!(" jhamming = {:?} , jexact = {:?}, j_easy : {:?}",h_dist , j_exact, easy_dist);
+            log::debug!("va = {:?}" , va);
+            log::debug!("vb = {:?}" , vb);
+            std::process::exit(1);
+        }       
+    }
+} // end of test_hamming_f32
+
+
+
+
 
 #[cfg(feature = "simdeez_f")]
 #[test]
@@ -1393,19 +1489,29 @@ fn test_simd_hamming_f64() {
         }
         let simd_dist = unsafe {distance_hamming_f64::<Avx2>(&va, &vb)} as f32;
 
+        let j_exact = ((i/2) as f32) / ( i as f32);
         let easy_dist : u32 = va.iter().zip(vb.iter()).map( |(a,b)| if a!=b { 1} else {0}).sum();
         let h_dist = DistHamming.eval(&va, &vb);
         let easy_dist = easy_dist as f32 / va.len() as f32;
-        log::debug!("test size {:?} simd  hammingDist easy  exact = {:.3e} {:.3e} {:.3e} {:.3e} ", i, simd_dist, h_dist, easy_dist, 0.5);
+        log::debug!("test size {:?} simd  = {:.3e} HammingDist {:.3e} easy : {:.3e} exact : {:.3e} ", i, simd_dist, h_dist, easy_dist, 0.5);
         if (easy_dist - simd_dist).abs() > 1.0e-5 {
             println!(" jsimd = {:?} , jexact = {:?}", simd_dist, easy_dist);
-            println!("va = {:?}" , va);
-            println!("vb = {:?}" , vb);
+            log::debug!("va = {:?}" , va);
+            log::debug!("vb = {:?}" , vb);
             std::process::exit(1);
         }
+        if (j_exact - h_dist).abs() > 1. / i as f32 + 1.0E-5 {
+            println!(" jhamming = {:?} , jexact = {:?}, j_easy : {:?}",h_dist , j_exact, easy_dist);
+            log::debug!("va = {:?}" , va);
+            log::debug!("vb = {:?}" , vb);
+            std::process::exit(1);
+        }    
     }
 } // cfg
-} // end of test_simd_hamming_i32
+} // end of test_simd_hamming_f64
+
+
+
 
 
 
@@ -1437,6 +1543,7 @@ fn test_simd_hamming_u32() {
         }
     }
 } // end of test_simd_hamming_u32
+
 
 
 #[cfg(feature = "stdsimd")]
