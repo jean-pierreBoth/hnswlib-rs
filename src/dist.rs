@@ -701,7 +701,7 @@ unsafe fn distance_hamming_f64<S: Simd> (va:&[f64], vb: &[f64]) -> f32 {
         i += S::VF64_WIDTH;
     }
     // get the sum of value in dist
-    let mut simd_res : Vec::<i64> = (0..S::VI64_WIDTH).into_iter().map(|_| 0).collect();
+    let mut simd_res : Vec::<i64> = (0..S::VF64_WIDTH).into_iter().map(|_| 0).collect();
 //    log::trace!("simd_res : {:?}", dist_simd);
     S::storeu_epi64(&mut simd_res[0] , dist_simd);
     // cmp_neq returns 0xFFFFFFFFFF if true and 0 else, we need to transform 0xFFFFFFF... to 1
@@ -1359,7 +1359,7 @@ use rand::distributions::{Distribution, Uniform};
 
 #[cfg(feature = "simdeez_f")]
 #[test]
-fn test_simd_hamming_i32() {
+fn test_avx2_hamming_i32() {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
     init_log();
     log::info!("running test_simd_hamming_i32 for avx2");
@@ -1376,9 +1376,9 @@ fn test_simd_hamming_i32() {
 
         let easy_dist : u32 = va.iter().zip(vb.iter()).map( |(a,b)| if a!=b { 1} else {0}).sum();
         let easy_dist = easy_dist as f32 / va.len() as f32;
-        println!("test size {:?} simd  exact = {:?} {:?}", i, simd_dist, easy_dist);
+        log::debug!("test size {:?} simd  exact = {:?} {:?}", i, simd_dist, easy_dist);
         if (easy_dist - simd_dist).abs() > 1.0e-5 {
-            println!(" jsimd = {:?} , jexact = {:?}", simd_dist, easy_dist);
+            println!(" jsimd = {:?} , easy dist = {:?}", simd_dist, easy_dist);
             println!("va = {:?}" , va);
             println!("vb = {:?}" , vb);
             std::process::exit(1);
@@ -1472,7 +1472,7 @@ fn test_hamming_f32() {
 
 #[cfg(feature = "simdeez_f")]
 #[test]
-fn test_simd_hamming_f64() {
+fn test_avx2_hamming_f64() {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
     init_log();
     log::info!("running test_simd_hamming_f64 for avx2");
@@ -1536,7 +1536,7 @@ fn test_simd_hamming_u32() {
 
         let easy_dist : u32 = va.iter().zip(vb.iter()).map( |(a,b)| if a!=b { 1} else {0}).sum();
         let easy_dist = easy_dist as f32 / va.len() as f32;
-        println!("test size {:?} simd  exact = {:?} {:?}", i, simd_dist, easy_dist);
+        log::debug!("test size {:?} simd  exact = {:?} {:?}", i, simd_dist, easy_dist);
         if (easy_dist - simd_dist).abs() > 1.0e-5 {
             println!(" jsimd = {:?} , jexact = {:?}", simd_dist, easy_dist);
             println!("va = {:?}" , va);
