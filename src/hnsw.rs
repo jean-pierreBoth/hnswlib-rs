@@ -848,6 +848,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         // log2(skiplist_size) must be greater than 1.
         let skiplist_size = ef.max(2);
         // we will store positive distances in this one
+        // print!("Len: {:?}", ef);
         let mut return_points = BinaryHeap::<Arc<PointWithOrder<T>> >::with_capacity(skiplist_size);
         //
         if self.layer_indexed_points.points_by_layer.read()[layer as usize].len() == 0 {
@@ -884,7 +885,9 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                 // This is the case we compare distance to point passed as arg.
                 log::trace!("fast return from search_layer, nb points : {:?} \n \t c {:?} \n \t f {:?} dists: {:?}  {:?}", 
                                 return_points.len(), c.point_ref.p_id, f.point_ref.p_id, -(c.dist_to_ref), f.dist_to_ref);
-                return return_points;
+                if filter.is_none() || (filter.is_some() && return_points.len() >= 10) {
+                    return return_points;
+                } 
             }
             // now we scan neighborhood of c in layer and increment visited_point, candidate_points 
             // and optimize candidate_points so that it contains points with lowest distances to point arg
@@ -917,7 +920,17 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                         } else {
                             let id:&usize = &e_prime.point_ref.get_origin_id();
                             match filter.as_ref().unwrap().binary_search(&id) {
-                                Ok(_) => return_points.push(Arc::clone(&e_prime)),
+                                Ok(_) => { 
+                                    if return_points.len() == 1 {
+                                        let only_id = return_points.peek().unwrap().point_ref.origin_id;
+                                        match filter.as_ref().unwrap().binary_search(&only_id) {
+                                            Ok(_) => (),
+                                            _ => { return_points.clear() }
+                                        }
+                                        // println!("-- First id: {:?}", only_id)
+                                    }
+                                    return_points.push(Arc::clone(&e_prime))
+                                },
                                 _ => ()
                             } 
                         }
@@ -1298,7 +1311,6 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
               entry_point =  Arc::clone((*entry_point_opt_ref).as_ref().unwrap()); 
             }
         }
-
 
         //
         let mut dist_to_entry = self.dist_f.eval(data , & entry_point.as_ref().v);

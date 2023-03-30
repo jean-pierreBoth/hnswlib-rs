@@ -22,19 +22,21 @@ fn search(word: &str, hns: &Hnsw<u16, DistLevenshtein>, words: &Vec<String>) {
     let ef_search = 30;
     let start = Instant::now();
     let mut filter: Vec<usize> = Vec::new();
-    for i in 1..100 {
+    for i in 300..400 {
         filter.push(i);
     }
     let mut filter2: Vec<usize> = Vec::new();
-    for i in 1..100 {
+    for i in 300..400 {
         filter2.push(i);
     }
     // let res = hns.search(&vec, 50, ef_search);
     let res = hns.search_possible_filter(&vec, 10, ef_search, Some(filter));
     let duration = start.elapsed();
     println!("Time elapsed in expensive_function() is: {:?}", duration);
+    let mut i = 0;
     for r in res {
-        println!("Word: {:?} Id: {:?} Distance: {:?}", words[r.d_id], r.d_id, r.distance);
+        i = i + 1;
+        println!("{:?}  Word: {:?} Id: {:?} Distance: {:?}", i, words[r.d_id], r.d_id, r.distance);
     }
     println!("==========");   
     let res3 = hns.search_possible_filter(&vec, 10, ef_search, None);
