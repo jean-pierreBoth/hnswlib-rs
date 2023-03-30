@@ -30,7 +30,7 @@ fn search(word: &str, hns: &Hnsw<u16, DistLevenshtein>, words: &Vec<String>) {
         filter2.push(i);
     }
     // let res = hns.search(&vec, 50, ef_search);
-    let res = hns.search_possible_filter(&vec, 10, ef_search, Some(filter));
+    let res = hns.search_possible_filter(&vec, 10, ef_search, &Some(filter));
     let duration = start.elapsed();
     println!("Time elapsed in expensive_function() is: {:?}", duration);
     let mut i = 0;
@@ -39,7 +39,7 @@ fn search(word: &str, hns: &Hnsw<u16, DistLevenshtein>, words: &Vec<String>) {
         println!("{:?}  Word: {:?} Id: {:?} Distance: {:?}", i, words[r.d_id], r.d_id, r.distance);
     }
     println!("==========");   
-    let res3 = hns.search_possible_filter(&vec, 10, ef_search, None);
+    let res3 = hns.search_possible_filter(&vec, 10, ef_search, &None);
     for r in res3 {
         println!("Word: {:?} Id: {:?} Distance: {:?}", words[r.d_id], r.d_id, r.distance);
     }

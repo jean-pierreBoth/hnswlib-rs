@@ -33,8 +33,17 @@ pub use crate::dist::Distance;
 // TODO
 // Profiling.
 
+trait FilterAble {
+    fn hnsw_filter(&self, id:&usize) -> bool;
+}
 
-
+impl FilterAble for Vec<usize> {
+    fn hnsw_filter(&self, id:&usize) -> bool {
+        return match &self.binary_search(id) {
+            Ok(_) => true,
+            _ => false }
+    }
+}
 
 /// This unit structure provides the type to instanciate Hnsw with,
 /// to get reload of graph only in the the structure. 
@@ -1298,7 +1307,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     /// The parameter ef controls the width of the search in the lowest level, it must be greater
     /// than number of neighbours asked.  
     /// A rule of thumb could be between knbn and max_nb_connection.
-    pub fn search_possible_filter(&self, data :&[T] , knbn:usize, ef_arg:usize, filter:Option<Vec<usize>>) -> Vec<Neighbour> {
+    pub fn search_possible_filter(&self, data :&[T] , knbn:usize, ef_arg:usize, filter:&Option<Vec<usize>>) -> Vec<Neighbour> {
         //
         let entry_point;
         {  // a lock on an option an a Arc<Point>
@@ -1337,10 +1346,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
             }
         } // end on for on layers
 
-        if filter.is_none() {
-            let entry_id = pivot.get_origin_id();
-            println!("Entry id: {:?}", entry_id);
-        }
+
         // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
         let ef = ef_arg.max(knbn);
         // now search with asked ef in layer 0
@@ -1357,7 +1363,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     } // end of knn_search
 
     pub fn search(&self, data :&[T] , knbn:usize, ef_arg:usize) -> Vec<Neighbour> {
-        self.search_possible_filter(data, knbn, ef_arg, None)
+        self.search_possible_filter(data, knbn, ef_arg, &None)
     }
 
 
