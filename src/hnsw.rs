@@ -885,7 +885,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                 // This is the case we compare distance to point passed as arg.
                 log::trace!("fast return from search_layer, nb points : {:?} \n \t c {:?} \n \t f {:?} dists: {:?}  {:?}", 
                                 return_points.len(), c.point_ref.p_id, f.point_ref.p_id, -(c.dist_to_ref), f.dist_to_ref);
-                if filter.is_none() || (filter.is_some() && return_points.len() >= 10) {
+                if filter.is_none() || (filter.is_some() && return_points.len() >= ef) {
                     return return_points;
                 } 
             }
@@ -927,7 +927,6 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                                             Ok(_) => (),
                                             _ => { return_points.clear() }
                                         }
-                                        // println!("-- First id: {:?}", only_id)
                                     }
                                     return_points.push(Arc::clone(&e_prime))
                                 },
