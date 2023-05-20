@@ -7,6 +7,7 @@ use std::ptr;
 use std::fs::OpenOptions;
 use std::io::{BufReader};
 use std::path::{PathBuf};
+use std::os::raw::c_ulong;
 
 use log;
 
@@ -434,7 +435,7 @@ pub unsafe extern "C" fn drop_hnsw_u16(p: *const HnswApiu16) {
 
 
 #[no_mangle]
-pub extern "C" fn init_hnsw_ptrdist_f32(max_nb_conn : usize, ef_const:usize, c_func : extern "C" fn(*const f32, *const f32, u64) -> f32 ) -> *const HnswApif32 {
+pub extern "C" fn init_hnsw_ptrdist_f32(max_nb_conn : usize, ef_const:usize, c_func : extern "C" fn(*const f32, *const f32, c_ulong) -> f32 ) -> *const HnswApif32 {
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<f32>::new(c_func);
     let h = Hnsw::<f32, DistCFFI<f32> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -565,7 +566,7 @@ pub extern "C" fn init_hnsw_i32(max_nb_conn : usize, ef_const:usize, namelen: us
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_i32(max_nb_conn : usize, ef_const:usize, 
-                c_func : extern "C" fn(*const i32, *const i32, u64) -> f32 ) -> *const HnswApii32 {
+                c_func : extern "C" fn(*const i32, *const i32, c_ulong) -> f32 ) -> *const HnswApii32 {
     log::debug!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<i32>::new(c_func);
     let h = Hnsw::<i32, DistCFFI<i32> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -624,7 +625,7 @@ pub extern "C" fn init_hnsw_u32(max_nb_conn : usize, ef_const:usize, namelen: us
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_u32(max_nb_conn : usize, ef_const:usize, 
-                c_func : extern "C" fn(*const u32, *const u32, u64) -> f32 ) -> *const HnswApiu32 {
+                c_func : extern "C" fn(*const u32, *const u32, c_ulong) -> f32 ) -> *const HnswApiu32 {
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u32>::new(c_func);
     let h = Hnsw::<u32, DistCFFI<u32> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -724,7 +725,7 @@ pub extern "C" fn new_hnsw_u16(max_nb_conn : usize, ef_const:usize, namelen: usi
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_u16(max_nb_conn : usize, ef_const:usize, 
-                c_func : extern "C" fn(*const u16, *const u16, u64) -> f32 ) -> *const HnswApiu16 {
+                c_func : extern "C" fn(*const u16, *const u16, c_ulong) -> f32 ) -> *const HnswApiu16 {
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u16>::new(c_func);
     let h = Hnsw::<u16, DistCFFI<u16> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
@@ -781,7 +782,7 @@ pub extern "C" fn init_hnsw_u8(max_nb_conn : usize, ef_const:usize, namelen: usi
 
 #[no_mangle]
 pub extern "C" fn init_hnsw_ptrdist_u8(max_nb_conn : usize, ef_const:usize, 
-                c_func : extern "C" fn(*const u8, *const u8, u64) -> f32 ) -> *const HnswApiu8 {
+                c_func : extern "C" fn(*const u8, *const u8, c_ulong) -> f32 ) -> *const HnswApiu8 {
     log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u8>::new(c_func);
     let h = Hnsw::<u8, DistCFFI<u8> >::new(max_nb_conn, 10000, 16, ef_const, c_dist);
