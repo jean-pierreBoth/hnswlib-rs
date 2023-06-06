@@ -7,7 +7,7 @@ use std::ptr;
 use std::fs::OpenOptions;
 use std::io::{BufReader};
 use std::path::{PathBuf};
-use std::os::raw::c_ulonglong;
+use core::ffi::c_ulonglong;
 
 use log;
 
