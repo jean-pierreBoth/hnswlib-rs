@@ -970,9 +970,9 @@ impl Distance<u16> for DistLevenshtein {
 /// This type is for function with a C-API
 /// Distances can be computed by such a function. It
 /// takes as arguments the two (C, rust, julia) pointers to primitive type vectos and length 
-/// passed as a unsignedlonlong (64 bits) (which is called c_ulong in Rust!) and Culonglong in Julia
+/// passed as a unsignedlonlong (64 bits) which is called c_ulonglong in Rust and Culonglong in Julia
 /// 
-type DistCFnPtr<T> = extern "C" fn(*const T, *const T, len : c_ulong) -> f32;
+type DistCFnPtr<T> = extern "C" fn(*const T, *const T, len : c_ulonglong) -> f32;
 
 
 /// A structure to implement Distance Api for type DistCFnPtr\<T\>, 
@@ -998,7 +998,7 @@ impl <T:Copy+Clone+Sized+Send+Sync> Distance<T> for DistCFFI<T>  {
         let len = va.len();
         let ptr_a = va.as_ptr();
         let ptr_b = vb.as_ptr();
-        let dist = (self.dist_function)(ptr_a, ptr_b, len as c_ulong);
+        let dist = (self.dist_function)(ptr_a, ptr_b, len as c_ulonglong);
         log::trace!("DistCFFI dist_function_ptr {:?} returning {:?} ", self.dist_function, dist);
         dist
         } // end of compute
@@ -1239,7 +1239,7 @@ fn test_dist_ext_float() {
     let va : Vec::<f32> = vec! [1. , 2., 3.];
     let vb : Vec::<f32> = vec! [1. , 2., 3.];
     println!("in test_dist_ext_float");
-    let dist1 = dist_func_float(va.as_ptr(), vb.as_ptr(), va.len() as c_ulong);
+    let dist1 = dist_func_float(va.as_ptr(), vb.as_ptr(), va.len() as c_ulonglong);
     println!("test_dist_ext_float computed : {:?}", dist1);
 
     let mydist = DistCFFI::<f32>::new(dist_func_float);
