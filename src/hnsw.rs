@@ -387,13 +387,9 @@ impl <T:Clone+Send+Sync> Drop for PointIndexation<T> {
             log::trace!("clearing layer {}", l);
             let layer = &mut self.points_by_layer.write()[l as usize];
             layer.into_par_iter().for_each(|p| clear_neighborhoods(p));
+            layer.clear();
         }
         //
-        log::trace!("dropping layers ...");
-        for l in 0..=nb_level {
-            let layer = &mut self.points_by_layer.write()[l as usize];
-            drop(layer);
-        }
         log::debug!("clearing self.points_by_layer...");
         drop(self.points_by_layer.write());
         log::debug!("exiting PointIndexation drop");
@@ -1043,7 +1039,9 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     /// Typically 1000 * the number of threads.  
     /// Many consecutive parallel_insert can be done, so the size of vector inserted in one insertion can be optimized.
     pub fn parallel_insert(&self, datas: &Vec<(&Vec<T>, usize)> ) {
+        log::debug!("entering parallel_insert");
         datas.par_iter().for_each( |&item| self.insert(item));
+        log::debug!("exiting parallel_insert");
     }  // end of parallel_insert
 
 
