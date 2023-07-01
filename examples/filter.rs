@@ -4,6 +4,10 @@ use hnsw_rs::dist::{DistLevenshtein};
 use rand::Rng;
 use std::iter;
 
+// Shows two ways to do filtering, by a sorted vector or with a closure
+// We define a hnsw-index with 500 entries
+// Only ids within 300-400 should be in the result-set 
+
 // Used to create a random string
 fn generate_random_string(len: usize) -> String {
     const CHARSET: &[u8] = b"abcdefghij";
