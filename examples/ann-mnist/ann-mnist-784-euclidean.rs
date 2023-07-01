@@ -15,6 +15,9 @@ use cpu_time::ProcessTime;
 // 8 hyperthreaded i7-core @ 2.3 Ghz
 //     24           400         24           1              0          0        0.977        22197        1.001
 
+// 24 core Core(TM) i9-13900HX simdeez
+//     24           400         24           1              0          0        0.977        59884        1.001
+
 use hnsw_rs::prelude::*;
 
 mod annhdf5;
