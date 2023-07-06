@@ -70,7 +70,7 @@ fn search_vector_filter(word: &str, hns: &Hnsw<u16, DistLevenshtein>, words: &Ve
 
 
 #[test]
-fn levensthein() {
+fn levenstein() {
 
     let nb_elem = 500000; // number of possible words in the dictionary
     let max_nb_connection = 15;
@@ -104,15 +104,17 @@ fn levensthein() {
     //
     println!("========== Search in filtered_hns" );
     let ef_search = 30;
-    let vec : Vec<u16> = "abcde".chars().map(|c| c as u16).collect();
+    let tosearch = "abcdefg";
+    let vec : Vec<u16> = tosearch.chars().map(|c| c as u16).collect();
     let res: Vec<Neighbour> = filtered_hns.search_possible_filter(&vec, 10, ef_search, None);
     for r in &res {
         println!("Word: {:?} Id: {:?} Distance: {:?}", words[r.d_id], r.d_id, r.distance);
     }
     //
     // search with filter
-    search_closure_filter(&"abcde", &hns, &words, &filter_vector);
-    let filter_vec_res = search_vector_filter(&"abcde", &hns, &words, &filter_vector);
+    let tosearch = "abcdefg";
+    search_closure_filter(tosearch, &hns, &words, &filter_vector);
+    let filter_vec_res = search_vector_filter(tosearch, &hns, &words, &filter_vector);
     // how many neighbours in res are in filter_vec_res
     let mut nb_found : usize = 0; 
     for n in &res {
@@ -124,6 +126,5 @@ fn levensthein() {
     }    
     println!(" recall : {}", nb_found as f32/res.len() as f32);
     println!(" last distances ratio : {} ", res.last().unwrap().distance / filter_vec_res.last().unwrap().distance);
-    println!("Words generated");
 
 }

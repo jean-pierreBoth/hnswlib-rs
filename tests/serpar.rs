@@ -11,12 +11,9 @@ use skiplist::OrderedSkipList;
 
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::hnsw;
+use hnsw_rs::prelude::*;
+use hnsw_rs::dist;
 
-#[allow(unused_imports)]    // necessary for rls
-use crate::dist;
-
-pub use self::hnsw::*;
 
 
 pub fn gen_random_vector_f32(nbrow :usize) -> Vec<f32> {
@@ -71,14 +68,11 @@ fn brute_force_neighbours<T:Serialize+DeserializeOwned+Copy+Send+Sync>(nb_neighb
 //================================================================================================
 
 
-#[cfg(test)]
-mod tests {
 
-use super::*;
 use std::time::Duration;
 use cpu_time::ProcessTime;
 
-use dist::l2_normalize;
+use hnsw_rs::dist::l2_normalize;
 
 #[test]
 fn test_serial() {
@@ -287,6 +281,3 @@ fn test_parallel() {
     //
   //  assert!(1==0);
 } // end test_par
-
-
-}   // end mod tests
