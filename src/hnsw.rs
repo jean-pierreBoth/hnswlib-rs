@@ -28,30 +28,11 @@ use log::debug;
 use log::trace;
 
 pub use crate::dist::Distance;
-
+pub use crate::filter::FilterT;
 
 // TODO
 // Profiling.
 
-pub trait FilterAble {
-    fn hnsw_filter(&self, id:&usize) -> bool;
-}
-
-impl FilterAble for Vec<usize> {
-    fn hnsw_filter(&self, id:&usize) -> bool {
-        return match &self.binary_search(id) {
-            Ok(_) => true,
-            _ => false }
-    }
-}
-
-impl<F> FilterAble for F
-where F: Fn(&usize) -> bool,
-{
-    fn hnsw_filter(&self, id:&usize) -> bool {
-        return self(id)
-    }
-}
 
 /// This unit structure provides the type to instanciate Hnsw with,
 /// to get reload of graph only in the the structure. 
@@ -853,7 +834,7 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
     ///
     /// Greedy algorithm n° 2 in Malkov paper.
     /// search in a layer (layer) for the ef points nearest a point to be inserted in hnsw.
-    fn search_layer(& self, point: &[T], entry_point: Arc<Point<T>> , ef:usize, layer: u8, filter:Option<& dyn FilterAble>) -> BinaryHeap<Arc<PointWithOrder<T>> > {
+    fn search_layer(& self, point: &[T], entry_point: Arc<Point<T>> , ef:usize, layer: u8, filter:Option<& dyn FilterT>) -> BinaryHeap<Arc<PointWithOrder<T>> > {
         //
         trace!("entering search_layer with entry_point_id {:?} layer : {:?} ef {:?} ", entry_point.p_id, layer, ef);
         //
@@ -861,7 +842,6 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         // log2(skiplist_size) must be greater than 1.
         let skiplist_size = ef.max(2);
         // we will store positive distances in this one
-        // print!("Len: {:?}", ef);
         let mut return_points = BinaryHeap::<Arc<PointWithOrder<T>> >::with_capacity(skiplist_size);
         //
         if self.layer_indexed_points.points_by_layer.read()[layer as usize].len() == 0 {
@@ -882,7 +862,6 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
         //
         let mut candidate_points = BinaryHeap::<Arc<PointWithOrder<T>> >::with_capacity(skiplist_size);
         candidate_points.push(Arc::new(PointWithOrder::new(&entry_point, -dist_to_entry_point)));
-
         return_points.push(Arc::new(PointWithOrder::new(&entry_point, dist_to_entry_point)));
         // at the beginning candidate_points contains point passed as arg in layer entry_point_id.0
         while candidate_points.len() > 0 {
@@ -933,13 +912,13 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                         } else {
                             let id:&usize = &e_prime.point_ref.get_origin_id();
                             if filter.as_ref().unwrap().hnsw_filter(&id) { 
-                                    if return_points.len() == 1 {
-                                        let only_id = return_points.peek().unwrap().point_ref.origin_id;
-                                        if !filter.as_ref().unwrap().hnsw_filter(&only_id) {
-                                            return_points.clear() 
-                                        }
+                                if return_points.len() == 1 {
+                                    let only_id = return_points.peek().unwrap().point_ref.origin_id;
+                                    if !filter.as_ref().unwrap().hnsw_filter(&only_id) {
+                                        return_points.clear() 
                                     }
-                                    return_points.push(Arc::clone(&e_prime))
+                                }
+                                return_points.push(Arc::clone(&e_prime))
                             } 
                         }
                         if return_points.len() > ef {
@@ -1306,11 +1285,10 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
 
 
 
-    /// search the first knbn nearest neigbours of a data and returns a Vector of Neighbour.   
-    /// The parameter ef controls the width of the search in the lowest level, it must be greater
-    /// than number of neighbours asked.  
-    /// A rule of thumb could be between knbn and max_nb_connection.
-    pub fn search_possible_filter(&self, data :&[T] , knbn:usize, ef_arg:usize, filter:Option<& dyn FilterAble>) -> Vec<Neighbour> {
+    /// a filtered version of [`Self::search`].  
+    /// A filter can be added to the search to get nodes with a particular property or id constraint.  
+    /// See examples in filter.rs 
+    pub fn search_filter(&self, data :&[T] , knbn:usize, ef_arg:usize, filter:Option<& dyn FilterT>) -> Vec<Neighbour> {
         //
         let entry_point;
         {  // a lock on an option an a Arc<Point>
@@ -1322,7 +1300,6 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
               entry_point =  Arc::clone((*entry_point_opt_ref).as_ref().unwrap()); 
             }
         }
-
         //
         let mut dist_to_entry = self.dist_f.eval(data , & entry_point.as_ref().v);
         let mut pivot = Arc::clone(&entry_point);
@@ -1348,8 +1325,6 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                 pivot =  Arc::clone(new_pivot.as_ref().unwrap());
             }
         } // end on for on layers
-
-
         // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
         let ef = ef_arg.max(knbn);
         // now search with asked ef in layer 0
@@ -1363,8 +1338,20 @@ impl <T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<T,D>  {
                 neighbours[0..last].iter().map(|p| Neighbour::new(p.as_ref().point_ref.origin_id, p.as_ref().dist_to_ref, p.as_ref().point_ref.p_id)).collect();
 
         knn_neighbours
-    } // end of knn_search
+    } // end of search_filter
 
+
+
+#[inline]
+    pub fn search_possible_filter(&self, data :&[T] , knbn:usize, ef_arg:usize, filter:Option<& dyn FilterT>) -> Vec<Neighbour> {
+        self.search_filter(data, knbn, ef_arg, filter)
+    }
+
+
+    /// search the first knbn nearest neigbours of a data and returns a Vector of Neighbour.   
+    /// The parameter ef controls the width of the search in the lowest level, it must be greater
+    /// than number of neighbours asked.  
+    /// A rule of thumb could be between knbn and max_nb_connection.
     pub fn search(&self, data :&[T] , knbn:usize, ef_arg:usize) -> Vec<Neighbour> {
         self.search_possible_filter(data, knbn, ef_arg, None)
     }
