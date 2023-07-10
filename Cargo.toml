@@ -71,11 +71,14 @@ num-traits = {version = "0.2"}
 
 
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
-hashbrown = {version = "0.9"}
+hashbrown = {version = "0.14"}
 skiplist= {version = "0.3"}
 
 rand = {version = "0.8"}
 lazy_static = { version = "1.4"}
+
+#
+mmap-rs = {version = "0.6"}
 #
 # decreasing order of log for debug build : (max_level_)trace debug info warn error off
 # decreasing order of log for release build (release_max_level_)  .. idem

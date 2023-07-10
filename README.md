@@ -107,22 +107,23 @@ The main parameters occuring in constructing the graph or in searching are:
     modify the search strategy. The interested user should check the paper to see the impact. By default
     the values are as recommended in the paper.
 
-## Benchmarks and Examples
+## Benchmarks and Examples [examples](./examples)
 
 Some examples are taken from the [ann-benchmarks site](https://github.com/erikbern/ann-benchmarks)
 and recall rates and request/s are given in comments in the examples files for some input parameters.
 The annhdf5 module implements reading the standardized data files
 of the [ann-benchmarks site](https://github.com/erikbern/ann-benchmarks),
 just download the necessary benchmark data files and modify path in sources accordingly.
-Then run: cargo build --examples --release.  
+Then run: cargo build --release --features="simdeez_f" --examples .  
 It is possible in these examples to change from parallel searches to serial searches to check for speeds
 or modify parameters to see the impact on performance.
 
-For example:
-
-1. On the fashion-mnist-784-euclidean benchmark search requests run at 22197 req/s with a recall rate of 0.9775 on a laptop with 8 i7-cores at 2.3Ghz
-2. On the sift1m benchmark (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 6100 req/s with a recall rate of 0.9907 or at 3077 req/s with a recall rate of 0.9959, depending on the parameters.
-3. A tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
+With a i9-13900HX 24 cores laptop we get the following results: 
+1. fashion-mnist-784-euclidean : search requests run at 59900 req/s with a recall rate of 0.977
+2. ann-glove-25-angular : search for the first 100 neighbours run with recall 0.979 at 12640 req/s
+3. sift1m benchmark: (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 15000 req/s with a recall rate of 0.9907 or at 8300 req/s with a recall rate of 0.9959, depending on the parameters.
+  
+Moreover a tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
 gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/) benchmark and can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
 
 Some lines extracted from this Mnist benchmark show how it works for f32 and L2 norm
@@ -154,7 +155,7 @@ Some lines extracted from this Mnist benchmark show how it works for f32 and L2 
 
 ## Contributions
 
-[Sannsyn](https://sannsyn.com/en/) contributed to Drop implementation and FilterAble trait.
+[Sannsyn](https://sannsyn.com/en/) contributed to Drop implementation and FilterT trait.
 Petter Egesund added the DistLevenshtein distance.
 
 ## Notes

@@ -19,6 +19,7 @@ pub mod api;
 pub mod libext;
 pub mod flatten;
 pub mod filter;
+pub mod datamap;
 
 lazy_static! {
     static ref LOG: u64 = {

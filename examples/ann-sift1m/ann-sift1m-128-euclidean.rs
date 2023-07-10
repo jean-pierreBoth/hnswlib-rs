@@ -16,8 +16,13 @@ use env_logger::{Builder};
 
 // search in paralle mode 8 core i7-10875H  @2.3Ghz time for 10 neighbours
 
-//     64           1600        128           1              0          0        0.9959       3077.      1.0001
 //     64           1600        64            1              0          0        0.9907       6100       1.0004
+//     64           1600        128           1              0          0        0.9959       3077.      1.0001
+
+// 24 core Core(TM) i9-13900HX simdeez
+
+//     64           1600        64            1              0          0        0.9907       15258       1.0004
+//     64           1600       128            1              0          0        0.9957       8296        1.0002
 
 use hnsw_rs::prelude::*;
 
@@ -77,7 +82,12 @@ pub fn main() {
     //
     let knbn = 10.min(knbn_max);
     let ef_search = 64;
+    println!("searching with ef = {}", ef_search);
     search(&mut hnsw, knbn, ef_search, &anndata);
+    //
+    println!("searching with ef = {}", ef_search);
+    let ef_search = 128;
+    search(&mut hnsw, knbn, ef_search, &anndata);    
 }
 
 
