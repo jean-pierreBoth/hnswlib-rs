@@ -1,24 +1,34 @@
-//! This module is devoted to reload the dump consisting in Data vectors.
+//! This module provides reload of the dump consisting in Data vectors.
 //! We mmap the file and provide 
-//!     - a Hashmap DataId to address
-//!     - an interface for retriving data in the hnsw structure
+//!     - a Hashmap from DataId to address
+//!     - an interface for retrieving just data vectors loaded in the hnsw structure.
 
+#![allow(unused)]
 
-use crate::prelude::DataId;
+use std::io::BufReader;
 
 use std::path::{PathBuf};
-use std::fs::File;
+use std::fs::{File,OpenOptions};
 
 use mmap_rs::{MmapOptions,Mmap};
 use hashbrown::HashMap;
 
+use crate::prelude::DataId;
+use crate::hnswio::load_description;
+
+
+/// This structure uses the data part of the dump of a Hnsw structure to retrieve the data.
+/// The data is access via a mmap of the data file, so memory is spared at the expense of page loading.
+// possibly to be used in graph to spare memory?
 pub struct DataMap {
     /// File containing Points data
     datapath : PathBuf,
-    ///
+    /// The mmap structure
     mmap : Mmap,
     /// map a dataId to an address
     hmap: HashMap<DataId, u64>,
+    /// type name of Data
+    t_name : String,
 } // end of DataMap
 
 
@@ -31,7 +41,6 @@ impl DataMap {
         let mut filename = fname.clone();
         filename.push_str(".hnsw.data");
         datapath.push(filename);
-
         //
         let meta = std::fs::metadata(&datapath);
         if meta.is_err() {
@@ -59,9 +68,37 @@ impl DataMap {
         //
         let hmap = HashMap::<DataId, u64>::new();
         log::info!("mmap done on file : {:?}", &datapath);
-        return DataMap{datapath, mmap, hmap};
+        //
+        // reload description to have data type
+        let mut graphpath = PathBuf::new();
+        graphpath.push(dir);
+        let mut filename = fname.clone();
+        filename.push_str(".hnsw.graph");
+        graphpath.push(filename);
+        let graphfileres = OpenOptions::new().read(true).open(&graphpath);
+        if graphfileres.is_err() {
+            println!("DataMap: could not open file {:?}", graphpath.as_os_str());
+            std::process::exit(1);            
+        }
+        let graphfile = graphfileres.unwrap();
+        let mut graph_in = BufReader::new(graphfile);
+        // we need to call load_description first to get distance name
+        let hnsw_description = crate::hnswio::load_description(&mut graph_in).unwrap();
+        let t_name = hnsw_description.get_typename();
+        // fill hmap to have address of each data point in file
+        //
+        return DataMap{datapath, mmap, hmap, t_name};
     } // end of new
 
+    /// get adress of data related to dataid
+    fn get_data_address(&self, dataid : DataId) -> u64 {
+        panic!("not yet implemented");
+    }
+
+    /// return the data corresponding to dataid. Access is done via mmap
+    pub fn get_data<T>(&self, dataid : DataId) -> &[T] {
+        panic!("not yet implemented");
+    }
 } // end of impl DataMap
 
 

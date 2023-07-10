@@ -134,6 +134,16 @@ impl Description {
         return Ok(1);
     } // end fo dump
 
+
+    /// return data typename 
+    pub fn get_typename(&self) -> String {
+        return self.t_name.clone();
+    }
+
+    /// returns dimension of data
+    pub fn get_dimension(&self) -> usize {
+        return self.dimension;
+    }
 } // end of HnswIO impl for Descr
 
 

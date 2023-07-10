@@ -42,7 +42,8 @@ See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.j
 
 * A flattening conversion of the Hnsw structure to keep only neighborhood relationships between points (without their internal data) internal to the Hnsw structure (*see module flatten.rs, FlatPoint and FlatNeighborhood*). It is thus possible to keep some topology information with low memory usage.
 
-* Filtering: It is possible to add filters so only results which satisfies the filter is in the result set. The filtering is done during the search, so it is not a post filter. There is currently two ways of using the filter, one can add allowed ids in a sorted vector and send as a parameter, or one can define a function which will be called before an id is added to the result set. Examples on both these strategies is in the examples directory. One can also implement the trait Filterable for new types, if one would like the filter to be kept in a bitvector, for example.
+* Filtering: It is possible to add filters so only results which satisfies the filter is in the result set. The filtering is done during the search, so it is not a post filter. There is currently two ways of using the filter, one can add allowed ids in a sorted vector and send as a parameter, or one can define a function which will be called before an id is added to the result set.  
+Examples on both these strategies are in the examples or tests directory. One can also implement the trait Filterable for new types, if one would like the filter to be kept in a bitvector, for example.
 
 ## Implementation
 
@@ -107,7 +108,7 @@ The main parameters occuring in constructing the graph or in searching are:
     modify the search strategy. The interested user should check the paper to see the impact. By default
     the values are as recommended in the paper.
 
-## Benchmarks and Examples [examples](./examples)
+## Benchmarks and Examples [(examples)](./examples)
 
 Some examples are taken from the [ann-benchmarks site](https://github.com/erikbern/ann-benchmarks)
 and recall rates and request/s are given in comments in the examples files for some input parameters.
