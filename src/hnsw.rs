@@ -6,7 +6,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use std::time::{SystemTime};
+use std::time::SystemTime;
 use cpu_time::ProcessTime;
 
 use std::cmp::Ordering;
@@ -16,7 +16,7 @@ use std::sync::Arc;
 use rayon::prelude::*;
 use std::sync::mpsc::channel;
 
-use std::any::{type_name};
+use std::any::type_name;
 
 use hashbrown::HashMap;
 use std::collections::binary_heap::BinaryHeap;
@@ -281,7 +281,7 @@ impl <T:Clone+Send+Sync> PointWithOrder<T> {
 
 //  LayerGenerator
 use rand::prelude::*;
-use rand::distributions::{Uniform};
+use rand::distributions::Uniform;
 
 /// a struct to randomly generate a level for an item according to an exponential law
 /// of parameter given by scale. 
@@ -1496,7 +1496,7 @@ mod tests {
 use super::*;
 use crate::dist;
 
-use rand::distributions::{Uniform};
+use rand::distributions::Uniform;
 
 use cpu_time::ProcessTime;
 

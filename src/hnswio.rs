@@ -23,13 +23,13 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use std::io;
 
-use parking_lot::{RwLock};
+use parking_lot::RwLock;
 use std::sync::Arc;
 use std::collections::HashMap;
 #[allow(unused_imports)]
 use std::path::PathBuf;
 
-use std::any::{type_name};
+use std::any::type_name;
 
 use std::io::prelude::*;
 use crate::hnsw;
@@ -45,7 +45,7 @@ const MAGICDESCR_2 : u32 = 0x002a677f;
 // magic at beginning of a layer dump
 const MAGICLAYER : u32 = 0x000a676f;
 // magic head of data file and before each data vector
-const MAGICDATAP : u32 = 0xa67f0000;
+pub(crate) const MAGICDATAP : u32 = 0xa67f0000;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DumpMode {
@@ -748,7 +748,7 @@ use crate::dist;
 
 
 use std::fs::OpenOptions;
-use std::io::{BufReader};
+use std::io::BufReader;
 use std::path::PathBuf;
 
 pub use crate::dist::*;

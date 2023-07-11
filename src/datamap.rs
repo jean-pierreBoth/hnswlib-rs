@@ -7,7 +7,7 @@
 
 use std::io::BufReader;
 
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::fs::{File,OpenOptions};
 
 use mmap_rs::{MmapOptions,Mmap};
@@ -16,7 +16,7 @@ use hashbrown::HashMap;
 use crate::prelude::DataId;
 use crate::hnswio::load_description;
 
-
+use crate::hnswio::MAGICDATAP;
 /// This structure uses the data part of the dump of a Hnsw structure to retrieve the data.
 /// The data is access via a mmap of the data file, so memory is spared at the expense of page loading.
 // possibly to be used in graph to spare memory?
@@ -85,6 +85,35 @@ impl DataMap {
         // we need to call load_description first to get distance name
         let hnsw_description = crate::hnswio::load_description(&mut graph_in).unwrap();
         let t_name = hnsw_description.get_typename();
+        // get dimension as declared in description
+        let descr_dimension = hnsw_description.get_dimension();
+        drop(graph_in);
+        //
+        log::debug!("got typename from reload : {:?}", t_name);
+        let mapped_slice = mmap.as_slice();
+        //
+        // where are we in decoding mmap slice?
+        let mut current_mmap_addr = 0usize;
+        // check magic
+        let mut it_slice = [0u8; std::mem::size_of::<u32>()];
+        it_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u32>()]);
+        current_mmap_addr += std::mem::size_of::<u32>();
+        let magic = u32::from_ne_bytes(it_slice);
+        assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in mmap");
+        log::debug!("got magic OK");
+        // get dimension
+        it_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u32>()]);
+        current_mmap_addr += std::mem::size_of::<u32>();
+        let dimension = u32::from_ne_bytes(it_slice);
+        if dimension as usize != descr_dimension {
+            log::error!("description and data do not agree on dimension, data got : {:?}, description got : {:?}",dimension, descr_dimension);
+        }
+        else {
+            log::info!(" got dimension : {:?}", dimension);
+        }
+        //
+        // now we know that each record consists in (MAGICDATAP, DataId, dimension * std::meme::size_of::<T>) 
+        //
         // fill hmap to have address of each data point in file
         //
         return DataMap{datapath, mmap, hmap, t_name};

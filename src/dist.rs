@@ -248,20 +248,22 @@ macro_rules! implementCosDistance(
     ($ty:ty) => (
      impl Distance<$ty> for DistCosine  {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
-        let dist:f32;
-        let zero:f32 = 0.;
-        // to // by rayon
-        let res = va.iter().zip(vb.iter()).map(|t| ((*t.0 * *t.1) as f32, (*t.0 * *t.0) as f32, (*t.1 * *t.1) as f32)).
-            fold((0., 0., 0.), |acc , t| (acc.0 + t.0, acc.1 + t.1, acc.2 + t.2));
-        //
-        if res.1 > zero && res.2 > zero {
-            dist = 1. - res.0 / (res.1 * res.2).sqrt();
-        }
-        else {
-           dist = 0.;
-         }
-         //
-         return dist;
+            let dist:f32;
+            let zero:f64 = 0.;
+            // to // by rayon
+            let res = va.iter().zip(vb.iter()).map(|t| ((*t.0 * *t.1) as f64, (*t.0 * *t.0) as f64, (*t.1 * *t.1) as f64)).
+                fold((0., 0., 0.), |acc , t| (acc.0 + t.0, acc.1 + t.1, acc.2 + t.2));
+            //
+            if res.1 > zero && res.2 > zero {
+                let dist_unchecked = 1. - res.0 / (res.1 * res.2).sqrt();
+                assert!(dist_unchecked >= - 0.00002);
+                dist = dist_unchecked.max(0.) as f32;
+            }
+            else {
+                dist = 0.;
+            }
+            //
+            return dist;
         } // end of function
      } // end of impl block
     ) // end of matching
