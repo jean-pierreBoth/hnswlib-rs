@@ -10,8 +10,8 @@
 /// 
 // datafile
 // MAGICDATAP : u32
-// dimension : u32
-// The for each point the triplet: (MAGICDATAP, origin_id , array of values.) ( u32, u64, ....)
+// dimension : usize!!
+// The for each point the triplet: (MAGICDATAP, origin_id , dimension , array of values bson encoded) ( u32, u64, ....)
 //
 // A point is dumped in graph file as given by its external id (type DataId i.e : a usize, possibly a hash value) 
 // and layer (u8) and rank_in_layer:i32.

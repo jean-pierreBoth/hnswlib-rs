@@ -1,9 +1,12 @@
-//! This module provides reload of the dump consisting in Data vectors.
+//! This module provides a bidirectional link between a file in the format used for the dump of Data vectors filling the Hnsw structure.
 //! We mmap the file and provide 
 //!     - a Hashmap from DataId to address
 //!     - an interface for retrieving just data vectors loaded in the hnsw structure.
+//!     - an interface for creating a Hnsw structure from the vectors stored in file
 
 #![allow(unused)]
+
+use serde::{Serialize, de::DeserializeOwned};
 
 use std::io::BufReader;
 
@@ -25,16 +28,19 @@ pub struct DataMap {
     datapath : PathBuf,
     /// The mmap structure
     mmap : Mmap,
-    /// map a dataId to an address
-    hmap: HashMap<DataId, u64>,
+    /// map a dataId to an address where we get a bson encoded vector of type T
+    hmap: HashMap<DataId, usize>,
     /// type name of Data
     t_name : String,
+    /// dimension of data vector
+    dimension : usize,
 } // end of DataMap
 
 
 impl DataMap {
 
-    pub fn new(dir : &str, fname : &String) -> Self {
+    // TODO: specifiy mmap option 
+    pub fn from_hnsw<T:DeserializeOwned + std::fmt::Debug>(dir : &str, fname : &String) -> Result<DataMap, String> {
         // we know data filename is hnswdump.hnsw.data
         let mut datapath = PathBuf::new();
         datapath.push(dir);
@@ -66,7 +72,6 @@ impl DataMap {
         }
         let mmap = mapping_res.unwrap();
         //
-        let hmap = HashMap::<DataId, u64>::new();
         log::info!("mmap done on file : {:?}", &datapath);
         //
         // reload description to have data type
@@ -88,45 +93,123 @@ impl DataMap {
         // get dimension as declared in description
         let descr_dimension = hnsw_description.get_dimension();
         drop(graph_in);
+        // check typename coherence
+        log::info!("got typename from reload : {:?}", t_name); 
+        if std::any::type_name::<T>() != t_name {
+            log::error!("description has typename {:?}, function type argument is : {:?}", t_name, std::any::type_name::<T>());
+            return Err(String::from("type error"));
+        }
         //
-        log::debug!("got typename from reload : {:?}", t_name);
+        // where are we in decoding mmap slice? at beginning
+        //
         let mapped_slice = mmap.as_slice();
         //
         // where are we in decoding mmap slice?
         let mut current_mmap_addr = 0usize;
+        let mut usize_slice = [0u8; std::mem::size_of::<usize>()];
         // check magic
-        let mut it_slice = [0u8; std::mem::size_of::<u32>()];
-        it_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u32>()]);
+        let mut u32_slice = [0u8; std::mem::size_of::<u32>()];
+        u32_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u32>()]);
         current_mmap_addr += std::mem::size_of::<u32>();
-        let magic = u32::from_ne_bytes(it_slice);
+        let magic = u32::from_ne_bytes(u32_slice);
         assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in mmap");
         log::debug!("got magic OK");
         // get dimension
-        it_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u32>()]);
-        current_mmap_addr += std::mem::size_of::<u32>();
-        let dimension = u32::from_ne_bytes(it_slice);
+        usize_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<usize>()]);
+        current_mmap_addr += std::mem::size_of::<usize>();
+        let dimension = usize::from_ne_bytes(usize_slice) as usize;
         if dimension as usize != descr_dimension {
             log::error!("description and data do not agree on dimension, data got : {:?}, description got : {:?}",dimension, descr_dimension);
+            return Err(String::from("description and data do not agree on dimension"));
         }
         else {
             log::info!(" got dimension : {:?}", dimension);
         }
         //
-        // now we know that each record consists in (MAGICDATAP, DataId, dimension * std::meme::size_of::<T>) 
+        // now we know that each record consists in (MAGICDATAP, DataId, dimensionn and bson serialized Vec<T> of dimension dimension) 
+        // We have in fact dimension 2 times one explicit one in serialized length!
         //
+        let record_size = 2 * std::mem::size_of::<u32>() + 2 * std::mem::size_of::<u64>() + dimension * std::mem::size_of::<T>();
+        let residual = mmap.size() - current_mmap_addr;
+        log::info!("mmap size {}, current_mmap_addr {}, residual : {}", mmap.size(), current_mmap_addr, residual);
+        let nb_record = residual / record_size;
+        log::debug!("record size : {}, nb_record : {}", record_size, nb_record);
+        // allocate hmap with correct capacity
+        let mut hmap = HashMap::<DataId, usize>::with_capacity(nb_record);
         // fill hmap to have address of each data point in file
+        let mut u64_slice = [0u8; std::mem::size_of::<u64>()];
         //
-        return DataMap{datapath, mmap, hmap, t_name};
-    } // end of new
+        // now we loop on records
+        //
+        for i in 0..nb_record {
+            log::info!("record i : {}, addr : {}", i, current_mmap_addr);
+            // decode Magic 
+            u32_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u32>()]);
+            current_mmap_addr += std::mem::size_of::<u32>();
+            let magic = u32::from_ne_bytes(u32_slice);
+            assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in mmap");
+            // decode DataId
+            u64_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u64>()]);
+            current_mmap_addr += std::mem::size_of::<u64>();
+            let data_id = u64::from_ne_bytes(u64_slice) as usize;
+            log::debug!("got dataid : {:?}", data_id);
+            // Note we store address where we have to decode dimension and full bson encoded vector
+            hmap.insert(data_id, current_mmap_addr);
+            // now read serialized length
+            u64_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u64>()]);
+            current_mmap_addr += std::mem::size_of::<u64>();
+            let serialized_len = u64::from_ne_bytes(u64_slice) as usize;
+            log::debug!("serialized bytes len to reload {:?}", serialized_len);
+            let mut v_serialized = Vec::<u8>::with_capacity(serialized_len);
+            // TODO avoid initialization
+            v_serialized.resize(serialized_len as usize, 0);
+            v_serialized.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+serialized_len]);
+            current_mmap_addr += serialized_len;
+            let v : Vec<T>;
+            v = bincode::deserialize(&v_serialized).unwrap();
+            log::debug!("deserialized v : {:?}", v);
+        } // end of for on record
+        //
+        log::debug!("end of from_hnsw");
+        //
+        let datamap =  DataMap{datapath, mmap, hmap, t_name, dimension : descr_dimension};
+        //
+        return Ok(datamap);
+    } // end of from_datas
+
+
+
+
 
     /// get adress of data related to dataid
     fn get_data_address(&self, dataid : DataId) -> u64 {
         panic!("not yet implemented");
     }
 
-    /// return the data corresponding to dataid. Access is done via mmap
-    pub fn get_data<T>(&self, dataid : DataId) -> &[T] {
-        panic!("not yet implemented");
+    /// return the data corresponding to dataid. Access is done via mmap. returns None if address is invalid
+    pub fn get_data<T:DeserializeOwned + std::fmt::Debug>(&self, dataid : &DataId) -> Option<Vec<T>> {
+        //
+        log::trace!("in DataMap::get_data, dataid : {:?}", dataid);
+        let address = self.hmap.get(dataid);
+        if address.is_none() {
+            return None;
+        }
+        log::debug!(" adress for id : {}, address : {:?}", dataid, address);
+        let mut current_mmap_addr = *address.unwrap();
+        let mapped_slice = self.mmap.as_slice();
+        let mut u64_slice = [0u8; std::mem::size_of::<u64>()];
+        u64_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u64>()]);
+        current_mmap_addr += std::mem::size_of::<u64>();
+        let serialized_len = u64::from_ne_bytes(u64_slice) as usize;
+        log::debug!("serialized bytes len to reload {:?}", serialized_len);
+        let mut v_serialized = Vec::<u8>::with_capacity(serialized_len);
+        // TODO avoid initialization
+        v_serialized.resize(serialized_len as usize, 0);
+        v_serialized.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+serialized_len]);
+        current_mmap_addr += serialized_len;
+        let v : Vec<T>;
+        v = bincode::deserialize(&v_serialized).unwrap();
+        Some(v)
     }
 } // end of impl DataMap
 
@@ -162,7 +245,7 @@ fn test_file_mmap() {
     let mut rng = rand::thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
     // 1000 vectors of size 10 f32
-    let nbcolumn = 1000;
+    let nbcolumn = 5;
     let nbrow = 10;
     let mut xsi;
     let mut data = Vec::with_capacity(nbcolumn);
@@ -172,6 +255,7 @@ fn test_file_mmap() {
             xsi = unif.sample(&mut rng);
             data[j].push(xsi);
         }
+        log::debug!("j : {:?}, data : {:?} ", j, &data[j]);
     } 
     // define hnsw
     let ef_construct= 25;
@@ -185,10 +269,42 @@ fn test_file_mmap() {
     // dump in a file.  Must take care of name as tests runs in // !!!
     let fname = String::from("mmap_test");
     let _res = hnsw.file_dump(&fname);
+    // We check we can reload
+    /* 
+    let graphfname = String::from("mmap_test.hnsw.graph");
+    let graphpath = PathBuf::from(graphfname);
+    let graphfileres = OpenOptions::new().read(true).open(&graphpath);
+    if graphfileres.is_err() {
+        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
+        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
+    }
+    let graphfile = graphfileres.unwrap();
+    //  
+    let datafname = String::from("mmap_test.hnsw.data");
+    let datapath = PathBuf::from(datafname);
+    let datafileres = OpenOptions::new().read(true).open(&datapath);
+    if datafileres.is_err() {
+        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
+        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
+    }
+    let datafile = datafileres.unwrap();
     //
+    let mut graph_in = BufReader::new(graphfile);
+    let mut data_in = BufReader::new(datafile);
+    // we need to call load_description first to get distance name
+    let hnsw_description = load_description(&mut graph_in).unwrap();
+    let hnsw_loaded : Hnsw<f32,DistL1>= crate::hnswio::load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+    check_graph_equality(&hnsw_loaded, &hnsw);
+    log::info!("reload success, going to mmap reloading");
+    */
     //
-    //
-    let datamap = DataMap::new(".", &fname);
+    let datamap = DataMap::from_hnsw::<f32>(".", &fname).unwrap();
+    let id = 3;
+    let d = datamap.get_data::<f32>(&id);
+    if d.is_some() {
+        log::debug!("id = {}, v = {:?}", id, d.as_ref().unwrap());
+        assert_eq!(d.as_ref().unwrap(), &data[id]);
+    }
 } // end of test_file_mmap
 
 } // end of mod tests 
