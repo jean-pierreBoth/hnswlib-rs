@@ -3,10 +3,12 @@
 //! The macro declare_myapi_type!  produces struct HnswApif32 and so on.
 //! 
 
+#![allow(non_camel_case_types)]
+
 use std::ptr;
 use std::fs::OpenOptions;
-use std::io::{BufReader};
-use std::path::{PathBuf};
+use std::io::BufReader;
+use std::path::PathBuf;
 use core::ffi::c_ulonglong;
 
 use log;
@@ -72,7 +74,6 @@ pub struct Neighbourhood_api {
     pub nbgh : i64,
     pub neighbours : *const Neighbour_api,
 }
-
 
 
 #[repr(C)]

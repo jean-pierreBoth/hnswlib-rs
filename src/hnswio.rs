@@ -38,10 +38,16 @@ use crate::dist::Distance;
 
 // magic before each graph point data for each point
 const MAGICPOINT : u32 = 0x000a678f;
-// magic at beginning of description format v& of dump
-const MAGICDESCR_1 : u32 = 0x001a677f;
-// magic at beginning of description format v& of dump
+// magic at beginning of description format v2 of dump
 const MAGICDESCR_2 : u32 = 0x002a677f;
+
+// magic at beginning of description format v3 of dump
+// format where we can use mmap to provide acces to data (not graph) via a memory mapping of file data , 
+// useful when data vector are large and data uses more space than graph.
+// differ from v2 as we do not use bincode encoding for point. We dump pure binary
+// This help use mmap as we can return directly a slice.
+const MAGICDESCR_3 : u32 = 0x002a6771;
+
 // magic at beginning of a layer dump
 const MAGICLAYER : u32 = 0x000a676f;
 // magic head of data file and before each data vector
@@ -67,6 +73,8 @@ pub trait HnswIO {
 /// Name of distance and type of data must be encoded in the dump file for a coherent reload.
 #[repr(C)]
 pub struct Description {
+    /// to keep track of format version
+    pub format_version : usize,
     ///  value is 1 for Full 0 for Light
     pub dumpmode : u8,
     /// max number of connections in layers != 0
@@ -87,7 +95,7 @@ pub struct Description {
 
 impl Description {
     /// The dump of Description consists in :
-    /// . The value MAGICDESCR_1 as a u32 (4 u8)
+    /// . The value MAGICDESCR_* as a u32 (4 u8)
     /// . The type of dump as u8
     /// . max_nb_connection as u8
     /// . ef (search parameter used in construction) as usize
@@ -96,7 +104,7 @@ impl Description {
     /// 
     fn dump<W:Write>(&self, argmode : DumpMode, out : &mut io::BufWriter<W>) -> Result<i32, String> {
         log::info!("in dump of description");
-        out.write(&MAGICDESCR_2.to_ne_bytes()).unwrap();
+        out.write(&MAGICDESCR_3.to_ne_bytes()).unwrap();
         let mode : u8 = match argmode {
             DumpMode::Full => 1,
             _              => 0,
@@ -152,21 +160,23 @@ impl Description {
 /// So the reload is made in two steps.
 pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     //
-    let mut descr = Description{ dumpmode: 0, max_nb_connection: 0, nb_layer: 0, 
+    let mut descr = Description{ format_version : 0, dumpmode: 0, max_nb_connection: 0, nb_layer: 0, 
                                 ef: 0, nb_point: 0, dimension : 0, 
                                 distname: String::from(""), t_name : String::from("")};
+    //
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
     io_in.read_exact(&mut it_slice)?;
     let magic = u32::from_ne_bytes(it_slice);
     log::debug!(" magic {:X} ", magic);
-    if magic !=  MAGICDESCR_1 && magic !=  MAGICDESCR_2 {
+    if magic !=  MAGICDESCR_2 && magic !=  MAGICDESCR_3 {
         log::info!("bad magic");
         return Err(io::Error::new(io::ErrorKind::Other, "bad magic at descr beginning"));
     }
-    else if magic ==  MAGICDESCR_1 {
-        log::info!("old version of dump..., exiting");
-        println!("old version of dump");
-        return Err(io::Error::new(io::ErrorKind::Other, "old format of dump"));
+    else if magic ==  MAGICDESCR_2 {
+        descr.format_version = 2;
+    }
+    else if magic ==  MAGICDESCR_3 {
+        descr.format_version = 3;
     }
     let mut it_slice = [0u8; std::mem::size_of::<u8>()];
     io_in.read_exact(&mut it_slice)?;
@@ -231,6 +241,8 @@ pub fn load_description(io_in: &mut dyn Read)  -> io::Result<Description> {
     //
     Ok(descr)
 }
+
+
 //
 // dump and load of Point<T>
 // ==========================
@@ -286,10 +298,11 @@ fn dump_point<'a, T:Serialize+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> 
     let origin_u64 = point.get_origin_id() as u64;
     dataout.write(&origin_u64.to_ne_bytes()).unwrap();
     //
-    let serialized : Vec<u8> = bincode::serialize(point.get_v()).unwrap();
-//    log::debug!("serializing len {:?}", serialized.len());
+    let serialized = unsafe {
+        std::slice::from_raw_parts(point.get_v().as_ptr() as *const u8, point.get_v().len() * std::mem::size_of::<T>()) };
+    log::debug!("serializing len {:?}", serialized.len());
     let len_64 = serialized.len() as u64;
-    dataout.write(&len_64.to_ne_bytes()).unwrap();
+    dataout.write(&len_64.to_ne_bytes()).unwrap();   
     dataout.write_all(&serialized).unwrap();
     //
     return Ok(1);
@@ -378,14 +391,24 @@ fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut d
     let mut it_slice = [0u8; std::mem::size_of::<u64>()];
     data_in.read_exact(&mut it_slice)?;
     let serialized_len = u64::from_ne_bytes(it_slice);
-//    log::debug!("serialized len to reload {:?}", serialized_len);
+    log::debug!("serialized len to reload {:?}", serialized_len);
     let mut v_serialized = Vec::<u8>::new();
     // TODO avoid initialization
     v_serialized.resize(serialized_len as usize, 0);
     data_in.read_exact(&mut v_serialized)?;
     let v : Vec<T>;
     if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
-        v = bincode::deserialize(&v_serialized).unwrap();
+        v = match descr.format_version {
+            2 => { bincode::deserialize(&v_serialized).unwrap() },
+            3 => {
+                let slice_t = unsafe {std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, descr.dimension as usize) };
+                slice_t.to_vec()
+            }
+            _ => {
+                log::error!("error in load_point, unknow format_version : {:?}", descr.format_version);
+                std::process::exit(1);
+            }
+        };
     }
     else {
         v = Vec::<T>::new();
@@ -586,6 +609,7 @@ impl <T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sy
         let datadim : usize = self.layer_indexed_points.get_data_dimension();
 
         let description = Description {
+            format_version : 3,
                ///  value is 1 for Full 0 for Light
             dumpmode : dumpmode,
             max_nb_connection : self.get_max_nb_connection(),
