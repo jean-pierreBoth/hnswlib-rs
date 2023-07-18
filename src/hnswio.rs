@@ -20,14 +20,17 @@
 
 use serde::{Serialize, de::DeserializeOwned};
 
-
+// io 
 use std::io;
+use std::fs::OpenOptions;
+use std::io::BufReader;
+use std::path::PathBuf;
 
+// synchro
 use parking_lot::RwLock;
 use std::sync::Arc;
+
 use std::collections::HashMap;
-#[allow(unused_imports)]
-use std::path::PathBuf;
 
 use std::any::type_name;
 
@@ -61,12 +64,102 @@ pub enum DumpMode {
 
 
 /// The main interface for dumping struct Hnsw.
-pub trait HnswIO {
+pub trait HnswIoT {
     fn dump<W:Write>(&self, mode : DumpMode, outgraph : &mut io::BufWriter<W>, outdata: &mut io::BufWriter<W>) -> Result<i32, String>;
 }
 
 
+/// Describe options accessible for reload
+///  - memory map of data
+pub struct ReloadOptions {
+    datamap : bool,   
+}
 
+impl Default for ReloadOptions {
+    fn default() -> Self {
+        ReloadOptions{datamap : false}
+    }
+}
+
+
+impl ReloadOptions {
+    pub fn new(datamap : bool) -> Self {
+        ReloadOptions{datamap}
+    }
+
+    pub fn use_mmap(&self) -> bool {
+        return self.datamap
+    }
+} // end of ReloadOptions
+
+
+
+//===============================================================================================
+
+
+/// a structure to drive reload of previous dump
+pub struct HnswIo {
+    dir : PathBuf,
+    /// basename is used to build $basename.hnsw.data and $basename.hnsw.graph
+    basename : String,
+    /// options 
+    options : ReloadOptions,
+
+} // end of struct ReloadOptions
+
+impl HnswIo {
+
+    /// - directory is directory containing the dump, 
+    /// - basename is used to build $basename.hnsw.data and $basename.hnsw.graph
+    ///  default is to use default ReloadOptions.
+    pub fn new(directory : PathBuf, basename : String) -> Self {
+        HnswIo{dir : directory, basename, options :ReloadOptions::default() }
+    }
+
+    /// to set non default options, in particular to ask for mmap of data file
+    pub fn set_options(&mut self, options : ReloadOptions) {
+        self.options = options;
+    }
+
+    pub fn load_hnsw<'b, T, D>(&self) -> io::Result<Hnsw<'b, T,D> > 
+        where   T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync,
+                D:Distance<T>+Default+Send+Sync  {
+        //
+        log::debug!("\n\n HnswIo::reload_hnsw ");
+        // we will need a procedural macro to get from distance name to its instanciation. 
+        let mut graphname = self.basename.clone();
+        graphname.push_str(".hnsw.graph");
+        let mut graphpath = self.dir.clone();
+        graphpath.push(graphname);
+        let graphfileres = OpenOptions::new().read(true).open(&graphpath);
+        if graphfileres.is_err() {
+            println!("HnswIo::reload_hnsw : could not open file {:?}", graphpath.as_os_str());
+            std::panic::panic_any("test_dump_reload: could not open file".to_string());            
+        }
+        let graphfile = graphfileres.unwrap();
+        //  same thing for data file
+        let mut dataname = self.basename.clone();
+        dataname.push_str(".hnsw.data");
+        let mut datapath = self.dir.clone();
+        datapath.push(dataname);
+        let datafileres = OpenOptions::new().read(true).open(&datapath);
+        if datafileres.is_err() {
+            println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
+            std::panic::panic_any("test_dump_reload : could not open file".to_string());            
+        }
+        let datafile = datafileres.unwrap();
+        //
+        let mut graph_in = BufReader::new(graphfile);
+        let mut data_in = BufReader::new(datafile);
+        // we need to call load_description first to get distance name
+        let hnsw_description = load_description(&mut graph_in).unwrap();
+        let hnsw_loaded : Hnsw<'b, T,D>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+        // TODO: why do i need to unwrap() and add Ok to have 'b accepted?
+        Ok(hnsw_loaded)
+    } // end of reload_hnsw
+
+
+} // end of Hnswio
 
 /// structure describing main parameters for hnsnw data and written at the beginning of a dump file.
 /// 
@@ -309,6 +402,54 @@ fn dump_point<'a, T:Serialize+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> 
 } // end of dump for Point<T>
 
 
+// just reload data vector for point from file where data were dumped
+// used when we do not used memory map in reload
+fn load_point_data<T>(origin_id : usize, data_in: &mut dyn Read, descr: &Description) -> io::Result<Vec<T>> 
+    where T:'static+DeserializeOwned+Clone+Sized+Send+Sync {
+    //
+    // construct a point from data_in
+    //
+    let mut it_slice = [0u8; std::mem::size_of::<u32>()];
+    data_in.read_exact(&mut it_slice)?;
+    let magic = u32::from_ne_bytes(it_slice);
+    assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in load_point, point_id : {:?} ", origin_id);
+    // read origin id
+    let mut it_slice = [0u8; std::mem::size_of::<u64>()];
+    data_in.read_exact(&mut it_slice)?;
+    let origin_id_data = u64::from_ne_bytes(it_slice) as usize;
+    assert_eq!(origin_id, origin_id_data as usize, "origin_id incoherent between graph and data");
+    // now read data. we use size_t that is in description, to take care of the casewhere we reload
+    let mut it_slice = [0u8; std::mem::size_of::<u64>()];
+    data_in.read_exact(&mut it_slice)?;
+    let serialized_len = u64::from_ne_bytes(it_slice);
+    log::debug!("serialized len to reload {:?}", serialized_len);
+    let mut v_serialized = Vec::<u8>::new();
+    // TODO avoid initialization
+    v_serialized.resize(serialized_len as usize, 0);
+    data_in.read_exact(&mut v_serialized)?;
+    let v : Vec<T>;
+    if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
+        v = match descr.format_version {
+            2 => { bincode::deserialize(&v_serialized).unwrap() },
+            3 => {
+                let slice_t = unsafe {std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, descr.dimension as usize) };
+                slice_t.to_vec()
+            }
+            _ => {
+                log::error!("error in load_point, unknow format_version : {:?}", descr.format_version);
+                std::process::exit(1);
+            }
+        };
+    }
+    else {
+        v = Vec::<T>::new();
+    }
+    //
+    return Ok(v);
+} // end of load_point_data
+
+
+
 
 //
 //  Reload a point from a dump.
@@ -316,8 +457,8 @@ fn dump_point<'a, T:Serialize+Clone+Sized+Send+Sync, W:Write>(point : &Point<T> 
 //  The graph part is loaded from graph_in file
 // the data vector itself is loaded from data_in
 // 
-fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, descr: &Description, 
-                                                data_in: &mut dyn Read) -> io::Result<(Arc<Point<T>>, Vec<Vec<Neighbour> >) > {
+fn load_point<'b,T>(graph_in: &mut dyn Read, descr: &Description, data_in: &mut dyn Read, reload_opt : &ReloadOptions) -> io::Result<(Arc<Point<'b, T>>, Vec<Vec<Neighbour> >) > 
+        where  T:'static+DeserializeOwned+Clone+Sized+Send+Sync {
     //
     // read and check magic
     let mut it_slice  = [0u8; std::mem::size_of::<u32>()];
@@ -376,44 +517,16 @@ fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut d
         neighborhood.push(Vec::<Neighbour>::new());
     }
     //
-    // construct a point from data_in
-    //
-    let mut it_slice = [0u8; std::mem::size_of::<u32>()];
-    data_in.read_exact(&mut it_slice)?;
-    let magic = u32::from_ne_bytes(it_slice);
-    assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in load_point, point_id : {:?} ", origin_id);
-    // read origin id
-    let mut it_slice = [0u8; std::mem::size_of::<u64>()];
-    data_in.read_exact(&mut it_slice)?;
-    let origin_id_data = u64::from_ne_bytes(it_slice) as usize;
-    assert_eq!(origin_id, origin_id_data, "origin_id incoherent between graph and data");
-    // now read data. we use size_t that is in description, to take care of the casewhere we reload
-    let mut it_slice = [0u8; std::mem::size_of::<u64>()];
-    data_in.read_exact(&mut it_slice)?;
-    let serialized_len = u64::from_ne_bytes(it_slice);
-    log::debug!("serialized len to reload {:?}", serialized_len);
-    let mut v_serialized = Vec::<u8>::new();
-    // TODO avoid initialization
-    v_serialized.resize(serialized_len as usize, 0);
-    data_in.read_exact(&mut v_serialized)?;
-    let v : Vec<T>;
-    if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
-        v = match descr.format_version {
-            2 => { bincode::deserialize(&v_serialized).unwrap() },
-            3 => {
-                let slice_t = unsafe {std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, descr.dimension as usize) };
-                slice_t.to_vec()
-            }
-            _ => {
-                log::error!("error in load_point, unknow format_version : {:?}", descr.format_version);
-                std::process::exit(1);
-            }
-        };
-    }
-    else {
-        v = Vec::<T>::new();
-    }
-    let point = Point::<T>::new(&v, origin_id as usize, p_id);
+    let point = match reload_opt.use_mmap() {
+        false => { 
+            let v = load_point_data::<T>(origin_id, data_in, &descr)?;
+            Point::<T>::new(v, origin_id as usize, p_id)
+        }
+        true => {
+            log::error!("not yet implemented");
+            std::process::exit(1);
+        }
+    };
     log::trace!("load_point  origin {:?} allocated size {:?}, dim {:?}", origin_id, point.get_v().len(), descr.dimension);
     //
     return Ok((Arc::new(point), neighborhood));
@@ -432,7 +545,7 @@ fn load_point<T:'static+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut d
 // . list of point of layer
 // dump entry point
 // 
-impl <T:Serialize+DeserializeOwned+Clone+Send+Sync> HnswIO for PointIndexation<T> {
+impl <'b, T:Serialize+DeserializeOwned+Clone+Send+Sync> HnswIoT for PointIndexation<'b, T> {
     fn dump<W:Write>(&self, mode : DumpMode, graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> Result<i32, String> {
         // dump max_layer
         let layers = self.points_by_layer.read();
@@ -466,9 +579,9 @@ impl <T:Serialize+DeserializeOwned+Clone+Send+Sync> HnswIO for PointIndexation<T
 } // end of impl HnswIO
 
 
-fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, 
+fn load_point_indexation<'b, T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync>(graph_in: &mut dyn Read, 
                 descr : &Description, 
-                data_in:  &mut dyn Read) -> io::Result<PointIndexation<T> > {
+                data_in:  &mut dyn Read, reload_opt : &ReloadOptions) -> io::Result<PointIndexation<'b, T> > {
     //
     log::debug!(" in load_point_indexation");
     //
@@ -508,7 +621,7 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
         let mut vlayer : Vec<Arc<Point<T>>> = Vec::with_capacity(nbpoints);
         for r in 0..nbpoints {
             // load graph and data part of point. Points are dumped in the same order.
-            let load_point_res = load_point(graph_in, descr, data_in);
+            let load_point_res = load_point(graph_in, descr, data_in, &reload_opt);
             match load_point_res {
                 Err(other) => {
                             log::error!("in load_point_indexation, loading of point {} failed", r);
@@ -596,7 +709,7 @@ fn load_point_indexation<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+S
 //
 //
 
-impl <T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sync> HnswIO for Hnsw<T, D> {
+impl <'b, T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sync> HnswIoT for Hnsw<'b, T, D> {
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
     /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
@@ -638,9 +751,9 @@ impl <T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Send+Sy
 /// about structure to reload (Typename, distance type, construction parameters).  
 /// Cf fn load_description(io_in: &mut dyn Read) -> io::Result\<Description\>
 ///
-pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(graph_in: &mut dyn Read, 
+pub fn load_hnsw<'b, T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(graph_in: &mut dyn Read, 
                                             description: &Description, 
-                                            data_in : &mut dyn Read) -> io::Result<Hnsw<T,D> > {
+                                            data_in : &mut dyn Read) -> io::Result<Hnsw<'b, T,D> > {
     //  In datafile , we must read MAGICDATAP and dimension and check
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
     data_in.read_exact(&mut it_slice)?;
@@ -652,6 +765,8 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
     let dimension = usize::from_ne_bytes(it_slice);
     assert_eq!(dimension, description.dimension, "data dimension incoherent {:?} {:?} ", 
             dimension, description.dimension);
+    //
+    let reload_opt = ReloadOptions::new(false);
     //
     let _mode = description.dumpmode;
     let distname = description.distname.clone();
@@ -675,7 +790,7 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
     }
     let t_type = description.t_name.clone();
     log::debug!("T type name in dump = {:?}", t_type);
-    let layer_point_indexation = load_point_indexation(graph_in, &description, data_in)?;
+    let layer_point_indexation = load_point_indexation(graph_in, &description, data_in, &reload_opt)?;
     let data_dim = layer_point_indexation.get_data_dimension();
     //
     let hnsw : Hnsw::<T,D> =  Hnsw{  max_nb_connection : description.max_nb_connection as usize,
@@ -687,6 +802,7 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
                         data_dimension : data_dim,
                         dist_f: D::default(),
                         searching : false,
+                        datamap_opt : None,
                     } ;
     //
     log::debug!("load_hnsw completed");
@@ -699,10 +815,10 @@ pub fn load_hnsw<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:D
 /// It is dedicated to distance of type  [crate::dist::DistPtr] that cannot implement Default.  
 /// **It is the user responsability to reload with the same function as used in the dump**
 /// 
-pub fn load_hnsw_with_dist<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Send+Sync>(graph_in: &mut dyn Read, 
+pub fn load_hnsw_with_dist<'b, T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Send+Sync>(graph_in: &mut dyn Read, 
                                             description: &Description, 
                                             f : D,
-                                            data_in : &mut dyn Read) -> io::Result<Hnsw<T,D> > {
+                                            data_in : &mut dyn Read) -> io::Result<Hnsw<'b, T,D> > {
     //  In datafile , we must read MAGICDATAP and dimension and check
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
     data_in.read_exact(&mut it_slice)?;
@@ -737,7 +853,10 @@ pub fn load_hnsw_with_dist<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send
     }
     let t_type = description.t_name.clone();
     log::debug!("T type name in dump = {:?}", t_type);
-    let layer_point_indexation = load_point_indexation(graph_in, &description, data_in)?;
+    //
+    let reload_opt: ReloadOptions = ReloadOptions::new(false);
+    //
+    let layer_point_indexation = load_point_indexation(graph_in, &description, data_in, &reload_opt)?;
     let data_dim = layer_point_indexation.get_data_dimension();
     //
     let hnsw : Hnsw::<T,D> =  Hnsw{  max_nb_connection : description.max_nb_connection as usize,
@@ -749,6 +868,7 @@ pub fn load_hnsw_with_dist<T:'static+Serialize+DeserializeOwned+Clone+Sized+Send
                         data_dimension : data_dim,
                         dist_f: f,
                         searching : false,
+                        datamap_opt : None,
                     } ;
     //
     log::debug!("load_hnsw_with_dist completed");
@@ -771,7 +891,6 @@ use super::*;
 use crate::dist;
 
 
-use std::fs::OpenOptions;
 use std::io::BufReader;
 use std::path::PathBuf;
 
@@ -830,6 +949,9 @@ fn test_dump_reload_1() {
     log::debug!("\n\n  hnsw reload");
     // we will need a procedural macro to get from distance name to its instanciation. 
     // from now on we test with DistL1
+    let directory = PathBuf::from(".");
+    let reloader = HnswIo::new(directory, String::from("dumpreloadtest1"));
+    /* 
     let graphfname = String::from("dumpreloadtest1.hnsw.graph");
     let graphpath = PathBuf::from(graphfname);
     let graphfileres = OpenOptions::new().read(true).open(&graphpath);
@@ -852,7 +974,9 @@ fn test_dump_reload_1() {
     let mut data_in = BufReader::new(datafile);
     // we need to call load_description first to get distance name
     let hnsw_description = load_description(&mut graph_in).unwrap();
-    let hnsw_loaded : Hnsw<f32,DistL1>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+    */
+//    let hnsw_loaded : Hnsw<f32,DistL1>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+    let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
     // test equality
     check_graph_equality(&hnsw_loaded, &hnsw);
 }  // end of test_dump_reload

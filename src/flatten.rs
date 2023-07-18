@@ -118,7 +118,7 @@ impl FlatNeighborhood {
 
 
 
-impl <T:Clone+Send+Sync,D:Distance<T>+Send+Sync> From<&Hnsw<T,D>> for FlatNeighborhood {
+impl <'b, T:Clone+Send+Sync,D:Distance<T>+Send+Sync> From<&Hnsw<'b, T,D>> for FlatNeighborhood {
     /// extract from the Hnsw strucure a hashtable mapping original DataId into a FlatPoint structure gathering its neighbourhood information.  
     /// Useful after reloading from a dump with T=NoData and D = NoDist as points are then reloaded with neighbourhood information only.
     fn from(hnsw : &Hnsw<T,D>) -> Self {
@@ -159,7 +159,7 @@ use crate::dist;
 
 
 use std::fs::OpenOptions;
-use std::io::{BufReader};
+use std::io::BufReader;
 use std::path::PathBuf;
 
 pub use crate::dist::*;

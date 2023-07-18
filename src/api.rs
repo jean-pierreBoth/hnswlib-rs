@@ -4,8 +4,8 @@
 
 use std::io::prelude::*;
 use std::fs::OpenOptions;
-use std::io::{BufWriter};
-use std::path::{PathBuf};
+use std::io::BufWriter;
+use std::path::PathBuf;
 
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -31,7 +31,7 @@ pub trait AnnT {
  }
 
 
-impl <T,D> AnnT for Hnsw<T,D>  where T:Serialize+DeserializeOwned+Clone+Send+Sync, D: Distance<T>+Send+Sync {
+impl <'b, T,D> AnnT for Hnsw<'b, T,D>  where T:Serialize+DeserializeOwned+Clone+Send+Sync, D: Distance<T>+Send+Sync {
     type Val= T;
     ///
     fn insert_data(&mut self, data: &Vec<Self::Val>, id: usize) {

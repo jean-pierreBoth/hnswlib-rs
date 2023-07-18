@@ -182,7 +182,7 @@ impl DataMap {
 
 
     /// return the data corresponding to dataid. Access is done via mmap. returns None if address is invalid
-    pub fn get_data<T:Clone + std::fmt::Debug>(&self, dataid : &DataId) -> Option<&[T]> {
+    pub fn get_data<'a, T:Clone + std::fmt::Debug>(&'a self, dataid : &DataId) -> Option<&'a [T]> {
         //
         log::trace!("in DataMap::get_data, dataid : {:?}", dataid);
         let address = self.hmap.get(dataid);
