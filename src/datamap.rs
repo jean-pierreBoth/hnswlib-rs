@@ -235,11 +235,11 @@ fn test_file_mmap() {
     let mut rng = rand::thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
     // 1000 vectors of size 10 f32
-    let nbcolumn = 50;
+    let nbdata = 50;
     let nbrow = 11;
     let mut xsi;
-    let mut data = Vec::with_capacity(nbcolumn);
-    for j in 0..nbcolumn {
+    let mut data = Vec::with_capacity(nbdata);
+    for j in 0..nbdata {
         data.push(Vec::with_capacity(nbrow));
         for _ in 0..nbrow {
             xsi = unif.sample(&mut rng);
@@ -250,7 +250,7 @@ fn test_file_mmap() {
     // define hnsw
     let ef_construct= 25;
     let nb_connection = 10;
-    let hnsw = Hnsw::<f32, dist::DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, dist::DistL1{});
+    let hnsw = Hnsw::<f32, dist::DistL1>::new(nb_connection, nbdata, 16, ef_construct, dist::DistL1{});
     for i in 0..data.len() {
         hnsw.insert((&data[i], i));
     }
@@ -270,15 +270,24 @@ fn test_file_mmap() {
         check_graph_equality(&hnsw_loaded, &hnsw);
         log::info!("\n ========= reload success, going to mmap reloading ========= \n");
     }
-    
+    //
     //
     let datamap = DataMap::from_hnswdump::<f32>(".", &fname).unwrap();
-    let id = 3;
-    let d = datamap.get_data::<f32>(&id);
-    if d.is_some() {
-        log::debug!("id = {}, v = {:?}", id, d.as_ref().unwrap());
-        assert_eq!(d.as_ref().unwrap(), &data[id]);
+    let nb_test = 30;
+    log::info!("checking random access of id , nb test : {}", nb_test);
+    for _ in 0..nb_test {
+        // sample an id in 0..nb_data
+        let unif =  Uniform::<usize>::new(0, nbdata);        
+        let id = unif.sample(&mut rng);
+        let d = datamap.get_data::<f32>(&id);
+        assert!(d.is_some());
+        if d.is_some() {
+            log::debug!("id = {}, v = {:?}", id, d.as_ref().unwrap());
+            assert_eq!(d.as_ref().unwrap(), &data[id]);
+        }
     }
+    // now we have check that datamap seems  ok, test reload of hnsw with mmap
+    
 } // end of test_file_mmap
 
 

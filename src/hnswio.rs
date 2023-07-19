@@ -174,9 +174,63 @@ impl HnswIo {
         //
         log::debug!("\n\n HnswIo::load_hnsw ");
         let mut init = self.init();
-        let hnsw_loaded : Hnsw<'b, T,D>= load_hnsw(&mut init.graphfile, &init.descr , &mut init.datafile, &self.options).unwrap();
-        // TODO: why do i need to unwrap() and add Ok to have 'b accepted?
-        Ok(hnsw_loaded)
+
+        let data_in = &mut init.datafile;
+        let graph_in = &mut init.graphfile;
+        let description = init.descr;
+        //  In datafile , we must read MAGICDATAP and dimension and check
+        let mut it_slice = [0u8; std::mem::size_of::<u32>()];
+        data_in.read_exact(&mut it_slice)?;
+        let magic = u32::from_ne_bytes(it_slice);
+        assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in load_point");
+        //
+        let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+        data_in.read_exact(&mut it_slice)?;
+        let dimension = usize::from_ne_bytes(it_slice);
+        assert_eq!(dimension, description.dimension, "data dimension incoherent {:?} {:?} ", 
+                dimension, description.dimension);
+        //
+        let _mode = description.dumpmode;
+        let distname = description.distname.clone();
+        // We must ensure that the distance stored matches the one asked for in loading hnsw
+        // for that we check for short names equality stripping 
+        log::debug!("distance in description = {:?}", distname);
+        let d_type_name = type_name::<D>().to_string();
+        let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
+        for s in v {
+            log::info!(" distname in generic type argument {:?}", s);
+        }
+        if (std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>())  &&  (d_type_name != distname) {
+            // for all types except NoData , distance asked in reload declaration and distance in dump must be equal!
+            let mut errmsg = String::from("error in distances : dumped distance is : ");
+            errmsg.push_str(&distname);
+            errmsg.push_str(" asked distance in loading is : ");
+            errmsg.push_str(&d_type_name);
+            log::error!(" distance in type argument : {:?}", d_type_name);
+            log::error!("error , dump is for distance = {:?}", distname);
+            return Err(io::Error::new(io::ErrorKind::Other, errmsg));
+        }
+        let t_type = description.t_name.clone();
+        log::debug!("T type name in dump = {:?}", t_type);
+        let reload_opt = ReloadOptions::default();
+        let layer_point_indexation = load_point_indexation(graph_in, &description, data_in, &reload_opt)?;
+        let data_dim = layer_point_indexation.get_data_dimension();
+        //
+        let hnsw : Hnsw::<T,D> =  Hnsw{  max_nb_connection : description.max_nb_connection as usize,
+                            ef_construction : description.ef, 
+                            extend_candidates : true, 
+                            keep_pruned: false,
+                            max_layer: description.nb_layer as usize, 
+                            layer_indexed_points: layer_point_indexation,
+                            data_dimension : data_dim,
+                            dist_f: D::default(),
+                            searching : false,
+                            datamap_opt : None,
+                        } ;
+        //
+        log::debug!("load_hnsw completed");
+        //
+        Ok(hnsw)
     } // end of load_hnsw
 
 
@@ -783,69 +837,6 @@ impl <'b, T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Sen
 }   // end impl block for Hnsw
 
 
-/// Prefer the simplified way using (HnswIo)[HnswIo] 
-/// The reload is made in two steps.
-/// First a call to load_description must be used to get basic information
-/// about structure to reload (Typename, distance type, construction parameters).  
-/// Cf fn load_description(io_in: &mut dyn Read) -> io::Result\<Description\>
-///
-pub fn load_hnsw<'b, T, D>(graph_in: &mut dyn Read, description: &Description, 
-                                            data_in : &mut dyn Read, reload_opt : &ReloadOptions) -> io::Result<Hnsw<'b, T, D> > 
-        where T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync,
-              D:Distance<T>+Default+Send+Sync  {
-    //  In datafile , we must read MAGICDATAP and dimension and check
-    let mut it_slice = [0u8; std::mem::size_of::<u32>()];
-    data_in.read_exact(&mut it_slice)?;
-    let magic = u32::from_ne_bytes(it_slice);
-    assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in load_point");
-    //
-    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
-    data_in.read_exact(&mut it_slice)?;
-    let dimension = usize::from_ne_bytes(it_slice);
-    assert_eq!(dimension, description.dimension, "data dimension incoherent {:?} {:?} ", 
-            dimension, description.dimension);
-    //
-    let _mode = description.dumpmode;
-    let distname = description.distname.clone();
-    // We must ensure that the distance stored matches the one asked for in loading hnsw
-    // for that we check for short names equality stripping 
-    log::debug!("distance in description = {:?}", distname);
-    let d_type_name = type_name::<D>().to_string();
-    let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
-    for s in v {
-        log::info!(" distname in generic type argument {:?}", s);
-    }
-    if (std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>())  &&  (d_type_name != distname) {
-        // for all types except NoData , distance asked in reload declaration and distance in dump must be equal!
-        let mut errmsg = String::from("error in distances : dumped distance is : ");
-        errmsg.push_str(&distname);
-        errmsg.push_str(" asked distance in loading is : ");
-        errmsg.push_str(&d_type_name);
-        log::error!(" distance in type argument : {:?}", d_type_name);
-        log::error!("error , dump is for distance = {:?}", distname);
-        return Err(io::Error::new(io::ErrorKind::Other, errmsg));
-    }
-    let t_type = description.t_name.clone();
-    log::debug!("T type name in dump = {:?}", t_type);
-    let layer_point_indexation = load_point_indexation(graph_in, &description, data_in, &reload_opt)?;
-    let data_dim = layer_point_indexation.get_data_dimension();
-    //
-    let hnsw : Hnsw::<T,D> =  Hnsw{  max_nb_connection : description.max_nb_connection as usize,
-                        ef_construction : description.ef, 
-                        extend_candidates : true, 
-                        keep_pruned: false,
-                        max_layer: description.nb_layer as usize, 
-                        layer_indexed_points: layer_point_indexation,
-                        data_dimension : data_dim,
-                        dist_f: D::default(),
-                        searching : false,
-                        datamap_opt : None,
-                    } ;
-    //
-    log::debug!("load_hnsw completed");
-    //
-    Ok(hnsw)
-}  // end of load_hnsw
 
 
 /// This function makes reload of a Hnsw dump with a given Dist.  

@@ -193,7 +193,16 @@ impl<'b, T:Clone+Send+Sync> Point<'b, T> {
         Point{data : PointData::new_v(v), origin_id, p_id, neighbours: Arc::new(RwLock::new(neighbours))}
     }
 
+    /// construction from a mmapped slice data
+    fn new_from_mmap(s :  &'b [T], origin_id: usize, p_id:PointId) -> Self {
+        let mut neighbours = Vec::with_capacity(NB_LAYER_MAX as usize);
+        for _ in 0..NB_LAYER_MAX {
+            neighbours.push(Vec::<Arc<PointWithOrder<T>> >::new());
+        }
+        Point{data : PointData::new_s(s), origin_id, p_id, neighbours: Arc::new(RwLock::new(neighbours))}        
+    } // end of new_from_mmap
 
+    
     /// get a reference to vector data
     pub fn get_v(&self) -> &[T] {
         self.data.get_v()
