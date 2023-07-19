@@ -107,7 +107,7 @@ struct Init {
 
 
 
-/// a structure to drive reload of previous dump
+/// a structure to provide simplified methods for reloading a previous dump
 pub struct HnswIo {
     dir : PathBuf,
     /// basename is used to build $basename.hnsw.data and $basename.hnsw.graph
@@ -123,6 +123,10 @@ impl HnswIo {
     ///  default is to use default ReloadOptions.
     pub fn new(directory : PathBuf, basename : String) -> Self {
         HnswIo{dir : directory, basename, options :ReloadOptions::default()}
+    }
+
+    pub fn new_with_options(directory : PathBuf, basename : String, options : ReloadOptions) -> Self {
+        HnswIo{dir : directory, basename, options}
     }
 
     //
@@ -170,7 +174,7 @@ impl HnswIo {
         //
         log::debug!("\n\n HnswIo::load_hnsw ");
         let mut init = self.init();
-        let hnsw_loaded : Hnsw<'b, T,D>= load_hnsw(&mut init.graphfile, &init.descr , &mut init.datafile).unwrap();
+        let hnsw_loaded : Hnsw<'b, T,D>= load_hnsw(&mut init.graphfile, &init.descr , &mut init.datafile, &self.options).unwrap();
         // TODO: why do i need to unwrap() and add Ok to have 'b accepted?
         Ok(hnsw_loaded)
     } // end of load_hnsw
@@ -779,15 +783,16 @@ impl <'b, T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Sen
 }   // end impl block for Hnsw
 
 
-
+/// Prefer the simplified way using (HnswIo)[HnswIo] 
 /// The reload is made in two steps.
 /// First a call to load_description must be used to get basic information
 /// about structure to reload (Typename, distance type, construction parameters).  
 /// Cf fn load_description(io_in: &mut dyn Read) -> io::Result\<Description\>
 ///
-pub fn load_hnsw<'b, T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D:Distance<T>+Default+Send+Sync>(graph_in: &mut dyn Read, 
-                                            description: &Description, 
-                                            data_in : &mut dyn Read) -> io::Result<Hnsw<'b, T,D> > {
+pub fn load_hnsw<'b, T, D>(graph_in: &mut dyn Read, description: &Description, 
+                                            data_in : &mut dyn Read, reload_opt : &ReloadOptions) -> io::Result<Hnsw<'b, T, D> > 
+        where T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync,
+              D:Distance<T>+Default+Send+Sync  {
     //  In datafile , we must read MAGICDATAP and dimension and check
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
     data_in.read_exact(&mut it_slice)?;
@@ -799,8 +804,6 @@ pub fn load_hnsw<'b, T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync,
     let dimension = usize::from_ne_bytes(it_slice);
     assert_eq!(dimension, description.dimension, "data dimension incoherent {:?} {:?} ", 
             dimension, description.dimension);
-    //
-    let reload_opt = ReloadOptions::new(false);
     //
     let _mode = description.dumpmode;
     let distname = description.distname.clone();
@@ -1078,6 +1081,49 @@ fn test_dump_reload_graph_only() {
     check_graph_equality(&hnsw_loaded, &hnsw);  
 }  // end of test_dump_reload
 
+
+// this tests reloads a dump with memory mapping of data
+#[test]
+fn reload_with_mmap() {
+    println!("\n\n hnswio tests : reload_with_mmap");
+    log_init_test();
+    // generate a random test
+    let mut rng = rand::thread_rng();
+    let unif =  Uniform::<f32>::new(0.,1.);
+    // 1000 vectors of size 10 f32
+    let nbcolumn = 1000;
+    let nbrow = 10;
+    let mut xsi;
+    let mut data = Vec::with_capacity(nbcolumn);
+    for j in 0..nbcolumn {
+        data.push(Vec::with_capacity(nbrow));
+        for _ in 0..nbrow {
+            xsi = unif.sample(&mut rng);
+            data[j].push(xsi);
+        }
+    } 
+    // define hnsw
+    let ef_construct= 25;
+    let nb_connection = 10;
+    let hnsw = Hnsw::<f32, dist::DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, dist::DistL1{});
+    for i in 0..data.len() {
+        hnsw.insert((&data[i], i));
+    }
+    // some loggin info
+    hnsw.dump_layer_info();
+    // dump in a file.  Must take care of name as tests runs in // !!!
+    let fname = String::from("mmapreloadtest");
+    let _res = hnsw.file_dump(&fname);
+    //
+    // reload reload_with_mmap
+    log::debug!("\n\n  hnsw reload");
+    let directory = PathBuf::from(".");
+    let reload_options = ReloadOptions::new(true);
+    let reloader = HnswIo::new_with_options(directory, String::from("mmapreloadtest"), reload_options);
+    let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
+    // test equality
+    check_graph_equality(&hnsw_loaded, &hnsw);
+} // end of reload_with_mmap
 
 
 #[test]

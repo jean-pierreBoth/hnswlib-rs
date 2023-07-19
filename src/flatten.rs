@@ -158,15 +158,13 @@ use super::*;
 use crate::dist;
 
 
-use std::fs::OpenOptions;
-use std::io::BufReader;
 use std::path::PathBuf;
 
 pub use crate::dist::*;
 pub use crate::api::AnnT;
+use crate::hnswio::*;
 
 use rand::distributions::{Distribution, Uniform};
-use crate::hnswio::*;
 
 
 fn log_init_test() {
@@ -214,29 +212,9 @@ fn test_dump_reload_graph_flatten() {
     log::debug!("\n\n  hnsw reload");
     // we will need a procedural macro to get from distance name to its instanciation. 
     // from now on we test with DistL1
-    let graphfname = String::from("dumpreloadtestflat.hnsw.graph");
-    let graphpath = PathBuf::from(graphfname);
-    let graphfileres = OpenOptions::new().read(true).open(&graphpath);
-    if graphfileres.is_err() {
-        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
-        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
-    }
-    let graphfile = graphfileres.unwrap();
-    //  
-    let datafname = String::from("dumpreloadtestflat.hnsw.data");
-    let datapath = PathBuf::from(datafname);
-    let datafileres = OpenOptions::new().read(true).open(&datapath);
-    if datafileres.is_err() {
-        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
-    }
-    let datafile = datafileres.unwrap();
-    //
-    let mut graph_in = BufReader::new(graphfile);
-    let mut data_in = BufReader::new(datafile);
-    // we need to call load_description first to get distance name
-    let hnsw_description = load_description(&mut graph_in).unwrap();
-    let hnsw_loaded : Hnsw<NoData,NoDist>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+    let directory = PathBuf::from(".");
+    let reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
+    let hnsw_loaded : Hnsw<NoData,NoDist>= reloader.load_hnsw().unwrap();
     let neighborhood_after_dump = FlatNeighborhood::from(&hnsw_loaded);
     let nbg_2_after = neighborhood_after_dump.get_neighbours(2).unwrap();
     println!("voisins du point 2 {:?}", nbg_2_after);

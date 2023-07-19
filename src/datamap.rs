@@ -214,6 +214,7 @@ mod tests {
 use super::*;
 
 use crate::dist;
+use crate::hnswio::HnswIo;
 
 use crate::prelude::*;
 pub use crate::api::AnnT;
@@ -262,29 +263,10 @@ fn test_file_mmap() {
     let check_reload = false;
     if check_reload {
         // We check we can reload
-        let graphfname = String::from("mmap_test.hnsw.graph");
-        let graphpath = PathBuf::from(graphfname);
-        let graphfileres = OpenOptions::new().read(true).open(&graphpath);
-        if graphfileres.is_err() {
-            println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
-            std::panic::panic_any("test_dump_reload: could not open file".to_string());            
-        }
-        let graphfile = graphfileres.unwrap();
-        //  
-        let datafname = String::from("mmap_test.hnsw.data");
-        let datapath = PathBuf::from(datafname);
-        let datafileres = OpenOptions::new().read(true).open(&datapath);
-        if datafileres.is_err() {
-            println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-            std::panic::panic_any("test_dump_reload : could not open file".to_string());            
-        }
-        let datafile = datafileres.unwrap();
-        //
-        let mut graph_in = BufReader::new(graphfile);
-        let mut data_in = BufReader::new(datafile);
-        // we need to call load_description first to get distance name
-        let hnsw_description = hnswio::load_description(&mut graph_in).unwrap();
-        let hnsw_loaded : Hnsw<f32,DistL1>= crate::hnswio::load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+        log::debug!("\n\n  hnsw reload");
+        let directory = PathBuf::from(".");
+        let reloader = HnswIo::new(directory, String::from("mmap_test"));
+        let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
         check_graph_equality(&hnsw_loaded, &hnsw);
         log::info!("\n ========= reload success, going to mmap reloading ========= \n");
     }

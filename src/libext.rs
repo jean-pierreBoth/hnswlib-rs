@@ -272,8 +272,9 @@ macro_rules! generate_loadhnsw(
             let mut data_in = buffers.1;
             // we need to call load_description first to get distance name
             let hnsw_description = load_description(&mut graph_in).unwrap();
-                // here we need a macro to dispatch 
-            let hnsw_loaded_res = load_hnsw::<$type_val, $type_dist>(&mut graph_in, &hnsw_description, &mut data_in);
+            // TODO: no options yet from exterior of Rust
+            let options = ReloadOptions::default();
+            let hnsw_loaded_res = load_hnsw::<$type_val, $type_dist>(&mut graph_in, &hnsw_description, &mut data_in, &options);
             if let Ok(hnsw_loaded) = hnsw_loaded_res {
                 let api = <$api_name>::new(Box::new(hnsw_loaded));
                 return Box::into_raw(Box::new(api));  
