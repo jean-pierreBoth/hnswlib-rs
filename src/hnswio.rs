@@ -22,7 +22,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 // io 
 use std::io;
-use std::fs::OpenOptions;
+use std::fs::{OpenOptions, File};
 use std::io::BufReader;
 use std::path::PathBuf;
 
@@ -96,6 +96,16 @@ impl ReloadOptions {
 
 //===============================================================================================
 
+// basic block used to provide arguments to load_hnsw and load_hnsw_with_dist
+struct Init {
+    descr : Description,
+    //
+    graphfile : BufReader<File>,
+    //
+    datafile : BufReader<File>,
+} // end of Init
+
+
 
 /// a structure to drive reload of previous dump
 pub struct HnswIo {
@@ -104,7 +114,6 @@ pub struct HnswIo {
     basename : String,
     /// options 
     options : ReloadOptions,
-
 } // end of struct ReloadOptions
 
 impl HnswIo {
@@ -113,20 +122,11 @@ impl HnswIo {
     /// - basename is used to build $basename.hnsw.data and $basename.hnsw.graph
     ///  default is to use default ReloadOptions.
     pub fn new(directory : PathBuf, basename : String) -> Self {
-        HnswIo{dir : directory, basename, options :ReloadOptions::default() }
+        HnswIo{dir : directory, basename, options :ReloadOptions::default()}
     }
 
-    /// to set non default options, in particular to ask for mmap of data file
-    pub fn set_options(&mut self, options : ReloadOptions) {
-        self.options = options;
-    }
-
-    pub fn load_hnsw<'b, T, D>(&self) -> io::Result<Hnsw<'b, T,D> > 
-        where   T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync,
-                D:Distance<T>+Default+Send+Sync  {
-        //
-        log::debug!("\n\n HnswIo::reload_hnsw ");
-        // we will need a procedural macro to get from distance name to its instanciation. 
+    //
+    fn init(&self) -> Init {
         let mut graphname = self.basename.clone();
         graphname.push_str(".hnsw.graph");
         let mut graphpath = self.dir.clone();
@@ -150,16 +150,50 @@ impl HnswIo {
         let datafile = datafileres.unwrap();
         //
         let mut graph_in = BufReader::new(graphfile);
-        let mut data_in = BufReader::new(datafile);
+        let data_in = BufReader::new(datafile);
         // we need to call load_description first to get distance name
         let hnsw_description = load_description(&mut graph_in).unwrap();
-        let hnsw_loaded : Hnsw<'b, T,D>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+        //
+        return Init{descr : hnsw_description, graphfile : graph_in, datafile : data_in};
+    }
+
+
+    /// to set non default options, in particular to ask for mmap of data file
+    pub fn set_options(&mut self, options : ReloadOptions) {
+        self.options = options;
+    }
+
+    /// reload a previously dumped hnsw stucture
+    pub fn load_hnsw<'b, T, D>(&self) -> io::Result<Hnsw<'b, T,D> > 
+        where   T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync,
+                D:Distance<T>+Default+Send+Sync  {
+        //
+        log::debug!("\n\n HnswIo::load_hnsw ");
+        let mut init = self.init();
+        let hnsw_loaded : Hnsw<'b, T,D>= load_hnsw(&mut init.graphfile, &init.descr , &mut init.datafile).unwrap();
         // TODO: why do i need to unwrap() and add Ok to have 'b accepted?
         Ok(hnsw_loaded)
-    } // end of reload_hnsw
+    } // end of load_hnsw
 
+
+    /// reload a previously dumped hnsw structure
+    /// /// This function makes reload of a Hnsw dump with a given Dist.  
+    /// It is dedicated to distance of type  [crate::dist::DistPtr] that cannot implement Default.  
+    /// **It is the user responsability to reload with the same function as used in the dump**
+    /// 
+    pub fn load_hnsw_with_dist<'b, T, D>(&self, f : D,) -> io::Result<Hnsw<'b, T,D> > 
+        where   T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync,
+                D:Distance<T>+Send+Sync  {
+        //
+        log::debug!("\n\n HnswIo::load_hnsw_with_dist");
+        let mut init = self.init();
+        let hnsw_loaded =load_hnsw_with_dist(&mut init.graphfile, &init.descr ,f,  &mut init.datafile).unwrap();
+        Ok(hnsw_loaded)
+    } // end of load_hnsw_with_dist
 
 } // end of Hnswio
+
+
 
 /// structure describing main parameters for hnsnw data and written at the beginning of a dump file.
 /// 
@@ -891,7 +925,6 @@ use super::*;
 use crate::dist;
 
 
-use std::io::BufReader;
 use std::path::PathBuf;
 
 pub use crate::dist::*;
@@ -943,39 +976,13 @@ fn test_dump_reload_1() {
     // dump in a file.  Must take care of name as tests runs in // !!!
     let fname = String::from("dumpreloadtest1");
     let _res = hnsw.file_dump(&fname);
-    // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
     //
     // reload
-    log::debug!("\n\n  hnsw reload");
+    log::debug!("\n\n test_dump_reload_1 hnsw reload");
     // we will need a procedural macro to get from distance name to its instanciation. 
     // from now on we test with DistL1
     let directory = PathBuf::from(".");
     let reloader = HnswIo::new(directory, String::from("dumpreloadtest1"));
-    /* 
-    let graphfname = String::from("dumpreloadtest1.hnsw.graph");
-    let graphpath = PathBuf::from(graphfname);
-    let graphfileres = OpenOptions::new().read(true).open(&graphpath);
-    if graphfileres.is_err() {
-        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
-        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
-    }
-    let graphfile = graphfileres.unwrap();
-    //  
-    let datafname = String::from("dumpreloadtest1.hnsw.data");
-    let datapath = PathBuf::from(datafname);
-    let datafileres = OpenOptions::new().read(true).open(&datapath);
-    if datafileres.is_err() {
-        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
-    }
-    let datafile = datafileres.unwrap();
-    //
-    let mut graph_in = BufReader::new(graphfile);
-    let mut data_in = BufReader::new(datafile);
-    // we need to call load_description first to get distance name
-    let hnsw_description = load_description(&mut graph_in).unwrap();
-    */
-//    let hnsw_loaded : Hnsw<f32,DistL1>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
     // test equality
     check_graph_equality(&hnsw_loaded, &hnsw);
@@ -1021,33 +1028,10 @@ fn test_dump_reload_myfn() {
     //
     // reload
     log::debug!("\n\n  hnsw reload");
-    // we will need a procedural macro to get from distance name to its instanciation. 
-    // from now on we test with DistL1
-    let graphfname = String::from("dumpreloadtest_myfn.hnsw.graph");
-    let graphpath = PathBuf::from(graphfname);
-    let graphfileres = OpenOptions::new().read(true).open(&graphpath);
-    if graphfileres.is_err() {
-        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
-        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
-    }
-    let graphfile = graphfileres.unwrap();
-    //  
-    let datafname = String::from("dumpreloadtest_myfn.hnsw.data");
-    let datapath = PathBuf::from(datafname);
-    let datafileres = OpenOptions::new().read(true).open(&datapath);
-    if datafileres.is_err() {
-        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
-    }
-    let datafile = datafileres.unwrap();
-    //
-    let mut graph_in = BufReader::new(graphfile);
-    let mut data_in = BufReader::new(datafile);
-    // we need to call load_description first to get distance name
-    let hnsw_description = load_description(&mut graph_in).unwrap();
+    let directory = PathBuf::from(".");
+    let reloader = HnswIo::new(directory, String::from("dumpreloadtest_myfn"));
     let mydist = dist::DistPtr::<f32,f32>::new(my_fn);
-    // we reload with the same function, no control (yet?)
-    let _hnsw_loaded : Hnsw<f32,DistPtr<f32,f32>>= load_hnsw_with_dist(&mut graph_in, &hnsw_description, mydist, &mut data_in).unwrap();
+    let _hnsw_loaded : Hnsw<f32,DistPtr<f32,f32>>= reloader.load_hnsw_with_dist(mydist).unwrap();
 }  // end of test_dump_reload_myfn
 
 
@@ -1087,33 +1071,11 @@ fn test_dump_reload_graph_only() {
     //
     // reload
     log::debug!("\n\n  hnsw reload");
-    // we will need a procedural macro to get from distance name to its instanciation. 
-    // from now on we test with DistL1
-    let graphfname = String::from("dumpreloadtestgraph.hnsw.graph");
-    let graphpath = PathBuf::from(graphfname);
-    let graphfileres = OpenOptions::new().read(true).open(&graphpath);
-    if graphfileres.is_err() {
-        println!("test_dump_reload: could not open file {:?}", graphpath.as_os_str());
-        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
-    }
-    let graphfile = graphfileres.unwrap();
-    //  
-    let datafname = String::from("dumpreloadtestgraph.hnsw.data");
-    let datapath = PathBuf::from(datafname);
-    let datafileres = OpenOptions::new().read(true).open(&datapath);
-    if datafileres.is_err() {
-        println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-        std::panic::panic_any("test_dump_reload : could not open file".to_string());            
-    }
-    let datafile = datafileres.unwrap();
-    //
-    let mut graph_in = BufReader::new(graphfile);
-    let mut data_in = BufReader::new(datafile);
-    // we need to call load_description first to get distance name
-    let hnsw_description = load_description(&mut graph_in).unwrap();
-    let hnsw_loaded : Hnsw<NoData,NoDist>= load_hnsw(&mut graph_in, &hnsw_description, &mut data_in).unwrap();
+    let directory = PathBuf::from(".");
+    let reloader = HnswIo::new(directory, String::from("dumpreloadtestgraph"));
+    let hnsw_loaded : Hnsw<NoData,NoDist>= reloader.load_hnsw().unwrap();
     // test equality
-    check_graph_equality(&hnsw_loaded, &hnsw);
+    check_graph_equality(&hnsw_loaded, &hnsw);  
 }  // end of test_dump_reload
 
 
