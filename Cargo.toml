@@ -86,6 +86,9 @@ mmap-rs = {version = "0.6"}
 log = { version = "0.4"}
 env_logger = { version = "0.10"}
 
+anyhow = {version = "1.0"}
+
+
 # x86_64 simd stuff , enabled by  simdeez_f feature 
 simdeez = {version = "1.0", optional = true}
 # beta 
