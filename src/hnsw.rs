@@ -39,7 +39,7 @@ pub use crate::filter::FilterT;
 /// This unit structure provides the type to instanciate Hnsw with,
 /// to get reload of graph only in the the structure. 
 /// It must be associated to the unit structure dist::NoDist for the distance type to provide. 
-#[derive(Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct NoData;
 
 /// maximum number of layers
@@ -194,7 +194,7 @@ impl<'b, T:Clone+Send+Sync> Point<'b, T> {
     }
 
     /// construction from a mmapped slice data
-    fn new_from_mmap(s :  &'b [T], origin_id: usize, p_id:PointId) -> Self {
+    pub(crate) fn new_from_mmap(s :  &'b [T], origin_id: usize, p_id:PointId) -> Self {
         let mut neighbours = Vec::with_capacity(NB_LAYER_MAX as usize);
         for _ in 0..NB_LAYER_MAX {
             neighbours.push(Vec::<Arc<PointWithOrder<T>> >::new());

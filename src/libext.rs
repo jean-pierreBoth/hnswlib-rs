@@ -267,7 +267,7 @@ macro_rules! generate_loadhnsw(
             let  slice = unsafe { std::slice::from_raw_parts(name, flen)} ;
             let filename = String::from_utf8_lossy(slice).into_owned(); 
             //
-            let reloader = HnswIo::new(PathBuf::from("."), filename.clone());
+            let mut reloader = HnswIo::new(PathBuf::from("."), filename.clone());
             let hnsw_loaded_res = reloader.load_hnsw::<$type_val, $type_dist>();
             if let Ok(hnsw_loaded) = hnsw_loaded_res {
                 let api = <$api_name>::new(Box::new(hnsw_loaded));

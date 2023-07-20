@@ -13,6 +13,7 @@ use std::fs::{File,OpenOptions};
 
 use mmap_rs::{MmapOptions,Mmap};
 use hashbrown::HashMap;
+use anyhow::*;
 
 use crate::prelude::DataId;
 use crate::hnswio;
@@ -38,7 +39,7 @@ pub struct DataMap {
 impl DataMap {
 
     // TODO: specifiy mmap option 
-    pub fn from_hnswdump<T: std::fmt::Debug>(dir : &str, fname : &String) -> Result<DataMap, String> {
+    pub fn from_hnswdump<T: std::fmt::Debug>(dir : &str, fname : &String) -> anyhow::Result<DataMap> {
         // we know data filename is hnswdump.hnsw.data
         let mut datapath = PathBuf::new();
         datapath.push(dir);
@@ -90,7 +91,7 @@ impl DataMap {
         if hnsw_description.format_version <= 2 {
             let msg = String::from("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version >= 0.1.20 of this crate");
             log::error!("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version >= 0.1.20 of this crate");
-            return Err(msg);
+            return Err(anyhow!(msg));
         }
         let t_name = hnsw_description.get_typename();
         // get dimension as declared in description
@@ -100,7 +101,7 @@ impl DataMap {
         log::info!("got typename from reload : {:?}", t_name); 
         if std::any::type_name::<T>() != t_name {
             log::error!("description has typename {:?}, function type argument is : {:?}", t_name, std::any::type_name::<T>());
-            return Err(String::from("type error"));
+            return Err(anyhow!("type error on distance"));
         }
         //
         // where are we in decoding mmap slice? at beginning
@@ -123,7 +124,7 @@ impl DataMap {
         let dimension = usize::from_ne_bytes(usize_slice) as usize;
         if dimension as usize != descr_dimension {
             log::error!("description and data do not agree on dimension, data got : {:?}, description got : {:?}",dimension, descr_dimension);
-            return Err(String::from("description and data do not agree on dimension"));
+            return Err(anyhow!("description and data do not agree on dimension"));
         }
         else {
             log::info!(" got dimension : {:?}", dimension);
@@ -265,7 +266,7 @@ fn test_file_mmap() {
         // We check we can reload
         log::debug!("\n\n  hnsw reload");
         let directory = PathBuf::from(".");
-        let reloader = HnswIo::new(directory, String::from("mmap_test"));
+        let mut reloader = HnswIo::new(directory, String::from("mmap_test"));
         let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
         check_graph_equality(&hnsw_loaded, &hnsw);
         log::info!("\n ========= reload success, going to mmap reloading ========= \n");
@@ -287,7 +288,7 @@ fn test_file_mmap() {
         }
     }
     // now we have check that datamap seems  ok, test reload of hnsw with mmap
-    
+
 } // end of test_file_mmap
 
 

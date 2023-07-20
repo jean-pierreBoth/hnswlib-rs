@@ -7,6 +7,8 @@ use std::fs::OpenOptions;
 use std::io::BufWriter;
 use std::path::PathBuf;
 
+use anyhow::*;
+
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::hnsw::*;
@@ -27,7 +29,7 @@ pub trait AnnT {
     ///
     /// dumps a data and graph in 2 files. 
     /// Datas are dumped in file filename.hnsw.data and graph in filename.hnsw.graph
-    fn file_dump(&self, filename: &String) -> Result<i32, String>;
+    fn file_dump(&self, filename: &String) -> anyhow::Result<i32>;
  }
 
 
@@ -50,7 +52,7 @@ impl <'b, T,D> AnnT for Hnsw<'b, T,D>  where T:Serialize+DeserializeOwned+Clone+
    }
    /// The main entry point to do a dump.  
    /// It will generate two files one for the graph part of the data. The other for the real data points of the structure.
-   fn file_dump(&self, filename: &String) -> Result<i32, String> {
+   fn file_dump(&self, filename: &String) -> anyhow::Result<i32> {
         log::debug!("\n in file_dump : {:?}", filename);
         //
         let mut graphname = filename.clone();
@@ -60,7 +62,7 @@ impl <'b, T,D> AnnT for Hnsw<'b, T,D>  where T:Serialize+DeserializeOwned+Clone+
         if fileres.is_err() {
             log::error!("api::file_dump could not open file {:?}", graphpath.as_os_str());
             println!("api::file_dump: could not open file {:?}", graphpath.as_os_str());
-            return Err("api::file_dump could not open file".to_string());            
+            return Err(anyhow!("api::file_dump could not open file".to_string()));            
         }
         let graphfile = fileres.unwrap();
         //
@@ -70,7 +72,7 @@ impl <'b, T,D> AnnT for Hnsw<'b, T,D>  where T:Serialize+DeserializeOwned+Clone+
         let fileres = OpenOptions::new().write(true).create(true).truncate(true).open(&datapath);
         if fileres.is_err() {
             println!("api::file_dumpcould not open file {:?}", datapath.as_os_str());
-            return Err("api::file_dump could not open file".to_string());            
+            return Err(anyhow!("api::file_dump could not open file".to_string()));            
         }
         let datafile = fileres.unwrap();
         let mut graphbufw = BufWriter::with_capacity(50_000_000 , graphfile);
