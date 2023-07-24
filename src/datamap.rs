@@ -265,7 +265,7 @@ fn test_file_mmap() {
         // We check we can reload
         log::debug!("\n\n  hnsw reload");
         let directory = PathBuf::from(".");
-        let reloader = HnswIo::new(directory, String::from("mmap_test"));
+        let mut reloader = HnswIo::new(directory, String::from("mmap_test"));
         let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
         check_graph_equality(&hnsw_loaded, &hnsw);
         log::info!("\n ========= reload success, going to mmap reloading ========= \n");

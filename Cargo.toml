@@ -76,7 +76,7 @@ skiplist= {version = "0.3"}
 
 rand = {version = "0.8"}
 lazy_static = { version = "1.4"}
-
+anyhow = {version = "1.0"}
 #
 mmap-rs = {version = "0.6"}
 #

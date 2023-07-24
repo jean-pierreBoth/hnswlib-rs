@@ -213,7 +213,7 @@ fn test_dump_reload_graph_flatten() {
     // we will need a procedural macro to get from distance name to its instanciation. 
     // from now on we test with DistL1
     let directory = PathBuf::from(".");
-    let reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
+    let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
     let hnsw_loaded : Hnsw<NoData,NoDist>= reloader.load_hnsw().unwrap();
     let neighborhood_after_dump = FlatNeighborhood::from(&hnsw_loaded);
     let nbg_2_after = neighborhood_after_dump.get_neighbours(2).unwrap();
