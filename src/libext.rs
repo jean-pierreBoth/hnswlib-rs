@@ -269,12 +269,15 @@ macro_rules! generate_loadhnsw(
             let filename = String::from_utf8_lossy(slice).into_owned(); 
             //
             unsafe {
+                if RELOADER_OPT.is_some() {
+                    log::error!("api can have nonly one mmap active");
+                    return ptr::null();            
+                }
                 RELOADER_OPT = Some(HnswIo::new(PathBuf::from("."), filename.clone()));                  
                 let hnsw_loaded_res = RELOADER_OPT.as_mut().unwrap().load_hnsw::<$type_val, $type_dist>();
 
                 if let Ok(hnsw_loaded) = hnsw_loaded_res {
                     let api = <$api_name>::new(Box::new(hnsw_loaded));
-
                     return Box::into_raw(Box::new(api));  
                 }
                 else {

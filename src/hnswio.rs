@@ -73,6 +73,7 @@ pub trait HnswIoT {
 
 /// Describe options accessible for reload
 ///  - memory map of data
+#[derive(Copy,Clone)]
 pub struct ReloadOptions {
     datamap : bool,   
 }
@@ -88,6 +89,12 @@ impl ReloadOptions {
     pub fn new(datamap : bool) -> Self {
         ReloadOptions{datamap}
     }
+
+    pub fn set_mmap(&mut self, val : bool) -> Self {
+        self.datamap = val;
+        *self
+    }
+
 
     pub fn use_mmap(&self) -> bool {
         return self.datamap
@@ -1086,8 +1093,8 @@ fn reload_with_mmap() {
     // generate a random test
     let mut rng = rand::thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
-    // 1000 vectors of size 10 f32
-    let nbcolumn = 1000;
+    // 100 vectors of size 10 f32
+    let nbcolumn = 100;
     let nbrow = 10;
     let mut xsi;
     let mut data = Vec::with_capacity(nbcolumn);
@@ -1098,6 +1105,9 @@ fn reload_with_mmap() {
             data[j].push(xsi);
         }
     } 
+    //
+    let first: Vec<f32> = data[0].clone();
+    log::info!("data[0] = {:?}", first);
     // define hnsw
     let ef_construct= 25;
     let nb_connection = 10;
@@ -1114,11 +1124,49 @@ fn reload_with_mmap() {
     // reload reload_with_mmap
     log::debug!("\n\n  hnsw reload");
     let directory = PathBuf::from(".");
-    let reload_options = ReloadOptions::new(true);
-    let mut reloader = HnswIo::new_with_options(directory, String::from("mmapreloadtest"), reload_options);
+    let mut reloader = HnswIo::new(directory.clone(), String::from("mmapreloadtest"));
+    let options = ReloadOptions::default().set_mmap(true);
+    reloader.set_options(options);
+    let mut reloader = HnswIo::new_with_options(directory, String::from("mmapreloadtest"), options);
     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
     // test equality
     check_graph_equality(&hnsw_loaded, &hnsw);
+    // We add nbcolumn new vectors
+    log::info!("adding points in hnsw reloaded");
+    let nbcolumn = 5;
+    let nbrow = 10;
+    let mut xsi;
+    let mut data = Vec::with_capacity(nbcolumn);
+    for j in 0..nbcolumn {
+        data.push(Vec::with_capacity(nbrow));
+        for _ in 0..nbrow {
+            xsi = unif.sample(&mut rng);
+            data[j].push(xsi);
+        }
+    }
+    let first_with_mmap: Vec<f32> = data[0].clone();
+    log::info!("first added after reloading with mmap : data[0] = {:?}", first_with_mmap);
+    let nb_in = hnsw.get_nb_point();
+    for i in 0..data.len() {
+        hnsw.insert((&data[i], i+nb_in));
+    }
+    //
+    let search_res = hnsw.search(&first, 5, ef_construct);
+    log::info!("neighbours od first point inserted");  
+    for n in &search_res {
+        log::info!("neighbour: {:?}", n);  
+    }
+    assert_eq!(search_res[0].d_id,0);
+    assert_eq!(search_res[0].distance,0.);    
+    let search_res = hnsw.search(&first_with_mmap, 5, ef_construct);
+    log::info!("neighbours of first point inserted after reload with mmap"); 
+    for n in &search_res {
+        log::info!("neighbour {:?}", n); 
+    }
+    assert_eq!(search_res[0].d_id,nb_in);
+    assert_eq!(search_res[0].distance,0.);
+    //
+    // TODO: redump  and care about mmepped file
 } // end of reload_with_mmap
 
 
