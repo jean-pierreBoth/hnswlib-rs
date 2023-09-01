@@ -27,7 +27,6 @@ use std::collections::HashSet;
 use log::debug;
 use log::trace;
 
-use crate::datamap::DataMap;
 
 pub use crate::dist::Distance;
 pub use crate::filter::FilterT;
@@ -39,7 +38,7 @@ pub use crate::filter::FilterT;
 /// This unit structure provides the type to instanciate Hnsw with,
 /// to get reload of graph only in the the structure. 
 /// It must be associated to the unit structure dist::NoDist for the distance type to provide. 
-#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct NoData;
 
 /// maximum number of layers
@@ -193,16 +192,16 @@ impl<'b, T:Clone+Send+Sync> Point<'b, T> {
         Point{data : PointData::new_v(v), origin_id, p_id, neighbours: Arc::new(RwLock::new(neighbours))}
     }
 
-    /// construction from a mmapped slice data
-    pub(crate) fn new_from_mmap(s :  &'b [T], origin_id: usize, p_id:PointId) -> Self {
+    pub fn new_from_mmap(s : &'b[T], origin_id: usize, p_id:PointId) -> Self {
         let mut neighbours = Vec::with_capacity(NB_LAYER_MAX as usize);
+        // CAVEAT, perhaps pass nb layer as arg ?
         for _ in 0..NB_LAYER_MAX {
             neighbours.push(Vec::<Arc<PointWithOrder<T>> >::new());
-        }
-        Point{data : PointData::new_s(s), origin_id, p_id, neighbours: Arc::new(RwLock::new(neighbours))}        
-    } // end of new_from_mmap
+        }        
+        Point{data : PointData::new_s(s), origin_id, p_id, neighbours: Arc::new(RwLock::new(neighbours))}
+    }
 
-    
+
     /// get a reference to vector data
     pub fn get_v(&self) -> &[T] {
         self.data.get_v()
@@ -750,9 +749,8 @@ pub struct Hnsw<'b, T:Clone+Send+Sync + 'b, D: Distance<T>> {
     pub(crate) dist_f : D,
     /// insertion mode or searching mode. This flag prevents a internal thread to do a write when searching with other threads.
     pub(crate) searching : bool,
-    ///
-#[allow(unused)]
-    pub(crate) datamap_opt : Option<DataMap>,
+    /// set to true if some data come from a mmap
+    pub(crate) datamap_opt : bool,
 }  // end of Hnsw
 
 
@@ -788,7 +786,7 @@ impl <'b, T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<'b, T,D>  {
                 data_dimension : 0,
                 dist_f: f,
                 searching : false,
-                datamap_opt : None,
+                datamap_opt : false,
             }
     }   // end of new
 
@@ -844,6 +842,9 @@ impl <'b, T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<'b, T,D>  {
     pub fn set_extend_candidates(&mut self, flag:bool) {
         self.extend_candidates = flag;
     }
+
+    // When dumping we need to know if some file is mmapped
+    pub(crate) fn get_datamap_opt(&self) -> bool { return self.datamap_opt; }
 
     // multiplicative factor applied to default scale. Must between 0.5 and 1.
     // more  than 1. gives more occupied layers. This is just to experiment

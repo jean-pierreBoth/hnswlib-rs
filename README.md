@@ -5,29 +5,18 @@ This crate provides a Rust implementation of the paper by Yu.A. Malkov and D.A Y
 "Efficient and Robust approximate nearest neighbours using Hierarchical Navigable Small World Graphs" (2016,2018)
 [arxiv](https://arxiv.org/abs/1603.09320)
 
-## License
 
-Licensed under either of
-
-* Apache License, Version 2.0, [LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>
-* MIT license [LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>
-
-at your option.
-
-This software was written on my own while working at [CEA](http://www.cea.fr/).
 
 ## Functionalities
 
 The crate provides:
 
-* usual distances as L1, L2, Cosine, Jaccard, Hamming for vectors of standard numeric types.
+* usual distances as L1, L2, Cosine, Jaccard, Hamming for vectors of standard numeric types, Levenshtein distance on u16.
 
 * Hellinger distance and Jeffreys divergence between probability distributions (f32 and f64). It must be noted that the Jeffreys divergence
 (a symetrized Kullback-Leibler divergence) do not satisfy the triangle inequality. (Neither Cosine distance !).
 
-* Jensen-Shannon distance between probability distributions (f32 and f64). It is defined as the **square root** of the Jensen-Shannon divergence and is a bounded metric. See [Nielsen F. in Entropy 2019, 21(5), 485](https://doi.org/10.3390/e21050485)
-
-* Levenshtein distance on u16.
+* Jensen-Shannon distance between probability distributions (f32 and f64). It is defined as the **square root** of the Jensen-Shannon divergence and is a bounded metric. See [Nielsen F. in Entropy 2019, 21(5), 485](https://doi.org/10.3390/e21050485).
 
 * A Trait to enable the user to implement its own distances.
   It takes as data slices of types T satisfying T:Serialize+Clone+Send+Sync. It is also possible to use C extern functions or closures.
@@ -44,6 +33,8 @@ See the companion Julia package [HnswAnn.jl](https://gitlab.com/jpboth/HnswAnn.j
 
 * Filtering: It is possible to add filters so only results which satisfies the filter is in the result set. The filtering is done during the search, so it is not a post filter. There is currently two ways of using the filter, one can add allowed ids in a sorted vector and send as a parameter, or one can define a function which will be called before an id is added to the result set.  
 Examples on both these strategies are in the examples or tests directory. One can also implement the trait Filterable for new types, if one would like the filter to be kept in a bitvector, for example.
+
+* Possibilty to use mmap on dumped data (not on graph part) which is useful for large data vectors.
 
 ## Implementation
 
@@ -121,7 +112,7 @@ or modify parameters to see the impact on performance.
 
 With a i9-13900HX 24 cores laptop we get the following results: 
 1. fashion-mnist-784-euclidean : search requests run at 59900 req/s with a recall rate of 0.977
-2. ann-glove-25-angular : search for the first 100 neighbours run with recall 0.979 at 12640 req/s
+2. ann-glove-25-angular : search for the first 100 neighbours run with recall 0.979 at 12000 req/s
 3. sift1m benchmark: (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 15000 req/s with a recall rate of 0.9907 or at 8300 req/s with a recall rate of 0.9959, depending on the parameters.
   
 Moreover a tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
@@ -159,5 +150,16 @@ Some lines extracted from this Mnist benchmark show how it works for f32 and L2 
 [Sannsyn](https://sannsyn.com/en/) contributed to Drop implementation and FilterT trait.
 Petter Egesund added the DistLevenshtein distance.
 
-## Evolutions are described [here](./changes.md)
+## Evolutions are described [here](./Changes.md)
+
+## License
+
+Licensed under either of
+
+* Apache License, Version 2.0, [LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>
+* MIT license [LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>
+
+at your option.
+
+This software was written on my own while working at [CEA](http://www.cea.fr/).
 

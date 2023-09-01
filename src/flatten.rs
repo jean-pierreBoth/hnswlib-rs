@@ -225,6 +225,9 @@ fn test_dump_reload_graph_flatten() {
        assert_eq!(nbg_2_before[i].distance, nbg_2_after[i].distance);
     }
     check_graph_equality(&hnsw_loaded, &hnsw);
+    //
+    let _= std::fs::remove_file("dumpreloadtestflat.hnsw.data");
+    let _= std::fs::remove_file("dumpreloadtestflat.hnsw.graph");
 }  // end of test_dump_reload
 
 } // end module test

@@ -13,7 +13,6 @@ use std::fs::{File,OpenOptions};
 
 use mmap_rs::{MmapOptions,Mmap};
 use hashbrown::HashMap;
-use anyhow::*;
 
 use crate::prelude::DataId;
 use crate::hnswio;
@@ -39,8 +38,40 @@ pub struct DataMap {
 impl DataMap {
 
     // TODO: specifiy mmap option 
-    pub fn from_hnswdump<T: std::fmt::Debug>(dir : &str, fname : &String) -> anyhow::Result<DataMap> {
+    pub fn from_hnswdump<T: std::fmt::Debug>(dir : &str, fname : &String) -> Result<DataMap, String> {
+        // reload description to have data type, and check for dump version
+        let mut graphpath = PathBuf::new();
+        graphpath.push(dir);
+        let mut filename = fname.clone();
+        filename.push_str(".hnsw.graph");
+        graphpath.push(filename);
+        let graphfileres = OpenOptions::new().read(true).open(&graphpath);
+        if graphfileres.is_err() {
+            println!("DataMap: could not open file {:?}", graphpath.as_os_str());
+            std::process::exit(1);            
+        }
+        let graphfile = graphfileres.unwrap();
+        let mut graph_in = BufReader::new(graphfile);
+        // we need to call load_description first to get distance name
+        let hnsw_description = hnswio::load_description(&mut graph_in).unwrap();
+        if hnsw_description.format_version <= 2 {
+            let msg = String::from("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version > 0.1.19 of this crate");
+            log::error!("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version > 0.1.19 of this crate");
+            return Err(msg);
+        }
+        let t_name = hnsw_description.get_typename();
+        // check typename coherence
+        log::info!("got typename from reload : {:?}", t_name); 
+        if std::any::type_name::<T>() != t_name {
+            log::error!("description has typename {:?}, function type argument is : {:?}", t_name, std::any::type_name::<T>());
+            return Err(String::from("type error"));
+        }
+        // get dimension as declared in description
+        let descr_dimension = hnsw_description.get_dimension();
+        drop(graph_in);
+        //
         // we know data filename is hnswdump.hnsw.data
+        //
         let mut datapath = PathBuf::new();
         datapath.push(dir);
         let mut filename = fname.clone();
@@ -73,37 +104,6 @@ impl DataMap {
         //
         log::info!("mmap done on file : {:?}", &datapath);
         //
-        // reload description to have data type
-        let mut graphpath = PathBuf::new();
-        graphpath.push(dir);
-        let mut filename = fname.clone();
-        filename.push_str(".hnsw.graph");
-        graphpath.push(filename);
-        let graphfileres = OpenOptions::new().read(true).open(&graphpath);
-        if graphfileres.is_err() {
-            println!("DataMap: could not open file {:?}", graphpath.as_os_str());
-            std::process::exit(1);            
-        }
-        let graphfile = graphfileres.unwrap();
-        let mut graph_in = BufReader::new(graphfile);
-        // we need to call load_description first to get distance name
-        let hnsw_description = hnswio::load_description(&mut graph_in).unwrap();
-        if hnsw_description.format_version <= 2 {
-            let msg = String::from("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version >= 0.1.20 of this crate");
-            log::error!("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version >= 0.1.20 of this crate");
-            return Err(anyhow!(msg));
-        }
-        let t_name = hnsw_description.get_typename();
-        // get dimension as declared in description
-        let descr_dimension = hnsw_description.get_dimension();
-        drop(graph_in);
-        // check typename coherence
-        log::info!("got typename from reload : {:?}", t_name); 
-        if std::any::type_name::<T>() != t_name {
-            log::error!("description has typename {:?}, function type argument is : {:?}", t_name, std::any::type_name::<T>());
-            return Err(anyhow!("type error on distance"));
-        }
-        //
         // where are we in decoding mmap slice? at beginning
         //
         let mapped_slice = mmap.as_slice();
@@ -124,14 +124,14 @@ impl DataMap {
         let dimension = usize::from_ne_bytes(usize_slice) as usize;
         if dimension as usize != descr_dimension {
             log::error!("description and data do not agree on dimension, data got : {:?}, description got : {:?}",dimension, descr_dimension);
-            return Err(anyhow!("description and data do not agree on dimension"));
+            return Err(String::from("description and data do not agree on dimension"));
         }
         else {
             log::info!(" got dimension : {:?}", dimension);
         }
         //
         // now we know that each record consists in 
-        //   - MAGICDATAP (u32), DataId  (u64), serialized_len (lenght in bytes * dimension) 
+        //   - MAGICDATAP (u32), DataId  (u64), dimension (u64) and then  (length of type in bytes * dimension) 
         //
         let record_size =  std::mem::size_of::<u32>() + 2 * std::mem::size_of::<u64>() + dimension * std::mem::size_of::<T>();
         let residual = mmap.size() - current_mmap_addr;
@@ -236,11 +236,11 @@ fn test_file_mmap() {
     let mut rng = rand::thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
     // 1000 vectors of size 10 f32
-    let nbdata = 50;
+    let nbcolumn = 50;
     let nbrow = 11;
     let mut xsi;
-    let mut data = Vec::with_capacity(nbdata);
-    for j in 0..nbdata {
+    let mut data = Vec::with_capacity(nbcolumn);
+    for j in 0..nbcolumn {
         data.push(Vec::with_capacity(nbrow));
         for _ in 0..nbrow {
             xsi = unif.sample(&mut rng);
@@ -251,7 +251,7 @@ fn test_file_mmap() {
     // define hnsw
     let ef_construct= 25;
     let nb_connection = 10;
-    let hnsw = Hnsw::<f32, dist::DistL1>::new(nb_connection, nbdata, 16, ef_construct, dist::DistL1{});
+    let hnsw = Hnsw::<f32, dist::DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, dist::DistL1{});
     for i in 0..data.len() {
         hnsw.insert((&data[i], i));
     }
@@ -272,13 +272,12 @@ fn test_file_mmap() {
         log::info!("\n ========= reload success, going to mmap reloading ========= \n");
     }
     //
-    //
-    let datamap = DataMap::from_hnswdump::<f32>(".", &fname).unwrap();
+    let datamap: DataMap = DataMap::from_hnswdump::<f32>(".", &fname).unwrap();
     let nb_test = 30;
     log::info!("checking random access of id , nb test : {}", nb_test);
     for _ in 0..nb_test {
         // sample an id in 0..nb_data
-        let unif =  Uniform::<usize>::new(0, nbdata);        
+        let unif =  Uniform::<usize>::new(0, nbcolumn);        
         let id = unif.sample(&mut rng);
         let d = datamap.get_data::<f32>(&id);
         assert!(d.is_some());
@@ -288,6 +287,10 @@ fn test_file_mmap() {
         }
     }
     // now we have check that datamap seems  ok, test reload of hnsw with mmap
+
+    // rm files generated!
+    std::fs::remove_file("mmap_test.hnsw.data");
+    std::fs::remove_file("mmap_test.hnsw.graph");
 
 } // end of test_file_mmap
 

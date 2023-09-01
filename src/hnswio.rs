@@ -1,11 +1,11 @@
-//! This file provides io dump/ reload of computed graph.
+//! This module provides io dump/ reload of computed graph.
 //!
 //! A dump is constituted of 2 files. 
 //! One file stores just the graph (or topology) with id of points.  
-//! The other file stores the ids and vector in point.
+//! The other file stores the ids and vector in point and can be reloaded via a mmap scheme.
 //! The graph file is suffixed by "hnsw.graph" the other is suffixed by "hnsw.data"
 //! 
-//! An example of dump and reload of structure Hnsw is given in the tests (see test_dump_reload)
+//! Examples of dump and reload of structure Hnsw is given in the tests (see test_dump_reload, reload_with_mmap)
 /// 
 /// 
 // datafile
@@ -19,11 +19,12 @@
 //
 
 use serde::{Serialize, de::DeserializeOwned};
+use std::cell::RefCell;
 
 // io 
 use std::io;
 use std::fs::{OpenOptions, File};
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
 
 // synchro
@@ -31,6 +32,8 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 
 use std::collections::HashMap;
+
+use rand::Rng;
 
 use std::any::type_name;
 use anyhow::*;
@@ -66,31 +69,59 @@ pub enum DumpMode {
 
 
 /// The main interface for dumping struct Hnsw.
-pub trait HnswIoT {
-    fn dump<W:Write>(&self, mode : DumpMode, outgraph : &mut io::BufWriter<W>, outdata: &mut io::BufWriter<W>) -> anyhow::Result<i32>;
+pub(crate) trait HnswIoT {
+    fn dump(&self, mode : DumpMode, dumpinit : &mut DumpInit) -> anyhow::Result<i32>;
 }
 
 
 /// Describe options accessible for reload
-///  - memory map of data
+/// 
+///  - datamap : a bool for mmap uasge.  
+///         The data point can be reloaded via mmap of data file dump.  
+///         This can be useful when data points consist in large vectors (as in genomic sketching)
+///         as in this case data needs more space than the graph.  
+/// 
+///  - mmap_threshold : the number of itmes above which we use mmap. Default is 0, meaning always use mmap data
+///    Can be useful for search speed in hnsw if we have part of data resident in memory.
+#[derive(Copy,Clone)]
 pub struct ReloadOptions {
-    datamap : bool,   
+    datamap : bool,
+    /// number of data items above which we use mmap.
+    mmap_threshold : usize,
 }
 
 impl Default for ReloadOptions {
+    /// default is no mmap
     fn default() -> Self {
-        ReloadOptions{datamap : false}
+        ReloadOptions{datamap : false, mmap_threshold : 0}
     }
 }
 
 
 impl ReloadOptions {
     pub fn new(datamap : bool) -> Self {
-        ReloadOptions{datamap}
+        ReloadOptions{datamap, mmap_threshold : 0}
     }
 
-    pub fn use_mmap(&self) -> bool {
-        return self.datamap
+    /// set mmap uasge to true
+    pub fn set_mmap(&mut self, val : bool) -> Self {
+        self.datamap = val;
+        *self
+    }
+
+    /// set mmap threshold. We use mmap only after a certain amount of data is used.
+    pub fn set_mmap_threshold(&mut self, threshold : usize) -> Self {
+        if threshold > 0 {
+            self.datamap = true;
+            self.mmap_threshold = threshold;
+        }
+        *self
+    }
+
+
+    /// return a 2-uple, (datamap, datamap)
+    pub fn use_mmap(&self) -> (bool, usize) {
+        return (self.datamap, self.mmap_threshold)
     }
 } // end of ReloadOptions
 
@@ -98,18 +129,126 @@ impl ReloadOptions {
 
 //===============================================================================================
 
+// initialize datafile and graphfile for io ops
+// This structure will check existence of dumps of same name and generate a unique filename if necessary according to overwrite flag
+#[allow(unused)]
+pub struct DumpInit {
+    // basename dump 
+    basename : String,
+    // to dump data
+    pub(crate) data_out : BufWriter<File>,
+    // to dump graph
+    pub(crate) graph_out : BufWriter<File>,
+} // end of 
+
+impl DumpInit {
+
+    // This structure will check existence of dumps of same name and generate a unique filename if necessary according to overwrite flag
+    pub fn new(dir : PathBuf, basename_default : String, overwrite : bool) -> Self {
+        // if we cannot overwrite data files (in case of mmap in particular)
+        // we will ensure we have a unique basename
+        
+        let basename = match overwrite {
+            true => { basename_default }
+            false => { // we check 
+                let mut dataname = basename_default.clone();
+                dataname.push_str(".hnsw.data");
+                let mut datapath = dir.clone();
+                datapath.push(dataname);
+                let exist_res =  std::fs::metadata(datapath.as_os_str());
+                if exist_res.is_ok() {
+                    let unique_basename = loop {
+                        let mut unique_basename;
+                        let mut dataname : String;
+                        let id : usize = rand::thread_rng().gen_range(0..10000);
+                        let strid : String  = id.to_string();
+                        unique_basename = basename_default.clone();
+                        unique_basename.push('-');
+                        unique_basename.push_str(&strid);
+                        dataname = unique_basename.clone();
+                        dataname.push_str(".hnsw.data");
+                        let mut datapath = dir.clone();
+                        datapath.push(dataname);
+                        let exist_res =  std::fs::metadata(datapath.as_os_str());
+                        if !exist_res.is_ok() {
+                            break unique_basename;
+                        }
+                    };
+                    unique_basename
+                } 
+                else { 
+                    basename_default  
+                }  
+            }
+        };
+        //
+        log::info!("\n dumping with (unique) basename : {}", basename);
+        //
+        let mut graphname = basename.clone();
+        graphname.push_str(".hnsw.graph");
+        let mut graphpath = dir.clone();
+        graphpath.push(graphname);
+        let graphfileres = OpenOptions::new().create(true).truncate(true).write(true).open(&graphpath);
+        if graphfileres.is_err() {
+            println!("HnswIo::reload_hnsw : could not open file {:?}", graphpath.as_os_str());
+            std::panic::panic_any("HnswIo::init : could not open file".to_string());            
+        }
+        let graphfile = graphfileres.unwrap();
+        //  same thing for data file
+        let mut dataname = basename.clone();
+        dataname.push_str(".hnsw.data");
+        let mut datapath = dir.clone();
+        datapath.push(dataname);
+        let datafileres = OpenOptions::new().create(true).truncate(true).write(true).open(&datapath);
+        if datafileres.is_err() {
+            println!("HnswIo::init : could not open file {:?}", datapath.as_os_str());
+            std::panic::panic_any("HnswIo::init : could not open file".to_string());            
+        }
+        let datafile = datafileres.unwrap();
+        //
+        let graph_out = BufWriter::new(graphfile);
+        let data_out = BufWriter::new(datafile);
+        //
+        DumpInit{basename, data_out, graph_out}
+    }
+
+    /// returns the basename used for the dump. May be it has been made unique to void overwriting a previous or mmapped dump
+    pub fn get_basename(&self) -> &String {
+        &self.basename
+    }
+} // end impl for DumpInit
+
+
+//====================================================
 // basic block used to provide arguments to load_hnsw and load_hnsw_with_dist
-struct Init {
+struct LoadInit {
     descr : Description,
     //
     graphfile : BufReader<File>,
     //
     datafile : BufReader<File>,
-} // end of Init
+} // end of LoadInit
 
 
 
-/// a structure to provide simplified methods for reloading a previous dump
+/// a structure to provide simplified methods for reloading a previous dump.  
+///  
+/// The data point can be reloaded via mmap of data file dump.  
+/// This can be useful when data points consist in large vectors (as in genomic sketching)
+/// as in this case data needs more space than the graph.  
+/// Note : **As this structure potentially contains the mmap data used in hnsw after reload it must not be dropped
+/// before the reloaded hnsw.** 
+/// Example:
+/// 
+/// See example in  tests::reload_with_mmap
+/// ```text
+///     let directory = PathBuf::from(".");
+///     let mut reloader = HnswIo::new(directory.clone(), String::from("mmapreloadtest"));
+///     let options = ReloadOptions::default().set_mmap(true);
+///     reloader.set_options(options);
+///     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
+/// ```
+///
 pub struct HnswIo {
     dir : PathBuf,
     /// basename is used to build $basename.hnsw.data and $basename.hnsw.graph
@@ -118,23 +257,29 @@ pub struct HnswIo {
     options : ReloadOptions,
     ///
     datamap : Option<DataMap>,
+    ///
+    nb_point_loaded : RefCell<usize>,
 } // end of struct ReloadOptions
 
 impl HnswIo {
 
-    /// - directory is directory containing the dump, 
+    /// - directory is directory containing the dumped files, 
     /// - basename is used to build $basename.hnsw.data and $basename.hnsw.graph
     ///  default is to use default ReloadOptions.
     pub fn new(directory : PathBuf, basename : String) -> Self {
-        HnswIo{dir : directory, basename, options :ReloadOptions::default(), datamap : None}
+        HnswIo{dir : directory, basename, options :ReloadOptions::default(), datamap : None, nb_point_loaded : RefCell::new(0)}
     }
 
+    /// same as preceding, avoids the call to [set_options](Self::set_options())
     pub fn new_with_options(directory : PathBuf, basename : String, options : ReloadOptions) -> Self {
-        HnswIo{dir : directory, basename, options, datamap :None}
+        HnswIo{dir : directory, basename, options, datamap :None, nb_point_loaded : RefCell::new(0)}
     }
 
     //
-    fn init(&self) -> Init {
+    fn init(&self) -> anyhow::Result<LoadInit> {
+        //
+        log::info!("reloading from basename : {}", &self.basename);
+        //
         let mut graphname = self.basename.clone();
         graphname.push_str(".hnsw.graph");
         let mut graphpath = self.dir.clone();
@@ -142,7 +287,8 @@ impl HnswIo {
         let graphfileres = OpenOptions::new().read(true).open(&graphpath);
         if graphfileres.is_err() {
             println!("HnswIo::reload_hnsw : could not open file {:?}", graphpath.as_os_str());
-            std::panic::panic_any("test_dump_reload: could not open file".to_string());            
+            log::error!("HnswIo::reload_hnsw : could not open file {:?}", graphpath.as_os_str());
+            return Err(anyhow!("HnswIo::reload_hnsw : could not open file {:?}", graphpath.as_os_str()));
         }
         let graphfile = graphfileres.unwrap();
         //  same thing for data file
@@ -152,8 +298,9 @@ impl HnswIo {
         datapath.push(dataname);
         let datafileres = OpenOptions::new().read(true).open(&datapath);
         if datafileres.is_err() {
-            println!("test_dump_reload : could not open file {:?}", datapath.as_os_str());
-            std::panic::panic_any("test_dump_reload : could not open file".to_string());            
+            println!("HnswIo::init : could not open file {:?}", datapath.as_os_str());
+            log::error!("HnswIo::init : could not open file {:?}", datapath.as_os_str());
+            return Err(anyhow!("HnswIo::reload_hnsw : could not open file {:?}", datapath.as_os_str()));
         }
         let datafile = datafileres.unwrap();
         //
@@ -162,7 +309,7 @@ impl HnswIo {
         // we need to call load_description first to get distance name
         let hnsw_description = load_description(&mut graph_in).unwrap();
         //
-        return Init{descr : hnsw_description, graphfile : graph_in, datafile : data_in};
+        return Ok(LoadInit{descr : hnsw_description, graphfile : graph_in, datafile : data_in});
     }
 
 
@@ -172,13 +319,16 @@ impl HnswIo {
     }
 
     /// reload a previously dumped hnsw stucture
-    pub fn load_hnsw<'b, T, D>(& mut self) -> anyhow::Result<Hnsw<'b, T,D> > 
+    pub fn load_hnsw<'b, 'a, T, D>(&'a mut self) -> anyhow::Result<Hnsw<'b, T,D> > 
         where   T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync + std::fmt::Debug,
-                D:Distance<T>+Default+Send+Sync  {
+                D:Distance<T>+Default+Send+Sync, 'a : 'b  {
         //
         log::debug!("\n\n HnswIo::load_hnsw ");
-        let mut init = self.init();
-
+        let init = self.init();
+        if init.is_err() {
+            return Err(anyhow!("could not reload hnsw structure"));
+        }
+        let mut init = init.unwrap();
         let data_in = &mut init.datafile;
         let graph_in = &mut init.graphfile;
         let description = init.descr;
@@ -217,7 +367,7 @@ impl HnswIo {
         let t_type = description.t_name.clone();
         log::debug!("T type name in dump = {:?}", t_type);
         // Do we use mmap at reload 
-        if self.options.use_mmap() {
+        if self.options.use_mmap().0 {
             let datamap_res = DataMap::from_hnswdump::<T>(self.dir.to_str().unwrap(), &self.basename);
             if datamap_res.is_err() {
                 log::error!("load_hnsw could not initialize mmap")
@@ -226,9 +376,10 @@ impl HnswIo {
                 self.datamap = Some(datamap_res.unwrap());
             }
         }
+        // reloader can use datamap
         let layer_point_indexation = self.load_point_indexation(graph_in, &description, data_in)?;
         let data_dim = layer_point_indexation.get_data_dimension();
-        //
+        // 
         let hnsw : Hnsw::<T,D> =  Hnsw{  max_nb_connection : description.max_nb_connection as usize,
                             ef_construction : description.ef, 
                             extend_candidates : true, 
@@ -238,7 +389,7 @@ impl HnswIo {
                             data_dimension : data_dim,
                             dist_f: D::default(),
                             searching : false,
-                            datamap_opt : None,
+                            datamap_opt : true, // set datamap_opt to true
                         } ;
         //
         log::debug!("load_hnsw completed");
@@ -247,18 +398,24 @@ impl HnswIo {
     } // end of load_hnsw
 
 
+
     /// reload a previously dumped hnsw structure
-    /// /// This function makes reload of a Hnsw dump with a given Dist.  
+    /// This function makes reload of a Hnsw dump with a given Dist.  
     /// It is dedicated to distance of type  [crate::dist::DistPtr] that cannot implement Default.  
     /// **It is the user responsability to reload with the same function as used in the dump**
     /// 
-    pub fn load_hnsw_with_dist<'b, T, D>(&self, f : D,) -> anyhow::Result<Hnsw<'b, T,D> > 
+    pub fn load_hnsw_with_dist<'b, 'a, T, D>(&'a self, f : D,) -> anyhow::Result<Hnsw<'b, T,D> > 
         where   T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync + std::fmt::Debug ,
-                D:Distance<T>+Send+Sync  {
+                D:Distance<T>+Send+Sync , 'a: 'b {
         //
         log::debug!("\n\n HnswIo::load_hnsw_with_dist");
         //
-        let mut init = self.init();
+        let init = self.init();
+        if init.is_err() {
+            return Err(anyhow!("could not reload hnsw structure"));
+        }
+        let mut init = init.unwrap();
+        //
         let data_in = &mut init.datafile;
         let graph_in = &mut init.graphfile;
         let description = init.descr;
@@ -310,7 +467,7 @@ impl HnswIo {
                             data_dimension : data_dim,
                             dist_f: f,
                             searching : false,
-                            datamap_opt : None,
+                            datamap_opt : false,
                         } ;
         //
         log::debug!("load_hnsw_with_dist completed");
@@ -320,8 +477,8 @@ impl HnswIo {
     } // end of load_hnsw_with_dist
 
 
-    fn load_point_indexation<'b, T>(&self, graph_in: &mut dyn Read, descr : &Description, data_in:  &mut dyn Read) -> anyhow::Result<PointIndexation<'b, T> > 
-                where T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync + std::fmt::Debug {
+    fn load_point_indexation<'b, 'a, T>(&'a self, graph_in: &mut dyn Read, descr : &Description, data_in:  &mut dyn Read) -> anyhow::Result<PointIndexation<'b, T> > 
+                where T:'static+Serialize+DeserializeOwned+Clone+Sized+Send+Sync + std::fmt::Debug , 'a : 'b {
         //
         log::debug!(" in load_point_indexation");
         //
@@ -448,15 +605,15 @@ impl HnswIo {
 //  The graph part is loaded from graph_in file
 // the data vector itself is loaded from data_in
 // 
-fn load_point<'b,T>(&self, graph_in: &mut dyn Read, descr: &Description, data_in: &mut dyn Read) -> anyhow::Result<(Arc<Point<'b, T>>, Vec<Vec<Neighbour> >) > 
-        where  T:'static+DeserializeOwned+Clone+Sized+Send+Sync + std::fmt::Debug {
+fn load_point<'b,'a, T>(&'a self, graph_in: &mut dyn Read, descr: &Description, data_in: &mut dyn Read) -> anyhow::Result<(Arc<Point<'b, T>>, Vec<Vec<Neighbour> >) > 
+        where  T:'static+DeserializeOwned+Clone+Sized+Send+Sync + std::fmt::Debug , 'a :'b {
     //
     // read and check magic
     let mut it_slice  = [0u8; std::mem::size_of::<u32>()];
     graph_in.read_exact(&mut it_slice).unwrap();
     let magic = u32::from_ne_bytes(it_slice);
     if magic != MAGICPOINT {
-        log::debug!("got instead of MAGICPOINT {:x}", magic);
+        log::error!("got instead of MAGICPOINT {:x}", magic);
         return Err(anyhow!("bad magic at point beginning"));
     }
     let mut it_slice = [0u8; std::mem::size_of::<DataId>()];
@@ -464,11 +621,11 @@ fn load_point<'b,T>(&self, graph_in: &mut dyn Read, descr: &Description, data_in
     let origin_id = DataId::from_ne_bytes(it_slice);
     // read point_id
     let mut it_slice = [0u8; std::mem::size_of::<u8>()];
-    graph_in.read_exact(&mut it_slice)?;
+    graph_in.read_exact(&mut it_slice).unwrap();
     let layer = u8::from_ne_bytes(it_slice); 
     //
     let mut it_slice = [0u8; std::mem::size_of::<i32>()];
-    graph_in.read_exact(&mut it_slice)?;
+    graph_in.read_exact(&mut it_slice).unwrap();
     let rank_in_l = i32::from_ne_bytes(it_slice);
     let p_id = PointId{0: layer, 1:rank_in_l};
 //    log::debug!(" point load {:?} {:?}  ", p_id, origin_id);
@@ -479,24 +636,24 @@ fn load_point<'b,T>(&self, graph_in: &mut dyn Read, descr: &Description, data_in
         let mut neighbour : Neighbour = Default::default();
         // read nb_neighbour as usize!!! CAUTION, then nb_neighbours times identity(depends on Full or Light) distance : f32 
         let mut it_slice = [0u8; std::mem::size_of::<usize>()];
-        graph_in.read_exact(&mut it_slice)?;
+        graph_in.read_exact(&mut it_slice).unwrap();
         let nb_neighbours = usize::from_ne_bytes(it_slice);
         let mut neighborhood_l : Vec<Neighbour> = Vec::with_capacity(nb_neighbours as usize);
         for _j in 0..nb_neighbours {
             let mut it_slice = [0u8; std::mem::size_of::<DataId>()];
-            graph_in.read_exact(&mut it_slice)?; 
+            graph_in.read_exact(&mut it_slice).unwrap(); 
             neighbour.d_id = DataId::from_ne_bytes(it_slice);          
             if descr.dumpmode == 1 {
                 let mut it_slice = [0u8; std::mem::size_of::<u8>()];
-                graph_in.read_exact(&mut it_slice)?;
+                graph_in.read_exact(&mut it_slice).unwrap();
                 neighbour.p_id.0 = u8::from_ne_bytes(it_slice);
                 //
                 let mut it_slice = [0u8; std::mem::size_of::<i32>() ];
-                graph_in.read_exact(&mut it_slice)?;
+                graph_in.read_exact(&mut it_slice).unwrap();
                 neighbour.p_id.1 = i32::from_ne_bytes(it_slice);
             }
             let mut it_slice = [0u8; std::mem::size_of::<f32>()];
-            graph_in.read_exact(&mut it_slice)?;
+            graph_in.read_exact(&mut it_slice).unwrap();
             neighbour.distance = f32::from_ne_bytes(it_slice);
         //  log::debug!("        voisins  load {:?} {:?} {:?} ", neighbour.p_id, neighbour.d_id , neighbour.distance);
             // now we have a new neighbour, we must really fill neighbourhood info, so it means going from Neighbour to PointWithOrder
@@ -509,16 +666,26 @@ fn load_point<'b,T>(&self, graph_in: &mut dyn Read, descr: &Description, data_in
     }
     //
     let point = match self.options.use_mmap() {
-        false => { 
-            let v = load_point_data::<T>(origin_id, data_in, &descr)?;
-            Point::<T>::new(v, origin_id as usize, p_id)
+        (false, _) => { 
+            let v = load_point_data::<T>(origin_id, data_in, &descr);
+            if v.is_err() {
+                log::error!("loading point {:?}", origin_id);
+                std::process::exit(1);
+            }
+            Point::<T>::new(v.unwrap(), origin_id as usize, p_id)
         }
-        true => {
+        (true, n) => {
             log::debug!("constructing point from datamap, dataid : {:?}", origin_id);
             let s : Option<&'b [T]> = self.datamap.as_ref().unwrap().get_data::<T>(&origin_id);
-            Point::<T>::new_from_mmap(s.unwrap(), origin_id as usize, p_id)
+            if *self.nb_point_loaded.borrow() >= n {
+                Point::<T>::new_from_mmap(s.unwrap(), origin_id as usize, p_id)
+            }
+            else {
+                Point::<T>::new(s.unwrap().to_vec(), origin_id as usize, p_id)
+            }
         }
     };
+    *self.nb_point_loaded.borrow_mut() += 1;
     log::trace!("load_point  origin {:?} allocated size {:?}, dim {:?}", origin_id, point.get_v().len(), descr.dimension);
     //
     return Ok((Arc::new(point), neighborhood));
@@ -832,7 +999,10 @@ fn load_point_data<T>(origin_id : usize, data_in: &mut dyn Read, descr: &Descrip
 // dump entry point
 // 
 impl <'b, T:Serialize+DeserializeOwned+Clone+Send+Sync> HnswIoT for PointIndexation<'b, T> {
-    fn dump<W:Write>(&self, mode : DumpMode, graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> anyhow::Result<i32> {
+    fn dump(&self, mode : DumpMode, dumpinit : &mut DumpInit) -> anyhow::Result<i32> 
+    {
+        let graphout = &mut dumpinit.graph_out;
+        let dataout = &mut dumpinit.data_out;
         // dump max_layer
         let layers = self.points_by_layer.read();
         let nb_layer = layers.len() as u8;
@@ -877,7 +1047,10 @@ impl <'b, T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Sen
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
     /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
-    fn dump<W:Write>(&self, mode : DumpMode, graphout : &mut io::BufWriter<W>, dataout : &mut io::BufWriter<W>) -> anyhow::Result<i32> {
+    fn dump(&self, mode : DumpMode, dumpinit : &mut DumpInit) -> anyhow::Result<i32> {
+        //
+        let graphout = &mut dumpinit.graph_out;
+        let dataout = &mut dumpinit.data_out;
         // dump description , then PointIndexation
         let dumpmode : u8 = match mode {
                 DumpMode::Full => 1,
@@ -903,7 +1076,7 @@ impl <'b, T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Sen
         dataout.write(&MAGICDATAP.to_ne_bytes()).unwrap();
         dataout.write(&datadim.to_ne_bytes()).unwrap();
         //
-        self.layer_indexed_points.dump(mode, graphout, dataout)?;
+        self.layer_indexed_points.dump(mode, dumpinit)?;
         Ok(1)
     }
 }   // end impl block for Hnsw
@@ -985,6 +1158,9 @@ fn test_dump_reload_1() {
     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
     // test equality
     check_graph_equality(&hnsw_loaded, &hnsw);
+    //
+    let _= std::fs::remove_file("dumpreloadtest1.hnsw.data");
+    let _= std::fs::remove_file("dumpreloadtest1.hnsw.graph");
 }  // end of test_dump_reload
 
 
@@ -1031,6 +1207,9 @@ fn test_dump_reload_myfn() {
     let reloader = HnswIo::new(directory, String::from("dumpreloadtest_myfn"));
     let mydist = dist::DistPtr::<f32,f32>::new(my_fn);
     let _hnsw_loaded : Hnsw<f32,DistPtr<f32,f32>>= reloader.load_hnsw_with_dist(mydist).unwrap();
+    //
+    let _= std::fs::remove_file("dumpreloadtest_myfn.hnsw.data");
+    let _= std::fs::remove_file("dumpreloadtest_myfn.hnsw.graph");
 }  // end of test_dump_reload_myfn
 
 
@@ -1074,11 +1253,15 @@ fn test_dump_reload_graph_only() {
     let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestgraph"));
     let hnsw_loaded : Hnsw<NoData,NoDist>= reloader.load_hnsw().unwrap();
     // test equality
-    check_graph_equality(&hnsw_loaded, &hnsw);  
+    check_graph_equality(&hnsw_loaded, &hnsw); 
+    //
+    let _= std::fs::remove_file("dumpreloadtestgraph.hnsw.data");
+    let _= std::fs::remove_file("dumpreloadtestgraph.hnsw.graph"); 
 }  // end of test_dump_reload
 
 
-// this tests reloads a dump with memory mapping of data
+
+// this tests reloads a dump with memory mapping of data, inserts new data and redump
 #[test]
 fn reload_with_mmap() {
     println!("\n\n hnswio tests : reload_with_mmap");
@@ -1086,8 +1269,8 @@ fn reload_with_mmap() {
     // generate a random test
     let mut rng = rand::thread_rng();
     let unif =  Uniform::<f32>::new(0.,1.);
-    // 1000 vectors of size 10 f32
-    let nbcolumn = 1000;
+    // 100 vectors of size 10 f32
+    let nbcolumn = 100;
     let nbrow = 10;
     let mut xsi;
     let mut data = Vec::with_capacity(nbcolumn);
@@ -1098,6 +1281,9 @@ fn reload_with_mmap() {
             data[j].push(xsi);
         }
     } 
+    //
+    let first: Vec<f32> = data[0].clone();
+    log::info!("data[0] = {:?}", first);
     // define hnsw
     let ef_construct= 25;
     let nb_connection = 10;
@@ -1109,17 +1295,76 @@ fn reload_with_mmap() {
     hnsw.dump_layer_info();
     // dump in a file.  Must take care of name as tests runs in // !!!
     let fname = String::from("mmapreloadtest");
-    let _res = hnsw.file_dump(&fname);
+    let dumpname = hnsw.file_dump(&fname).unwrap();
+    log::debug!("dump succeeded in file basename : {}", dumpname);
     //
     // reload reload_with_mmap
     log::debug!("\n\n  hnsw reload");
     let directory = PathBuf::from(".");
-    let reload_options = ReloadOptions::new(true);
-    let mut reloader = HnswIo::new_with_options(directory, String::from("mmapreloadtest"), reload_options);
+    let mut reloader = HnswIo::new(directory.clone(), dumpname);
+    // use mmap for points after half number of points
+    let options = ReloadOptions::default().set_mmap_threshold(nbcolumn/2);
+    reloader.set_options(options);
     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
     // test equality
     check_graph_equality(&hnsw_loaded, &hnsw);
+    // We add nbcolumn new vectors
+    log::info!("adding points in hnsw reloaded");
+    let nbcolumn = 5;
+    let nbrow = 10;
+    let mut xsi;
+    let mut data = Vec::with_capacity(nbcolumn);
+    for j in 0..nbcolumn {
+        data.push(Vec::with_capacity(nbrow));
+        for _ in 0..nbrow {
+            xsi = unif.sample(&mut rng);
+            data[j].push(xsi);
+        }
+    }
+    let first_with_mmap: Vec<f32> = data[0].clone();
+    log::info!("first added after reloading with mmap : data[0] = {:?}", first_with_mmap);
+    let nb_in = hnsw.get_nb_point();
+    for i in 0..data.len() {
+        hnsw.insert((&data[i], i+nb_in));
+    }
+    //
+    let search_res = hnsw.search(&first, 5, ef_construct);
+    log::info!("neighbours od first point inserted");  
+    for n in &search_res {
+        log::info!("neighbour: {:?}", n);  
+    }
+    assert_eq!(search_res[0].d_id,0);
+    assert_eq!(search_res[0].distance,0.);    
+    let search_res = hnsw.search(&first_with_mmap, 5, ef_construct);
+    log::info!("neighbours of first point inserted after reload with mmap"); 
+    for n in &search_res {
+        log::info!("neighbour {:?}", n); 
+    }
+    assert_eq!(search_res[0].d_id,nb_in);
+    assert_eq!(search_res[0].distance,0.);
+    //
+    // TODO: redump  and care about mmapped file, so we do not overwrite
+    //
+    let dump_init = DumpInit::new(directory, fname, false);
+    log::info!("will use basename : {}", dump_init.get_basename());
+    let res = hnsw.file_dump(dump_init.get_basename());
+    if res.is_err() {
+        log::error!("hnsw.file_dump failed");
+        std::panic!("hnsw.file_dump failed");
+    } 
+    let d_basename = res.unwrap(); 
+    // clean generated files
+    let _= std::fs::remove_file("mmapreloadtest.hnsw.data");
+    let _= std::fs::remove_file("mmapreloadtest.hnsw.graph");
+    let mut to_remove = d_basename.clone();
+    log::info!("cleaning basename : {}", to_remove);
+    to_remove.push_str(".hnsw.data");
+    let _= std::fs::remove_file(&to_remove);
+    let mut to_remove = d_basename.clone();
+    to_remove.push_str(".hnsw.graph");
+    let _= std::fs::remove_file(&to_remove);
 } // end of reload_with_mmap
+
 
 
 #[test]
