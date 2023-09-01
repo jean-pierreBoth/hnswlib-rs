@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 use cpu_time::ProcessTime;
 
-use env_logger::{Builder};
+use env_logger::Builder;
 
 // search in paralle mode 8 core i7-10875H  @2.3Ghz time 100 neighbours
 
