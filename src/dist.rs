@@ -67,7 +67,7 @@ pub trait Distance<T:Send+Sync> {
 /// Special forbidden computation distance. It is associated to a unit NoData structure
 /// This is a special structure used when we want to only reload the graph from a previous computation
 /// possibly from an foreign language (and we do not have access to the original type of data from the foreign language).
-#[derive(Default)]
+#[derive(Default, Copy,Clone)]
 pub struct NoDist;
 
 impl <T:Send+Sync> Distance<T> for NoDist {
@@ -82,7 +82,7 @@ impl <T:Send+Sync> Distance<T> for NoDist {
 
 
 /// L1 distance : implemented for i32, f64, i64, u32 , u16 , u8 and with Simd avx2 for f32
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistL1;
 
 
@@ -160,7 +160,7 @@ impl  Distance<f32> for DistL1 {
 //========================================================================
 
 /// L2 distance : implemented for i32, f64, i64, u32 , u16 , u8 and with Simd avx2 for f32
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistL2;
 
 
@@ -240,7 +240,7 @@ impl  Distance<f32> for DistL2 {
 //=========================================================================
 
 /// Cosine distance : implemented for f32, f64, i64, i32 , u16
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistCosine;
 
 
@@ -292,7 +292,7 @@ implementCosDistance!(u16);
 /// We provide for avx2 implementations for f32 that provides consequent gains
 /// in large dimensions
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistDot;
 
 
@@ -394,7 +394,7 @@ pub fn l2_normalize(va:&  mut [f32]) {
 /// at best or code will panic!
 /// 
 /// For f32 a simd implementation is provided if avx2 is detected.
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistHellinger;
 
 
@@ -488,7 +488,7 @@ impl  Distance<f32> for  DistHellinger {
 /// otherwise results will be meaningless at best or code will panic!
 /// 
 /// For f32 a simd implementation is provided if avx2 is detected.
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistJeffreys;
 
 
@@ -576,7 +576,7 @@ impl  Distance<f32> for  DistJeffreys {
 /// It is defined as the **square root** of the  Jensen–Shannon divergence and is a metric.
 /// Vector must be >= 0 and normalized to 1!
 /// The distance computation does not check that. 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistJensenShannon;
 
 macro_rules! implementDistJensenShannon (
@@ -615,7 +615,7 @@ implementDistJensenShannon!(f32);
 /// 
 /// A special implementation for f64 is made but exclusively dedicated to SuperMinHash usage in crate [probminhash](https://crates.io/crates/probminhash).  
 /// It could be made generic with the PartialEq implementation for f64 and f32 in unsable source of Rust
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistHamming;
 
 
@@ -867,7 +867,7 @@ implementHammingDistance!(i16);
 //   Jaccard Distance
 
 /// Jaccard distance. Implemented for u8, u16 , u32.
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistJaccard;
 
 
@@ -908,7 +908,7 @@ implementJaccardDistance!(u32);
 
 
 /// Levenshtein distance. Implemented for u16
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct DistLevenshtein;
 impl Distance<u16> for DistLevenshtein {
     fn eval(&self, a: &[u16], b: &[u16]) -> f32 {
