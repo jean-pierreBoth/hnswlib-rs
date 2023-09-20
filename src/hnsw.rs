@@ -1332,7 +1332,7 @@ impl <'b, T:Clone+Send+Sync, D: Distance<T>+Send+Sync > Hnsw<'b, T,D>  {
 
     /// a filtered version of [`Self::search`].  
     /// A filter can be added to the search to get nodes with a particular property or id constraint.  
-    /// See examples in filter.rs 
+    /// See examples in tests/filtertest.rs 
     pub fn search_filter(&self, data :&[T] , knbn:usize, ef_arg:usize, filter:Option<& dyn FilterT>) -> Vec<Neighbour> {
         //
         let entry_point;

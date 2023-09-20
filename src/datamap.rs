@@ -38,6 +38,9 @@ pub struct DataMap {
 impl DataMap {
 
     // TODO: specifiy mmap option 
+    /// The fname argument corresponds to the basename of the dump.  
+    /// To reload from file fname.hnsw.data just pass fname as argument.
+    /// The dir argument is the directory where the fname.hnsw.data and fname.hnsw.graph reside.
     pub fn from_hnswdump<T: std::fmt::Debug>(dir : &str, fname : &String) -> Result<DataMap, String> {
         // reload description to have data type, and check for dump version
         let mut graphpath = PathBuf::new();

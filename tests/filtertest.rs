@@ -42,7 +42,7 @@ fn search_closure_filter(word: &str, hns: &Hnsw<u16, DistLevenshtein>, words: &V
 
 
 #[test]
-fn levenstein() {
+fn filter_levenstein() {
 
     let nb_elem = 500000; // number of possible words in the dictionary
     let max_nb_connection = 15;
@@ -121,6 +121,8 @@ fn levenstein() {
 
 
 // A test with random uniform data vectors and L2 distance
+// We compare a search of a random vector in hnsw structure with a filter to a filtered_hnsw
+// containing only the data fitting the filter
 #[test]
 fn filter_l2() {
     let nb_elem = 5000;

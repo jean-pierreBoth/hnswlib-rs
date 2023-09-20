@@ -1,7 +1,9 @@
-//! defines a trait for filtering requests
+//! defines a trait for filtering requests.  
+//! See examples in tests/filtertest.rs 
 
 use crate::prelude::DataId;
 
+/// Only queries returning true are taken into account along the search
 pub trait FilterT {
     fn hnsw_filter(&self, id:&DataId) -> bool;
 }
