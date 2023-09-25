@@ -1524,7 +1524,7 @@ fn test_avx2_hamming_f64() {
 #[test]
 fn test_simd_hamming_u32() {
     init_log();
-    log::info!("testing test_simd_hamming_u32 with packed_simd_2");
+    log::info!("testing test_simd_hamming_u32 with packed_simd");
     //
     let size_test = 500;
     let imax = 3;
@@ -1554,7 +1554,7 @@ fn test_simd_hamming_u32() {
 #[test]
 fn test_simd_hamming_u64() {
     init_log();
-    log::info!("testing test_simd_hamming_u32 with packed_simd_2");
+    log::info!("testing test_simd_hamming_u32 with packed_simd");
     //
     let size_test = 500;
     let imax = 3;
@@ -1583,7 +1583,7 @@ fn test_simd_hamming_u64() {
 #[test]
 fn test_feature_simd() {
     init_log();
-    log::info!("I have activated packed_simd_2");
+    log::info!("I have activated packed_simd");
 } // end of test_feature_simd
 
 
