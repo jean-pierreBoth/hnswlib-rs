@@ -92,7 +92,7 @@ anyhow = {version = "1.0"}
 # x86_64 simd stuff , enabled by  simdeez_f feature 
 simdeez = {version = "1.0", optional = true}
 # beta 
-packed_simd_2 = { version = "0.3", optional = true}
+packed_simd = { version = "0.3", optional = true }
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
@@ -108,4 +108,4 @@ default = []
 # simd on x86/x86_64
 simdeez_f = ["simdeez"]
 # a beta feature experimental
-stdsimd = ["packed_simd_2"]
+stdsimd = ["packed_simd"]
