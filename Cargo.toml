@@ -63,7 +63,7 @@ bincode = {version = "1.3"}
 
 # for //
 parking_lot = "0.12"
-rayon = {version = "1.7"}
+rayon = {version = "1.8"}
 num_cpus = {version = "1.15.0"}
 
 cpu-time = {version = "1.0"}

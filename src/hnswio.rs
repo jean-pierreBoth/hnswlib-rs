@@ -20,6 +20,8 @@
 
 use serde::{Serialize, de::DeserializeOwned};
 use std::cell::RefCell;
+//
+use std::time::SystemTime;
 
 // io 
 use std::io;
@@ -247,8 +249,30 @@ struct LoadInit {
 ///     let options = ReloadOptions::default().set_mmap(true);
 ///     reloader.set_options(options);
 ///     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
-/// ```
-///
+/// ```  
+///   
+/// In some cases we need a hnsw variable that can come from a reload **OR** a direct initialization.  
+///   
+/// Hnswio must be defined before Hnsw as drop is done in reverse order of definition, and the function [load_hnsw](Self::load_hnsw())
+/// borrows Hnswio.  
+/// It is also possibly to preinitialize a Hnswio with the default() function which leaves all the fields with blank values and use 
+/// the function [set_values](Self::set_values()) after.  
+/// We get something like:
+/// 
+/// ```text
+///     let need_reload : bool;
+///     ....................
+///     let mut hnswio : Hnswio::default();
+///     let hnsw : Hnsw<>;
+///     if need_reload {
+///         hnswio.set_values(...);
+///         hnsw = hnswio.reload_hnsw(...)
+///     }
+///     else {
+///         hnsw = Hnsw::new(...)
+///     }
+/// ````
+#[derive(Default)]
 pub struct HnswIo {
     dir : PathBuf,
     /// basename is used to build $basename.hnsw.data and $basename.hnsw.graph
@@ -259,6 +283,8 @@ pub struct HnswIo {
     datamap : Option<DataMap>,
     ///
     nb_point_loaded : RefCell<usize>,
+    ///
+    initialized : bool,
 } // end of struct ReloadOptions
 
 impl HnswIo {
@@ -267,13 +293,31 @@ impl HnswIo {
     /// - basename is used to build $basename.hnsw.data and $basename.hnsw.graph
     ///  default is to use default ReloadOptions.
     pub fn new(directory : PathBuf, basename : String) -> Self {
-        HnswIo{dir : directory, basename, options :ReloadOptions::default(), datamap : None, nb_point_loaded : RefCell::new(0)}
+        HnswIo{dir : directory, basename, options :ReloadOptions::default(), datamap : None, nb_point_loaded : RefCell::new(0), initialized : true}
     }
 
     /// same as preceding, avoids the call to [set_options](Self::set_options())
     pub fn new_with_options(directory : PathBuf, basename : String, options : ReloadOptions) -> Self {
-        HnswIo{dir : directory, basename, options, datamap :None, nb_point_loaded : RefCell::new(0)}
+        HnswIo{dir : directory, basename, options, datamap :None, nb_point_loaded : RefCell::new(0), initialized : true}
     }
+
+    /// this method enables effective initialization after default allocation.
+    /// It is an error to call set_values on an already defined Hswnio by any function other than [default](Self::default())
+    pub fn set_values(&mut self, directory : PathBuf, basename : String, options : ReloadOptions) -> anyhow::Result<()> {
+        if self.initialized {
+            return Err(anyhow!("Hnswio already initialized"));
+        };
+        //
+        self.dir = directory;
+        self.basename = basename;
+        self.options = options;
+        self.datamap = None;
+        //
+        self.initialized = true;
+        //
+        return Ok(());
+    } // end of set_values
+
 
     //
     fn init(&self) -> anyhow::Result<LoadInit> {
@@ -324,6 +368,8 @@ impl HnswIo {
                 D:Distance<T>+Default+Send+Sync, 'a : 'b  {
         //
         log::debug!("\n\n HnswIo::load_hnsw ");
+        let start_t = SystemTime::now();
+        //
         let init = self.init();
         if init.is_err() {
             return Err(anyhow!("could not reload hnsw structure"));
@@ -393,6 +439,13 @@ impl HnswIo {
                         } ;
         //
         log::debug!("load_hnsw completed");
+        let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
+        if log::log_enabled!(log::Level::Info) {
+            log::info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+        }
+        else {
+            println!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+        }
         //
         Ok(hnsw)
     } // end of load_hnsw
@@ -1060,7 +1113,7 @@ impl <'b, T:Serialize+DeserializeOwned+Clone+Sized+Send+Sync, D: Distance<T>+Sen
 
         let description = Description {
             format_version : 3,
-               ///  value is 1 for Full 0 for Light
+            //  value is 1 for Full 0 for Light
             dumpmode : dumpmode,
             max_nb_connection : self.get_max_nb_connection(),
             nb_layer : self.get_max_level() as u8,

@@ -4,3 +4,4 @@ pub use crate::hnsw::*;
 pub use crate::dist::*;
 pub use crate::api::*;
 pub use crate::filter::*;
+pub use crate::hnswio::*;
