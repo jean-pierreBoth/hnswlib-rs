@@ -1,4 +1,5 @@
-//! This module provides io dump/ reload of computed graph.
+//! This module provides io dump/ reload of computed graph via the structure Hnswio.  
+//! This structure stores references to data points if memory map is used.  
 //!
 //! A dump is constituted of 2 files. 
 //! One file stores just the graph (or topology) with id of points.  
@@ -111,7 +112,7 @@ impl ReloadOptions {
         *self
     }
 
-    /// set mmap threshold. We use mmap only after a certain amount of data is used.
+    /// set mmap threshold. We use mmap only after a certain number of data point have been reloaded. See test *reload_with_mmap()*
     pub fn set_mmap_threshold(&mut self, threshold : usize) -> Self {
         if threshold > 0 {
             self.datamap = true;
@@ -121,7 +122,7 @@ impl ReloadOptions {
     }
 
 
-    /// return a 2-uple, (datamap, datamap)
+    /// return a 2-uple, (datamap, threshold)
     pub fn use_mmap(&self) -> (bool, usize) {
         return (self.datamap, self.mmap_threshold)
     }
@@ -254,8 +255,8 @@ struct LoadInit {
 /// In some cases we need a hnsw variable that can come from a reload **OR** a direct initialization.  
 ///   
 /// Hnswio must be defined before Hnsw as drop is done in reverse order of definition, and the function [load_hnsw](Self::load_hnsw())
-/// borrows Hnswio.  
-/// It is also possibly to preinitialize a Hnswio with the default() function which leaves all the fields with blank values and use 
+/// borrows Hnswio. (Hnswio stores the mmap address Hnsw can refer to if mmap is used) 
+/// It is also possible to preinitialize a Hnswio with the default() function which leaves all the fields with blank values and use 
 /// the function [set_values](Self::set_values()) after.  
 /// We get something like:
 /// 

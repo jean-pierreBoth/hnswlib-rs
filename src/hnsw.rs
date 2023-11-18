@@ -137,17 +137,21 @@ impl Neighbour {
 
 #[derive(Debug,Clone)]
 enum PointData<'b,T:Clone+Send+Sync + 'b> {
+    // full data
     V(Vec<T>),
+    // areference to a mmaped slice
     S(&'b [T]),
 } // end of enum PointData
 
 
 impl <'b, T:Clone+Send+Sync + 'b > PointData<'b,T> {
 
+    // allocate a point stored in structure
     fn new_v(v : Vec<T>) -> Self {
         PointData::V(v)
     }
 
+    // allocate a point representation a memory mapped slice
     fn new_s( s: &'b [T]) -> Self {
             PointData::S(s)
     }
