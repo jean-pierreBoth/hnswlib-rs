@@ -1,8 +1,8 @@
-//! This module provides a bidirectional link between a file in the format used for the dump of Data vectors filling the Hnsw structure.
-//! We mmap the file and provide 
-//!     - a Hashmap from DataId to address
-//!     - an interface for retrieving just data vectors loaded in the hnsw structure.
-//!     - an interface for creating a Hnsw structure from the vectors stored in file
+//! This module provides a memory mapping of Data vectors filling the Hnsw structure. It is managed by the module [hnswio]
+//! 
+//! We mmap the file and provide   
+//!   - a Hashmap from DataId to address  
+//!   - an interface for retrieving just data vectors loaded in the hnsw structure.
 
 #![allow(unused)]
 
@@ -11,6 +11,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::fs::{File,OpenOptions};
 
+use log::log_enabled;
 use mmap_rs::{MmapOptions,Mmap};
 use hashbrown::HashMap;
 
@@ -120,7 +121,6 @@ impl DataMap {
         current_mmap_addr += std::mem::size_of::<u32>();
         let magic = u32::from_ne_bytes(u32_slice);
         assert_eq!(magic, MAGICDATAP, "magic not equal to MAGICDATAP in mmap");
-        log::debug!("got magic OK");
         // get dimension
         usize_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<usize>()]);
         current_mmap_addr += std::mem::size_of::<usize>();
@@ -149,7 +149,7 @@ impl DataMap {
         // now we loop on records
         //
         for i in 0..nb_record {
-            log::info!("record i : {}, addr : {}", i, current_mmap_addr);
+            log::debug!("record i : {}, addr : {}", i, current_mmap_addr);
             // decode Magic 
             u32_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u32>()]);
             current_mmap_addr += std::mem::size_of::<u32>();
@@ -166,7 +166,9 @@ impl DataMap {
             u64_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u64>()]);
             current_mmap_addr += std::mem::size_of::<u64>();
             let serialized_len = u64::from_ne_bytes(u64_slice) as usize;
-            log::debug!("serialized bytes len to reload {:?}", serialized_len);
+            if log_enabled!(log::Level::Debug) && i == 0 {
+                log::debug!("serialized bytes len to reload {:?}", serialized_len);
+            }
             let mut v_serialized = Vec::<u8>::with_capacity(serialized_len);
             // TODO avoid initialization
             v_serialized.resize(serialized_len as usize, 0);
@@ -176,7 +178,7 @@ impl DataMap {
             log::debug!("deserialized v : {:?} address : {:?} ", slice_t, v_serialized.as_ptr() as *const T);
         } // end of for on record
         //
-        log::debug!("\n end of from_hnsw");
+        log::debug!("\n end of DataMap::from_hnsw \n");
         //
         let datamap =  DataMap{datapath, mmap, hmap, t_name, dimension : descr_dimension};
         //
@@ -200,7 +202,7 @@ impl DataMap {
         u64_slice.copy_from_slice(&mapped_slice[current_mmap_addr..current_mmap_addr+std::mem::size_of::<u64>()]);
         let serialized_len = u64::from_ne_bytes(u64_slice) as usize;
         current_mmap_addr += std::mem::size_of::<u64>();
-        log::debug!("serialized bytes len to reload {:?}", serialized_len);
+        log::trace!("serialized bytes len to reload {:?}", serialized_len);
         let slice_t = unsafe {std::slice::from_raw_parts(mapped_slice[current_mmap_addr..].as_ptr() as *const T, self.dimension as usize) };
         Some(slice_t)
     }
