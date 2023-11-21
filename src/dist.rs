@@ -4,7 +4,7 @@
 
 
 #[cfg(feature = "stdsimd")]
-use std::simd::{u32x16, u64x8, i32x16, i64x8};
+use packed_simd::*;
 
 #[cfg(feature = "simdeez_f")]
 use simdeez::avx2::*;
@@ -726,7 +726,6 @@ unsafe fn distance_hamming_f64<S: Simd> (va:&[f64], vb: &[f64]) -> f32 {
 
 #[cfg(feature = "stdsimd")]
 fn distance_jaccard_u32_16_simd(va:&[u32], vb: &[u32]) -> f32 {
-    let mut dist_simd = i32x16::splat(0);
     //
     assert_eq!(va.len(), vb.len());
     //
@@ -734,14 +733,13 @@ fn distance_jaccard_u32_16_simd(va:&[u32], vb: &[u32]) -> f32 {
     let nb_simd = va.len()/ nb_lanes;
     let simd_length = nb_simd * nb_lanes;
     //
-    for i in (0..simd_length).step_by(nb_lanes) {
-        let a = u32x16::from_slice(&va[i..]);
-        let b = u32x16::from_slice(&vb[i..]);
-        // recall a test return 0 if false -1 if true! 
-        let delta = a.lanes_ne(b);
-        dist_simd = dist_simd - delta.to_int(); 
-    }
-    let mut dist = dist_simd.horizontal_sum();
+    let dist_simd = va.chunks_exact(nb_lanes)
+            .map(u32x16::from_slice_unaligned)
+            .zip(vb.chunks_exact(nb_lanes).map(u32x16::from_slice_unaligned))
+            .map(|(a,b)| <i32x16>::from_cast(a.ne(b)))
+            .sum::<i32x16>();
+    // recall a test return 0 if false -1 if true! 
+    let mut dist = - dist_simd.wrapping_sum();
     // residual
     for i in simd_length..va.len() {
         dist = dist + if va[i] != vb[i] { 1 } else {0};
@@ -750,10 +748,32 @@ fn distance_jaccard_u32_16_simd(va:&[u32], vb: &[u32]) -> f32 {
 }  // end of distance_jaccard_u32_simd
 
 
+#[cfg(feature = "stdsimd")]
+fn distance_jaccard_f32_16_simd(va:&[f32], vb: &[f32]) -> f32 {
+    //
+    assert_eq!(va.len(), vb.len());
+    //
+    let nb_lanes = 16;
+    let nb_simd = va.len()/ nb_lanes;
+    let simd_length = nb_simd * nb_lanes;
+    //
+    let dist_simd = va.chunks_exact(nb_lanes)
+            .map(f32x16::from_slice_unaligned)
+            .zip(vb.chunks_exact(nb_lanes).map(f32x16::from_slice_unaligned))
+            .map(|(a,b)| <i32x16>::from_cast(a.ne(b)))
+            .sum::<i32x16>();
+    // recall a test return 0 if false -1 if true! 
+    let mut dist = - dist_simd.wrapping_sum();
+    // residual
+    for i in simd_length..va.len() {
+        dist = dist + if va[i] != vb[i] { 1 } else {0};
+    }
+    return dist as f32/ va.len() as f32;
+}  // end of distance_jaccard_u32_simd
+
 
 #[cfg(feature = "stdsimd")]
 fn distance_jaccard_u64_8_simd(va:&[u64], vb: &[u64]) -> f32 {
-    let mut dist_simd = i64x8::splat(0);
     //
     assert_eq!(va.len(), vb.len());
     //
@@ -761,14 +781,13 @@ fn distance_jaccard_u64_8_simd(va:&[u64], vb: &[u64]) -> f32 {
     let nb_simd = va.len()/ nb_lanes;
     let simd_length = nb_simd * nb_lanes;
     //
-    for i in (0..simd_length).step_by(nb_lanes) {
-        let a = u64x8::from_slice(&va[i..]);
-        let b = u64x8::from_slice(&vb[i..]);
-        // recall a test return 0 if false -1 if true! 
-        let delta = a.lanes_ne(b);
-        dist_simd = dist_simd - delta.to_int(); 
-    }
-    let mut dist = dist_simd.horizontal_sum();
+    let dist_simd = va.chunks_exact(nb_lanes)
+            .map(u64x8::from_slice_unaligned)
+            .zip(vb.chunks_exact(nb_lanes).map(u64x8::from_slice_unaligned))
+            .map(|(a,b)| <i64x8>::from_cast(a.ne(b)))
+            .sum::<i64x8>();
+    // recall a test return 0 if false -1 if true! 
+    let mut dist = - dist_simd.wrapping_sum();
     // residual
     for i in simd_length..va.len() {
         dist = dist + if va[i] != vb[i] { 1 } else {0};
@@ -822,12 +841,15 @@ impl  Distance<f64> for  DistHamming {
 /// This implementation is dedicated to SuperMinHash algorithm in crate [probminhash](https://crates.io/crates/probminhash).  
 /// Could be made generic with unstable source as there is implementation of PartialEq for f32
 impl  Distance<f32> for  DistHamming {
-    fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
-        // in fact simd comparaison seems slower than simple iter
-        assert_eq!(va.len(), vb.len());
-        let dist : usize = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count();
-        (dist as f64 / va.len() as f64) as f32
-    } // end of eval
+        fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
+            #[cfg(feature = "stdsimd")]
+            return distance_jaccard_f32_16_simd(va,vb);
+            #[cfg(not(feature = "stdsimd"))] {
+            assert_eq!(va.len(), vb.len());
+            let dist : usize = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count();
+            (dist as f64 / va.len() as f64) as f32
+            }
+        } // end of eval
 } // end implementation Distance<f32>
 
 

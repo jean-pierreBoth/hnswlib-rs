@@ -4,7 +4,7 @@
 //! parallel test corresponds to random data in 25 dimensions k = 10, dist Cosine
 
 #![allow(dead_code)]
-use rand::distributions::{Uniform};
+use rand::distributions::Uniform;
 use rand::prelude::*;
 
 use skiplist::OrderedSkipList;
