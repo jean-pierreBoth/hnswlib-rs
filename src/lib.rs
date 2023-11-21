@@ -6,10 +6,9 @@
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::Builder;
 
-#[macro_use]
-extern crate lazy_static;
 
 
+use lazy_static::lazy_static;
 
 pub mod hnsw;
 pub mod dist;

@@ -2,6 +2,7 @@
 //! and a structure to enable the user to implement its own distances.
 //! For the heavily used case (f32) we provide simd avx2 implementation.
 
+use cfg_if;
 
 #[cfg(feature = "stdsimd")]
 use packed_simd::*;
@@ -106,9 +107,34 @@ implementL1Distance!(u32);
 implementL1Distance!(u16);
 implementL1Distance!(u8);
 
+#[cfg(feature = "stdsimd")]
+fn distance_l1_f32_simd(va:&[f32], vb: &[f32]) -> f32 {
+    //
+    let nb_lanes = 16;
+    let nb_simd = va.len()/ nb_lanes;
+    let simd_length = nb_simd * nb_lanes;
+    //
+    let dist_simd = va.chunks_exact(nb_lanes)
+            .map(f32x16::from_slice_unaligned)
+            .zip(vb.chunks_exact(nb_lanes).map(f32x16::from_slice_unaligned))
+            .map(|(a,b)| (a - b).abs())
+            .sum::<f32x16>();
+    //
+    let mut dist = dist_simd.sum();
+    // residual
+    for i in simd_length..va.len() {
+        dist = dist + (va[i]- vb[i]).abs();
+    }
+    return dist as f32;
+}  // end of distance_l1_f32_simd
+
+
+
 
 #[cfg(feature = "simdeez_f")]
 unsafe fn distance_l1_f32<S: Simd> (va:&[f32], vb: &[f32]) -> f32 {
+    assert_eq!(va.len(), vb.len());
+    //
     let mut dist_simd = S::setzero_ps();
     //
     let nb_simd = va.len() / S::VF32_WIDTH;
@@ -144,19 +170,29 @@ unsafe fn distance_l1_f32_avx2(va:&[f32], vb: &[f32]) -> f32 {
 impl  Distance<f32> for DistL1 {
     fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
         //
-        // assert_eq!(va.len(), vb.len());
-        //
-    #[cfg(feature = "simdeez_f")] {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
-            if is_x86_feature_detected!("avx2") {
-                return unsafe {distance_l1_f32_avx2(va,vb)};
+cfg_if::cfg_if! {
+        if #[cfg(feature = "simdeez_f")] {
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] {
+                if is_x86_feature_detected!("avx2") {
+                    return unsafe {distance_l1_f32_avx2(va,vb)};
+                }
+                else {
+                    assert_eq!(va.len(), vb.len());
+                    va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32).abs()).sum()
+                }
             }
         }
-    }
-        va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32).abs()).sum()
+        else if #[cfg(feature = "stdsimd")] {
+            distance_l1_f32_simd(va,vb)
+        }
+        else {   
+            va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32).abs()).sum()
+        }
+        } // end cfg_if
     } // end of eval
+} // end impl Distance<f32> for DistL1
 
-}
+
 //========================================================================
 
 /// L2 distance : implemented for i32, f64, i64, u32 , u16 , u8 and with Simd avx2 for f32
@@ -841,15 +877,18 @@ impl  Distance<f64> for  DistHamming {
 /// This implementation is dedicated to SuperMinHash algorithm in crate [probminhash](https://crates.io/crates/probminhash).  
 /// Could be made generic with unstable source as there is implementation of PartialEq for f32
 impl  Distance<f32> for  DistHamming {
-        fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
-            #[cfg(feature = "stdsimd")]
-            return distance_jaccard_f32_16_simd(va,vb);
-            #[cfg(not(feature = "stdsimd"))] {
-            assert_eq!(va.len(), vb.len());
-            let dist : usize = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count();
-            (dist as f64 / va.len() as f64) as f32
+    fn eval(&self, va:&[f32], vb: &[f32]) -> f32 {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "stdsimd")] {
+                return distance_jaccard_f32_16_simd(va,vb);
             }
-        } // end of eval
+            else {
+                assert_eq!(va.len(), vb.len());
+                let dist : usize = va.iter().zip(vb.iter()).filter(|t| t.0 != t.1).count();
+                (dist as f64 / va.len() as f64) as f32
+            }
+        } 
+    } // end of eval
 } // end implementation Distance<f32>
 
 
@@ -1200,11 +1239,26 @@ fn test_dot_distances () {
     l2_normalize(&mut v2);
 
     println!( " after normalisation v1 = {:?}" , v1);
-
     let dot = DistDot.eval(&v1,&v2);
-    
     println!("dot  cos avec prenormalisation  = {:?} ,  avec for {:?}", dot , dcos);
 }
+
+#[test]
+fn test_l1() {
+    init_log();
+    //
+    let va: Vec<f32> = vec![1.234,-1.678, 1.367, 1.234,-1.678, 1.367];
+    let vb: Vec<f32> = vec![4.234,-6.678, 10.367, 1.234,-1.678, 1.367];   
+    //
+    let dist = DistL1.eval(&va, &vb);
+    let dist_check = va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32).abs()).sum::<f32>();
+    //
+    log::info!(" dist : {:.5e} dist_check : {:.5e}", dist, dist_check);
+    assert!((dist-dist_check).abs() / dist_check < 1.0e-5 );
+
+} // end of test_l1
+
+
 
 #[test]
 fn test_jaccard_u16() {
