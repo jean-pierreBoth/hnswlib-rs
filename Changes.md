@@ -1,3 +1,8 @@
+- version 0.2.1:
+  
+  when using mmap, the points less frequently used (points in lower layers) are preferentially mmap-ed while upper layers are preferentially 
+  explcitly read from file.
+  feature stdsimd runs with nightly on Hamming with u32,u64 and DisL1 with f32
 - The **version 0.2** introduces 
     1. possibility to use mmap on the data file storing  the vectors represented in the hnsw structure. This is mostly usefule for
     large vectors, where data needs more space than the graph part.
@@ -5,7 +10,7 @@
     In case of mmap usage, a dump after inserting new elements must ensure that the old file is not overwritten, so a unique file name is
   generated if necessary. See documentation of module Hnswio
 
-    2. the filtering trait
+    1. the filtering trait
   
    
 -  Upgrade of many dependencies. Change from simple_logger to env_logger. The logger is initialized one for all in file src/lib.rs and cannot be intialized twice. The level of log can be modulated by the RUST_LOG env variable on a module basis or switched off. See the *env_logger* crate doc.
