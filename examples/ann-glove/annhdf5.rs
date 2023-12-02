@@ -3,16 +3,11 @@
 //! ann benchmarks.  
 //! The only way I found make the library independant and ndarray.
 
-
-
-use ndarray::{Array2};
+use ndarray::Array2;
 
 use ::hdf5::*;
 
-
-
-
-// datasets 
+// datasets
 //   . distances (nbojects, dim)   f32 matrix    for tests objects
 //   . neighbors (nbobjects, nbnearest) int32 matrix giving the num of nearest neighbors in train data
 //   . test      (nbobjects, dim)   f32 matrix  test data
@@ -22,7 +17,7 @@ use ::hdf5::*;
 pub struct AnnBenchmarkData {
     pub fname: String,
     /// distances from each test object to its nearest neighbours.
-    pub test_distances : Array2<f32>,
+    pub test_distances: Array2<f32>,
     // for each test data , id of its nearest neighbours
     pub test_neighbours: Array2<i32>,
     /// list of vectors for which we will search ann.
@@ -30,17 +25,19 @@ pub struct AnnBenchmarkData {
     /// list of data vectors and id
     pub train_data: Vec<(Vec<f32>, usize)>,
     /// searched results. first neighbours for each test data.
-    pub searched_neighbours : Vec<Vec<i32>>,
-    /// distances of neighbours obtained of each test 
+    pub searched_neighbours: Vec<Vec<i32>>,
+    /// distances of neighbours obtained of each test
     pub searched_distances: Vec<Vec<f32>>,
 }
 
 impl AnnBenchmarkData {
-    pub fn new(fname: String) ->  Result<AnnBenchmarkData> {
+    pub fn new(fname: String) -> Result<AnnBenchmarkData> {
         let res = hdf5::File::open(fname.clone());
         if res.is_err() {
             println!("you must download file {:?}", fname);
-            panic!("download benchmark file some where and modify examples source file accordingly");
+            panic!(
+                "download benchmark file some where and modify examples source file accordingly"
+            );
         }
         let file = res.ok().unwrap();
         //
@@ -48,7 +45,7 @@ impl AnnBenchmarkData {
         //
         let res_distances = file.dataset("distances");
         if res_distances.is_err() {
-         //   let reader = hdf5::Reader::<f32>::new(&test_distance);
+            //   let reader = hdf5::Reader::<f32>::new(&test_distance);
             panic!("error getting distances dataset");
         }
         let distances = res_distances.unwrap();
@@ -60,21 +57,25 @@ impl AnnBenchmarkData {
             panic!("error getting type distances dataset");
         }
         // read really data
-        let res = distances.read_2d::<f32> ();
+        let res = distances.read_2d::<f32>();
         if res.is_err() {
             // some error
-             panic!("error reading distances dataset");
+            panic!("error reading distances dataset");
         }
         let test_distances = res.unwrap();
         // a check for row order
-        log::debug!(" first 2 distances for first test {:?} {:?}  ", test_distances.get((0,0)).unwrap(), test_distances.get((0,1)).unwrap());
+        log::debug!(
+            " first 2 distances for first test {:?} {:?}  ",
+            test_distances.get((0, 0)).unwrap(),
+            test_distances.get((0, 1)).unwrap()
+        );
         //
         // read neighbours
         //
         let res_neighbours = file.dataset("neighbors");
         if res_neighbours.is_err() {
-         //   let reader = hdf5::Reader::<f32>::new(&test_distance);
-            panic!("error getting neighbours");        
+            //   let reader = hdf5::Reader::<f32>::new(&test_distance);
+            panic!("error getting neighbours");
         }
         let neighbours = res_neighbours.unwrap();
         let shape = neighbours.shape();
@@ -83,23 +84,27 @@ impl AnnBenchmarkData {
         let datai32 = neighbours.dtype().unwrap().is::<i32>();
         if !datai32 {
             // error
-            panic!("error getting type  neighbours");        
+            panic!("error getting type  neighbours");
         }
         // read really data
-        let res = neighbours.read_2d::<i32> ();
+        let res = neighbours.read_2d::<i32>();
         if res.is_err() {
             // some error
             panic!("error reading neighbours dataset");
         }
         let test_neighbours = res.unwrap();
-        log::debug!(" first 2 neighbours  for first test {:?} {:?}  ", test_neighbours.get((0,0)).unwrap(), test_neighbours.get((0,1)).unwrap());
+        log::debug!(
+            " first 2 neighbours  for first test {:?} {:?}  ",
+            test_neighbours.get((0, 0)).unwrap(),
+            test_neighbours.get((0, 1)).unwrap()
+        );
         println!("\n 10 first neighbours for first vector : ");
         for i in 0..10 {
-            print!(" {:?} ", test_neighbours.get((0,i)).unwrap());
+            print!(" {:?} ", test_neighbours.get((0, i)).unwrap());
         }
         println!("\n 10 first neighbours for second vector : ");
         for i in 0..10 {
-            print!(" {:?} ", test_neighbours.get((1,i)).unwrap());
+            print!(" {:?} ", test_neighbours.get((1, i)).unwrap());
         }
         //
         // read test data
@@ -110,17 +115,17 @@ impl AnnBenchmarkData {
             panic!("error getting test de notataset");
         }
         let test_data = res_testdata.unwrap();
-        let shape = test_data.shape();  // nota shape returns a slice, dim returns a t-uple
+        let shape = test_data.shape(); // nota shape returns a slice, dim returns a t-uple
         assert_eq!(shape.len(), 2);
         let dataf32 = test_data.dtype().unwrap().is::<f32>();
         if !dataf32 {
             panic!("error getting type de notistances dataset");
         }
         // read really datae not
-        let res = test_data.read_2d::<f32> ();
+        let res = test_data.read_2d::<f32>();
         if res.is_err() {
             // some error
-             panic!("error reading distances dataset");
+            panic!("error reading distances dataset");
         }
         let test_data_2d = res.unwrap();
         let mut test_data = Vec::<Vec<f32>>::with_capacity(shape[1]);
@@ -129,13 +134,13 @@ impl AnnBenchmarkData {
         for i in 0..nbrow {
             let mut vec = Vec::with_capacity(nbcolumn);
             for j in 0..nbcolumn {
-                vec.push(*test_data_2d.get((i,j)).unwrap());
+                vec.push(*test_data_2d.get((i, j)).unwrap());
             }
             test_data.push(vec);
-        }   
+        }
         //
         //  loaf train data
-        //       
+        //
         let res_traindata = file.dataset("train");
         if res_traindata.is_err() {
             panic!("error getting distances dataset");
@@ -147,36 +152,50 @@ impl AnnBenchmarkData {
             println!("test and train have not the same dimension");
             panic!();
         }
-        println!("\n train data shape : {:?}, nbvector {:?} ", train_shape, train_shape[0]);
+        println!(
+            "\n train data shape : {:?}, nbvector {:?} ",
+            train_shape, train_shape[0]
+        );
         let dataf32 = train_data.dtype().unwrap().is::<f32>();
         if !dataf32 {
             // error
             panic!("error getting type distances dataset");
         }
         // read really data
-        let res = train_data.read_2d::<f32> ();
+        let res = train_data.read_2d::<f32>();
         if res.is_err() {
             // some error
-             panic!("error reading distances dataset");
+            panic!("error reading distances dataset");
         }
         let train_data_2d = res.unwrap();
-        let mut train_data = Vec::<(Vec<f32>,usize)>::with_capacity(shape[1]);
+        let mut train_data = Vec::<(Vec<f32>, usize)>::with_capacity(shape[1]);
         let (nbrow, nbcolumn) = train_data_2d.dim();
         for i in 0..nbrow {
             let mut vec = Vec::with_capacity(nbcolumn);
             for j in 0..nbcolumn {
-                vec.push(*train_data_2d.get((i,j)).unwrap());
+                vec.push(*train_data_2d.get((i, j)).unwrap());
             }
-            train_data.push((vec,i));
-        }   
+            train_data.push((vec, i));
+        }
         //
         // now allocate array's for result
         //
-        println!(" allocating vector for search neighbours answer : {:?}", test_data.len());
+        println!(
+            " allocating vector for search neighbours answer : {:?}",
+            test_data.len()
+        );
         let searched_neighbours = Vec::<Vec<i32>>::with_capacity(test_data.len());
         let searched_distances = Vec::<Vec<f32>>::with_capacity(test_data.len());
         // searched_distances
-         Ok(AnnBenchmarkData{fname:fname.clone(), test_distances, test_neighbours, test_data, train_data, searched_neighbours, searched_distances})     
+        Ok(AnnBenchmarkData {
+            fname: fname.clone(),
+            test_distances,
+            test_neighbours,
+            test_data,
+            train_data,
+            searched_neighbours,
+            searched_distances,
+        })
     } // end new
 
     /// do l2 normalisation of test and train vector to use DistDot metrinc instead DistCosine to spare cpu
@@ -188,30 +207,23 @@ impl AnnBenchmarkData {
             hnsw_rs::dist::l2_normalize(&mut self.train_data[i].0);
         }
     } // end of do_l2_normalization
-
-
-}  // end of impl block
-
-
+} // end of impl block
 
 #[cfg(test)]
 
-
 mod tests {
 
-use super::*;
+    use super::*;
 
+    #[test]
 
-#[test]
-
-fn test_load_hdf5() {
-    env_logger::Builder::from_default_env().init();
-    //
-    let fname = String::from("/home.2/Data/ANN/glove-25-angular.hdf5");
-    println!("\n\n test_load_hdf5 {:?}", fname);
-    // now recall that data are stored in row order.
-    let _anndata = AnnBenchmarkData::new(fname).unwrap();
-    //
-} // end of test_load_hdf5
-
-}  // end of module test
+    fn test_load_hdf5() {
+        env_logger::Builder::from_default_env().init();
+        //
+        let fname = String::from("/home.2/Data/ANN/glove-25-angular.hdf5");
+        println!("\n\n test_load_hdf5 {:?}", fname);
+        // now recall that data are stored in row order.
+        let _anndata = AnnBenchmarkData::new(fname).unwrap();
+        //
+    } // end of test_load_hdf5
+} // end of module test
