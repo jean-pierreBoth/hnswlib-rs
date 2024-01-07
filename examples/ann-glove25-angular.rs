@@ -53,9 +53,9 @@ use cpu_time::ProcessTime;
 
 use hnsw_rs::prelude::*;
 
-mod annhdf5;
+mod utils;
 
-use annhdf5::*;
+use utils::*;
 
 
 pub fn main() {
@@ -115,7 +115,7 @@ pub fn main() {
 }
 
 
-pub fn search<Dist>(hnsw: &mut Hnsw<f32, Dist>, knbn : usize, ef_search: usize, anndata : & AnnBenchmarkData) 
+pub fn search<Dist>(hnsw: &mut Hnsw<f32, Dist>, knbn : usize, ef_search: usize, anndata : & annhdf5::AnnBenchmarkData) 
      where Dist : Distance<f32> + Send + Sync {
 
     println!("\n\n ef_search : {:?} knbn : {:?} ",  ef_search, knbn);

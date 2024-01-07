@@ -16,12 +16,12 @@ use cpu_time::ProcessTime;
 //     24           400         24           1              0          0        0.977        22197        1.001
 
 // 24 core Core(TM) i9-13900HX simdeez
-//     24           400         24           1              0          0        0.977        59884        1.001
+//     24           400         24           1              0          0        0.977        62000        1.001
 
 use hnsw_rs::prelude::*;
 
-mod annhdf5;
-use annhdf5::*;
+mod utils;
+use utils::*;
 
 
 pub fn main() {
@@ -30,7 +30,7 @@ pub fn main() {
     let fname = String::from("/home/jpboth/Data/ANN/fashion-mnist-784-euclidean.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
-    let anndata = AnnBenchmarkData::new(fname).unwrap();
+    let anndata = annhdf5::AnnBenchmarkData::new(fname).unwrap();
     let knbn_max = anndata.test_distances.dim().1;
     let nb_elem = anndata.train_data.len();
     log::info!(" train size : {}, test size : {}", nb_elem, anndata.test_data.len());

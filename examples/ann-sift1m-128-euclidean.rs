@@ -26,8 +26,8 @@ use env_logger::Builder;
 
 use hnsw_rs::prelude::*;
 
-mod annhdf5;
-use annhdf5::*;
+mod utils;
+use utils::*;
 
 
 pub fn main() {
@@ -39,7 +39,7 @@ pub fn main() {
     let fname = String::from("/home/jpboth/Data/ANN/sift1m-128-euclidean.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
-    let anndata = AnnBenchmarkData::new(fname).unwrap();
+    let anndata = annhdf5::AnnBenchmarkData::new(fname).unwrap();
     // run bench
     let knbn_max = anndata.test_distances.dim().1;
     let nb_elem = anndata.train_data.len();
@@ -92,7 +92,7 @@ pub fn main() {
 
 
 
-pub fn search<Dist>(hnsw: &mut Hnsw<f32, Dist>, knbn : usize, ef_search: usize, anndata : & AnnBenchmarkData) 
+pub fn search<Dist>(hnsw: &mut Hnsw<f32, Dist>, knbn : usize, ef_search: usize, anndata : & annhdf5::AnnBenchmarkData) 
      where Dist : Distance<f32> + Send + Sync {
 
     println!("\n\n ef_search : {:?} knbn : {:?} ",  ef_search, knbn);

@@ -35,16 +35,16 @@ path = "examples/random.rs"
 
 [[example]]
 name = "ann-glove"
-path = "examples/ann-glove/ann-glove25-angular.rs"
+path = "examples/ann-glove25-angular.rs"
 
 
 [[example]]
 name = "ann-mnist"
-path = "examples/ann-mnist/ann-mnist-784-euclidean.rs"
+path = "examples/ann-mnist-784-euclidean.rs"
 
 [[example]]
 name = "ann-sift1m"
-path = "examples/ann-sift1m/ann-sift1m-128-euclidean.rs"
+path = "examples/ann-sift1m-128-euclidean.rs"
 
 [[example]]
 name = "levenshtein"
