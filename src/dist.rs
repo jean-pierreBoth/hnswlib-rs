@@ -92,6 +92,7 @@ macro_rules! implementL1Distance (
 
     impl Distance<$ty> for DistL1  {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
+            assert_eq!(va.len(), vb.len());
         // RUSTFLAGS = "-C opt-level=3 -C target-cpu=native"
             va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32).abs()).sum()
         } // end of compute
@@ -109,6 +110,8 @@ implementL1Distance!(u8);
 
 #[cfg(feature = "stdsimd")]
 fn distance_l1_f32_simd(va:&[f32], vb: &[f32]) -> f32 {
+    //
+    assert_eq!(va.len(), vb.len());
     //
     let nb_lanes = 16;
     let nb_simd = va.len()/ nb_lanes;
@@ -205,6 +208,7 @@ macro_rules! implementL2Distance (
 
     impl Distance<$ty> for DistL2  {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
+            assert_eq!(va.len(), vb.len());
             let norm : f32 = va.iter().zip(vb.iter()).map(|t| (*t.0 as f32- *t.1 as f32) * (*t.0 as f32- *t.1 as f32)).sum();
             norm.sqrt()
         } // end of compute
@@ -225,6 +229,8 @@ implementL2Distance!(u8);
 
 #[cfg(feature = "simdeez_f")]
 unsafe fn distance_l2_f32<S: Simd> (va:&[f32], vb: &[f32]) -> f32 {
+    //
+    assert_eq!(va.len(), vb.len());
     //
     let nb_simd = va.len() / S::VF32_WIDTH;
     let simd_length = nb_simd * S::VF32_WIDTH;
@@ -284,6 +290,8 @@ macro_rules! implementCosDistance(
     ($ty:ty) => (
      impl Distance<$ty> for DistCosine  {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
+            assert_eq!(va.len(), vb.len());
+            //
             let dist:f32;
             let zero:f64 = 0.;
             // to // by rayon
@@ -337,12 +345,14 @@ macro_rules! implementDotDistance(
     ($ty:ty) => (
      impl Distance<$ty> for DistDot  {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
-        let zero:f32 = 0f32;
-        // to // by rayon
-        let dot = va.iter().zip(vb.iter()).map(|t| (*t.0 * *t.1) as f32).fold(0., |acc , t| (acc + t));
-        //
-        assert(dot <= 1.);
-        return  1. - dot;
+            assert_eq!(va.len(), vb.len());
+            //
+            let zero:f32 = 0f32;
+            // to // by rayon
+            let dot = va.iter().zip(vb.iter()).map(|t| (*t.0 * *t.1) as f32).fold(0., |acc , t| (acc + t));
+            //
+            assert(dot <= 1.);
+            return  1. - dot;
         } // end of function
       } // end of impl block
     ) // end of matching
@@ -351,6 +361,8 @@ macro_rules! implementDotDistance(
 
 #[cfg(feature = "simdeez_f")]
 unsafe fn distance_dot_f32<S: Simd> (va:&[f32], vb: &[f32]) -> f32 {
+    //
+    assert_eq!(va.len(), vb.len());
     //
     let mut i = 0;
     let mut dot_simd = S::setzero_ps();
@@ -440,6 +452,7 @@ macro_rules! implementHellingerDistance (
 
     impl Distance<$ty> for DistHellinger {
         fn eval(&self, va:&[$ty], vb: &[$ty]) -> f32 {
+            assert_eq!(va.len(), vb.len());
         // RUSTFLAGS = "-C opt-level=3 -C target-cpu=native"
         // to // by rayon
             let mut dist = va.iter().zip(vb.iter()).map(|t| ((*t.0).sqrt() * (*t.1).sqrt()) as f32).fold(0., |acc , t| (acc + t*t));
@@ -455,6 +468,7 @@ implementHellingerDistance!(f64);
 
 #[cfg(feature = "simdeez_f")]
 unsafe fn distance_hellinger_f32<S: Simd> (va:&[f32], vb: &[f32]) -> f32 {
+    assert_eq!(va.len(), vb.len());
     let mut dist_simd = S::setzero_ps();
     //
     let mut i = 0;
