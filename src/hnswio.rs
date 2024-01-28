@@ -20,7 +20,7 @@
 //
 
 use serde::{Serialize, de::DeserializeOwned};
-use std::cell::RefCell;
+use std::sync::atomic::{AtomicUsize,Ordering};
 //
 use std::time::SystemTime;
 
@@ -284,8 +284,8 @@ pub struct HnswIo {
     options : ReloadOptions,
     ///
     datamap : Option<DataMap>,
-    ///
-    nb_point_loaded : RefCell<usize>,
+    /// for Hnswio to be async
+    nb_point_loaded : Arc<AtomicUsize>,
     ///
     initialized : bool,
 } // end of struct ReloadOptions
@@ -296,12 +296,12 @@ impl HnswIo {
     /// - basename is used to build $basename.hnsw.data and $basename.hnsw.graph
     ///  default is to use default ReloadOptions.
     pub fn new(directory : PathBuf, basename : String) -> Self {
-        HnswIo{dir : directory, basename, options :ReloadOptions::default(), datamap : None, nb_point_loaded : RefCell::new(0), initialized : true}
+        HnswIo{dir : directory, basename, options :ReloadOptions::default(), datamap : None, nb_point_loaded : Arc::new(AtomicUsize::new(0)), initialized : true}
     }
 
     /// same as preceding, avoids the call to [set_options](Self::set_options())
     pub fn new_with_options(directory : PathBuf, basename : String, options : ReloadOptions) -> Self {
-        HnswIo{dir : directory, basename, options, datamap :None, nb_point_loaded : RefCell::new(0), initialized : true}
+        HnswIo{dir : directory, basename, options, datamap :None, nb_point_loaded : Arc::new(AtomicUsize::new(0)), initialized : true}
     }
 
     /// this method enables effective initialization after default allocation.
@@ -708,7 +708,7 @@ fn load_point<'b,'a, T>(&'a self, graph_in: &mut dyn Read, descr: &Description, 
                 Point::<T>::new_from_mmap(s.unwrap(), origin_id as usize, p_id)
         }
     };
-    *self.nb_point_loaded.borrow_mut() += 1;
+    self.nb_point_loaded.fetch_add(1,Ordering::Relaxed);
     log::trace!("load_point  origin {:?} allocated size {:?}, dim {:?}", origin_id, point.get_v().len(), descr.dimension);
     //
     return Ok((Arc::new(point), neighborhood));

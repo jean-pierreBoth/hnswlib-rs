@@ -2,7 +2,11 @@
   
   when using mmap, the points less frequently used (points in lower layers) are preferentially mmap-ed while upper layers are preferentially 
   explcitly read from file.
+
+  Hnswio is now Sync (request from https://www.patreon.com/jodiethemathgenius)
+
   feature stdsimd runs with nightly on Hamming with u32,u64 and DisL1 with f32
+  
 - The **version 0.2** introduces 
     1. possibility to use mmap on the data file storing  the vectors represented in the hnsw structure. This is mostly usefule for
     large vectors, where data needs more space than the graph part.
