@@ -9,38 +9,42 @@ use rand::prelude::*;
 
 use skiplist::OrderedSkipList;
 
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
-use hnsw_rs::prelude::*;
 use hnsw_rs::dist;
+use hnsw_rs::prelude::*;
 
-
-
-pub fn gen_random_vector_f32(nbrow :usize) -> Vec<f32> {
+pub fn gen_random_vector_f32(nbrow: usize) -> Vec<f32> {
     let mut rng = thread_rng();
-    let unif =  Uniform::<f32>::new(0.,1.);
-    let vec = (0..nbrow).into_iter().map(|_| rng.sample(unif)).collect::<Vec<f32>>();
+    let unif = Uniform::<f32>::new(0., 1.);
+    let vec = (0..nbrow)
+        .into_iter()
+        .map(|_| rng.sample(unif))
+        .collect::<Vec<f32>>();
     vec
 }
 
-
-
 /// return nbcolumn vectors of dimension nbrow
-pub fn gen_random_matrix_f32(nbrow:usize, nbcolumn:usize) -> Vec<Vec<f32>> {
+pub fn gen_random_matrix_f32(nbrow: usize, nbcolumn: usize) -> Vec<Vec<f32>> {
     let mut rng = thread_rng();
-    let unif =  Uniform::<f32>::new(0.,1.);
+    let unif = Uniform::<f32>::new(0., 1.);
     let mut data = Vec::with_capacity(nbcolumn);
     for _ in 0..nbcolumn {
-        let column = (0..nbrow).into_iter().map(|_| rng.sample(unif)).collect::<Vec<f32>>();
+        let column = (0..nbrow)
+            .into_iter()
+            .map(|_| rng.sample(unif))
+            .collect::<Vec<f32>>();
         data.push(column);
     }
     return data;
 }
 
-
-
-fn brute_force_neighbours<T:Serialize+DeserializeOwned+Copy+Send+Sync>(nb_neighbours: usize, refdata: &PointIndexation<T>, distance: PointDistance<T>,  data : &Vec<T>) -> OrderedSkipList<PointIdWithOrder> {
-
+fn brute_force_neighbours<T: Serialize + DeserializeOwned + Copy + Send + Sync>(
+    nb_neighbours: usize,
+    refdata: &PointIndexation<T>,
+    distance: PointDistance<T>,
+    data: &Vec<T>,
+) -> OrderedSkipList<PointIdWithOrder> {
     let mut neighbours = OrderedSkipList::<PointIdWithOrder>::with_capacity(refdata.get_nb_point());
 
     let mut ptiter = refdata.into_iter();
@@ -49,30 +53,24 @@ fn brute_force_neighbours<T:Serialize+DeserializeOwned+Copy+Send+Sync>(nb_neighb
         if let Some(point) = ptiter.next() {
             let dist_p = distance.eval(data, point.get_v());
             let ordered_point = PointIdWithOrder::new(point.get_point_id(), dist_p);
-//            log::debug!(" brute force inserting {:?}", ordered_point);
+            //            log::debug!(" brute force inserting {:?}", ordered_point);
             if neighbours.len() < nb_neighbours {
                 neighbours.insert(ordered_point);
-            }
-            else {
+            } else {
                 neighbours.insert(ordered_point);
                 neighbours.pop_back();
             }
-        }
-        else {
+        } else {
             more = false;
         }
     } // end while
     neighbours
-}  // end of brute_force_2
+} // end of brute_force_2
 
 //================================================================================================
 
-
-
-use std::time::Duration;
 use cpu_time::ProcessTime;
-
-use hnsw_rs::dist::l2_normalize;
+use std::time::Duration;
 
 #[test]
 fn test_serial() {
@@ -92,27 +90,27 @@ fn test_serial() {
     let ef_c = 400;
     let max_nb_connection = 32;
     let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
-    let mut hns = Hnsw::<f32, dist::DistL1>::new(max_nb_connection, nb_elem, nb_layer, ef_c, dist::DistL1{});
+    let mut hns =
+        Hnsw::<f32, dist::DistL1>::new(max_nb_connection, nb_elem, nb_layer, ef_c, dist::DistL1 {});
     hns.set_extend_candidates(true);
     hns.set_keeping_pruned(true);
     let mut start = ProcessTime::now();
     if parallel {
         println!("parallel insertion");
         hns.parallel_insert(&data_with_id);
-    }
-    else {
+    } else {
         println!("serial insertion");
         for i in 0..data.len() {
-            hns.insert((&data[i],i));
-         }
-    }    
+            hns.insert((&data[i], i));
+        }
+    }
     let mut cpu_time: Duration = start.elapsed();
-    println!(" hnsw serial data insertion {:?}", cpu_time); 
+    println!(" hnsw serial data insertion {:?}", cpu_time);
     hns.dump_layer_info();
     println!(" hnsw data nb point inserted {:?}", hns.get_nb_point());
     //
 
-    let nbtest=300;
+    let nbtest = 300;
     let mut recalls = Vec::<usize>::with_capacity(nbtest);
     let mut nb_returned = Vec::<usize>::with_capacity(nb_elem);
     let mut search_times = Vec::<f32>::with_capacity(nbtest);
@@ -120,18 +118,23 @@ fn test_serial() {
         //
         let mut r_vec = Vec::<f32>::with_capacity(dim);
         let mut rng = thread_rng();
-        let unif = Uniform::<f32>::new(0.,1.);
+        let unif = Uniform::<f32>::new(0., 1.);
         for _ in 0..dim {
             r_vec.push(rng.sample(unif));
         }
         start = ProcessTime::now();
-        let brute_neighbours = brute_force_neighbours(knbn, hns.get_point_indexation() , Box::new(dist::DistL1{}) , &r_vec);
+        let brute_neighbours = brute_force_neighbours(
+            knbn,
+            hns.get_point_indexation(),
+            Box::new(dist::DistL1 {}),
+            &r_vec,
+        );
         cpu_time = start.elapsed();
         if nbtest <= 100 {
             println!("\n\n  **************** test {:?}", _itest);
-            println!("\n brute force neighbours :" );
+            println!("\n brute force neighbours :");
             println!("======================");
-            println!(" brute force computing {:?} \n ", cpu_time); 
+            println!(" brute force computing {:?} \n ", cpu_time);
             for i in 0..brute_neighbours.len() {
                 let p = brute_neighbours[i].point_id;
                 println!(" {:?} {:?} ", p, brute_neighbours[i].dist_to_ref);
@@ -144,7 +147,7 @@ fn test_serial() {
         cpu_time = start.elapsed();
         search_times.push(cpu_time.as_micros() as f32);
         if nbtest <= 100 {
-            println!("\n\n hnsw searching  {:?} \n", cpu_time); 
+            println!("\n\n hnsw searching  {:?} \n", cpu_time);
             println!("\n knn neighbours");
             println!("======================");
             for n in &knn_neighbours {
@@ -152,24 +155,35 @@ fn test_serial() {
             }
         }
         // compute recall
-        let knn_neighbours_dist : Vec<f32> = knn_neighbours.iter().map(|p| p.distance).collect();
-        let max_dist = brute_neighbours[knbn-1].dist_to_ref;
-        let recall = knn_neighbours_dist.iter().filter(|d| *d <= &max_dist).count();
+        let knn_neighbours_dist: Vec<f32> = knn_neighbours.iter().map(|p| p.distance).collect();
+        let max_dist = brute_neighbours[knbn - 1].dist_to_ref;
+        let recall = knn_neighbours_dist
+            .iter()
+            .filter(|d| *d <= &max_dist)
+            .count();
         if nbtest <= 100 {
-           println!("recall   {:?}", (recall as f32)/ (knbn as f32));
+            println!("recall   {:?}", (recall as f32) / (knbn as f32));
         }
         recalls.push(recall);
         nb_returned.push(knn_neighbours.len());
-   }  // end on nbtest
-    //
-    // compute recall
-    //
- 
-    let mean_recall = (recalls.iter().sum::<usize>() as f32)/((knbn * recalls.len()) as f32);
-    let mean_search_time = (search_times.iter().sum::<f32>() as f32)/(search_times.len() as f32);
-    println!("\n mean fraction (of knbn) returned by search {:?} ", (nb_returned.iter().sum::<usize>() as f32)/ ((nb_returned.len() * knbn) as f32));
-    println!("\n nb element {:?} nb search : {:?} recall rate  is {:?} search time inverse {:?} ",  nb_elem, nbtest, mean_recall, 1.0e+6_f32/mean_search_time);
+    } // end on nbtest
+      //
+      // compute recall
+      //
 
+    let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
+    let mean_search_time = (search_times.iter().sum::<f32>() as f32) / (search_times.len() as f32);
+    println!(
+        "\n mean fraction (of knbn) returned by search {:?} ",
+        (nb_returned.iter().sum::<usize>() as f32) / ((nb_returned.len() * knbn) as f32)
+    );
+    println!(
+        "\n nb element {:?} nb search : {:?} recall rate  is {:?} search time inverse {:?} ",
+        nb_elem,
+        nbtest,
+        mean_recall,
+        1.0e+6_f32 / mean_search_time
+    );
 } // end test1
 
 #[test]
@@ -189,25 +203,35 @@ fn test_parallel() {
     }
     let data_with_id = data.iter().zip(0..data.len()).collect();
     let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
-    let mut hns = Hnsw::<f32, dist::DistDot>::new(max_nb_connection, nb_elem, nb_layer, ef_c, dist::DistDot{});
+    let mut hns = Hnsw::<f32, dist::DistDot>::new(
+        max_nb_connection,
+        nb_elem,
+        nb_layer,
+        ef_c,
+        dist::DistDot {},
+    );
     // !
- //   hns.set_extend_candidates(true);
+    //   hns.set_extend_candidates(true);
     let mut start = ProcessTime::now();
     let now = std::time::SystemTime::now();
     // parallel insertion
     hns.parallel_insert(&data_with_id);
     let mut cpu_time: Duration = start.elapsed();
-    println!("\n hnsw data parallel insertion cpu time {:?} , system time {:?}", cpu_time, now.elapsed()); 
+    println!(
+        "\n hnsw data parallel insertion cpu time {:?} , system time {:?}",
+        cpu_time,
+        now.elapsed()
+    );
     // one serial more to check
     let mut v = gen_random_vector_f32(dim);
     l2_normalize(&mut v);
-    hns.insert((&v, hns.get_nb_point() +1));
+    hns.insert((&v, hns.get_nb_point() + 1));
     //
     hns.dump_layer_info();
     println!(" hnsw data nb point inserted {:?}", hns.get_nb_point());
     //
     println!("\n hnsw testing requests ...");
-    let nbtest=100;
+    let nbtest = 100;
     let mut recalls = Vec::<usize>::with_capacity(nbtest);
     let mut recalls_id = Vec::<usize>::with_capacity(nbtest);
 
@@ -215,22 +239,30 @@ fn test_parallel() {
     for _itest in 0..nbtest {
         let mut r_vec = Vec::<f32>::with_capacity(dim);
         let mut rng = thread_rng();
-        let unif = Uniform::<f32>::new(0.,1.);
+        let unif = Uniform::<f32>::new(0., 1.);
         for _ in 0..dim {
             r_vec.push(rng.sample(unif));
         }
         l2_normalize(&mut r_vec);
-    
+
         start = ProcessTime::now();
-        let brute_neighbours = brute_force_neighbours(knbn, hns.get_point_indexation() , Box::new(dist::DistDot) , &r_vec);
+        let brute_neighbours = brute_force_neighbours(
+            knbn,
+            hns.get_point_indexation(),
+            Box::new(dist::DistDot),
+            &r_vec,
+        );
         cpu_time = start.elapsed();
         if nbtest <= 100 {
             println!("\n\n test_par nb_elem {:?}", nb_elem);
-            println!("\n brute force neighbours :" );
+            println!("\n brute force neighbours :");
             println!("======================");
-            println!(" brute force computing {:?} \n", cpu_time); 
+            println!(" brute force computing {:?} \n", cpu_time);
             for i in 0..brute_neighbours.len() {
-                println!(" {:?}  {:?} ", brute_neighbours[i].point_id, brute_neighbours[i].dist_to_ref);
+                println!(
+                    " {:?}  {:?} ",
+                    brute_neighbours[i].point_id, brute_neighbours[i].dist_to_ref
+                );
             }
         }
         //
@@ -243,41 +275,49 @@ fn test_parallel() {
         if nbtest <= 100 {
             println!("\n knn neighbours");
             println!("======================");
-            println!(" hnsw searching  {:?} \n", cpu_time); 
+            println!(" hnsw searching  {:?} \n", cpu_time);
             for n in &knn_neighbours {
                 println!("  {:?} \t {:?}  \t {:?}", n.d_id, n.p_id, n.distance);
             }
         }
         // compute recall with balls
-        let knn_neighbours_dist : Vec<f32> = knn_neighbours.iter().map(|p| p.distance).collect();
-        let max_dist = brute_neighbours[knbn-1].dist_to_ref;
-        let recall = knn_neighbours_dist.iter().filter(|d| *d <= &max_dist).count();
-        if nbtest <= 100 {     
-            println!("recall   {:?}", (recall as f32)/ (knbn as f32));
+        let knn_neighbours_dist: Vec<f32> = knn_neighbours.iter().map(|p| p.distance).collect();
+        let max_dist = brute_neighbours[knbn - 1].dist_to_ref;
+        let recall = knn_neighbours_dist
+            .iter()
+            .filter(|d| *d <= &max_dist)
+            .count();
+        if nbtest <= 100 {
+            println!("recall   {:?}", (recall as f32) / (knbn as f32));
         }
         recalls.push(recall);
         // compute recall with id
         let mut recall_id = 0;
-        let mut knn_neighbours_id : Vec<PointId> = knn_neighbours.iter().map(|p| p.p_id).collect();
+        let mut knn_neighbours_id: Vec<PointId> = knn_neighbours.iter().map(|p| p.p_id).collect();
         knn_neighbours_id.sort_unstable();
         let snbn = knbn.min(brute_neighbours.len());
         for j in 0..snbn {
             let to_search = brute_neighbours[j].point_id;
             if knn_neighbours_id.binary_search(&to_search).is_ok() {
-                recall_id +=1;
+                recall_id += 1;
             }
-        } 
+        }
         recalls_id.push(recall_id);
-   }  // end on nbtest
-    //
-    // compute recall
-    //
- 
-    let mean_recall = (recalls.iter().sum::<usize>() as f32)/((knbn * recalls.len()) as f32);
-    let mean_search_time = (search_times.iter().sum::<f32>() as f32)/(search_times.len() as f32);
-    println!("\n nb search {:?} recall rate  is {:?} search time inverse {:?} ",  nbtest, mean_recall, 1.0e+6_f32/mean_search_time);
-    let mean_recall_id = (recalls.iter().sum::<usize>() as f32)/((knbn * recalls.len()) as f32);
+    } // end on nbtest
+      //
+      // compute recall
+      //
+
+    let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
+    let mean_search_time = (search_times.iter().sum::<f32>() as f32) / (search_times.len() as f32);
+    println!(
+        "\n nb search {:?} recall rate  is {:?} search time inverse {:?} ",
+        nbtest,
+        mean_recall,
+        1.0e+6_f32 / mean_search_time
+    );
+    let mean_recall_id = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
     println!("mean recall rate with point ids {:?}", mean_recall_id);
     //
-  //  assert!(1==0);
+    //  assert!(1==0);
 } // end test_par

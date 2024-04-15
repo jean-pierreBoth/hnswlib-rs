@@ -2,8 +2,6 @@
 //! and a structure to enable the user to implement its own distances.
 //! For the heavily used case (f32) we provide simd avx2 implementation.
 
-use cfg_if;
-
 #[cfg(feature = "stdsimd")]
 use packed_simd::*;
 
