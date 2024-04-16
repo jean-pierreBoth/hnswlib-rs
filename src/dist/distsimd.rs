@@ -35,6 +35,89 @@ pub(super) fn distance_l1_f32_simd(va: &[f32], vb: &[f32]) -> f32 {
 } // end of distance_l1_f32_simd
 
 //
+//==== DistL2
+//
+
+pub(super) fn distance_l2_f32_simd(va: &[f32], vb: &[f32]) -> f32 {
+    //
+    assert_eq!(va.len(), vb.len());
+    //
+    let nb_lanes = 16;
+    let nb_simd = va.len() / nb_lanes;
+    let simd_length = nb_simd * nb_lanes;
+    //
+    let dist_simd = va
+        .chunks_exact(nb_lanes)
+        .map(f32x16::from_slice)
+        .zip(vb.chunks_exact(nb_lanes).map(f32x16::from_slice))
+        .map(|(a, b)| (a - b) * (a - b))
+        .sum::<f32x16>();
+    //
+    let mut dist = dist_simd.to_array().iter().sum::<f32>();
+    // residual
+    for i in simd_length..va.len() {
+        dist = dist + (va[i] - vb[i]) * (va[i] - vb[i]);
+    }
+    let dist = dist.sqrt();
+    return dist as f32;
+} // end of distance_l2_f32_simd
+
+//
+//  DistDot
+//
+
+#[allow(unused)]
+pub(super) fn distance_dot_f32_simd_loop(va: &[f32], vb: &[f32]) -> f32 {
+    //
+    assert_eq!(va.len(), vb.len());
+    //
+    let mut i = 0;
+    let nb_lanes = 16;
+    let nb_simd = va.len() / nb_lanes;
+    let simd_length = nb_simd * nb_lanes;
+    let mut dist_simd = f32x16::splat(0.);
+    while i < simd_length {
+        let a = f32x16::from_slice(&va[i..]);
+        let b = f32x16::from_slice(&vb[i..]);
+        let delta = a * b;
+        dist_simd += delta;
+        //
+        i += f32x16::LEN;
+    }
+    // residual
+    let mut dist = dist_simd.to_array().iter().sum::<f32>();
+    for i in simd_length..va.len() {
+        dist = dist + va[i] * vb[i];
+    }
+    assert!(dist <= 1.000002);
+    return (1. - dist).max(0.);
+}
+
+// iter version as fast as loop version
+pub(super) fn distance_dot_f32_simd_iter(va: &[f32], vb: &[f32]) -> f32 {
+    //
+    assert_eq!(va.len(), vb.len());
+    //
+    let nb_lanes = f32x16::LEN;
+    let nb_simd = va.len() / nb_lanes;
+    let simd_length = nb_simd * nb_lanes;
+    let dist_simd = va
+        .chunks_exact(nb_lanes)
+        .map(f32x16::from_slice)
+        .zip(vb.chunks_exact(nb_lanes).map(f32x16::from_slice))
+        .map(|(a, b)| a * b)
+        .sum::<f32x16>();
+    //
+    let mut dist = dist_simd.to_array().iter().sum::<f32>();
+    // residual
+    for i in simd_length..va.len() {
+        dist = dist + va[i] * vb[i];
+    }
+    assert!(dist <= 1.000002);
+    return (1. - dist).max(0.);
+}
+
+//
 //====   DistHamming
 //
 pub(super) fn distance_jaccard_u32_16_simd(va: &[u32], vb: &[u32]) -> f32 {
@@ -52,7 +135,6 @@ pub(super) fn distance_jaccard_u32_16_simd(va: &[u32], vb: &[u32]) -> f32 {
         .map(|(a, b)| a.simd_ne(b).to_int())
         .sum::<i32x16>();
     // recall a test return 0 if false -1 if true!
-    //    let mut dist = -dist_simd.wrapping_sum();
     let mut dist = -dist_simd.to_array().iter().sum::<i32>();
     // residual
     for i in simd_length..va.len() {
@@ -78,7 +160,6 @@ pub(super) fn distance_jaccard_f32_16_simd(va: &[f32], vb: &[f32]) -> f32 {
         .sum::<i32x16>();
     // recall a test return 0 if false -1 if true!
     let mut dist = -dist_simd.to_array().iter().sum::<i32>();
-    //    let mut dist = -dist_simd.wrapping_sum();
     // residual
     for i in simd_length..va.len() {
         dist = dist + if va[i] != vb[i] { 1 } else { 0 };
@@ -103,7 +184,6 @@ pub(super) fn distance_jaccard_u64_8_simd(va: &[u64], vb: &[u64]) -> f32 {
         .sum::<i64x8>();
     // recall a test return 0 if false -1 if true!
     let mut dist = -dist_simd.to_array().iter().sum::<i64>();
-    //    let mut dist = -dist_simd.wrapping_sum();
     // residual
     for i in simd_length..va.len() {
         dist = dist + if va[i] != vb[i] { 1 } else { 0 };

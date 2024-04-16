@@ -61,8 +61,8 @@ cfg-if = { version = "1.0" }
 
 # for //
 parking_lot = "0.12"
-rayon = { version = "1.8" }
-num_cpus = { version = "1.15.0" }
+rayon = { version = "1.10" }
+num_cpus = { version = "1.16" }
 
 cpu-time = { version = "1.0" }
 num-traits = { version = "0.2" }
@@ -89,8 +89,7 @@ anyhow = { version = "1.0" }
 
 # x86_64 simd stuff , enabled by  simdeez_f feature 
 simdeez = { version = "1.0", optional = true }
-# beta 
-packed_simd = { version = "0.3", optional = true }
+
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
@@ -102,7 +101,7 @@ ndarray = { version = "0.15" }
 
 default = []
 
-# simd on x86/x86_64
+# feature for std simd on nightly
 stdsimd = []
+# feature for simd on stable for x86*
 simdeez_f = ["simdeez"]
-# a beta feature experimental

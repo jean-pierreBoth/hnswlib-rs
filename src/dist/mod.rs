@@ -7,4 +7,4 @@ pub use dist::*;
 pub mod distsimd;
 
 // simdeez distance implementation
-//pub mod disteez;
+pub mod disteez;
