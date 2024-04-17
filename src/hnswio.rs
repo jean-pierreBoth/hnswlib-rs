@@ -458,12 +458,13 @@ impl HnswIo {
         // for that we check for short names equality stripping
         log::debug!("distance in description = {:?}", distname);
         let d_type_name = type_name::<D>().to_string();
-        let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
-        for s in v {
+        let d_type_name_split: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
+        for s in &d_type_name_split {
             log::info!(" distname in generic type argument {:?}", s);
         }
+        let distname_split: Vec<&str> = distname.rsplit_terminator("::").collect();
         if (std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>())
-            && (d_type_name != distname)
+            && (d_type_name_split[0] != distname_split[0])
         {
             // for all types except NoData , distance asked in reload declaration and distance in dump must be equal!
             let mut errmsg = String::from("error in distances : dumped distance is : ");
