@@ -422,7 +422,7 @@ impl Distance<f32> for DistJeffreys {
 /// Jensen-Shannon distance.  
 /// It is defined as the **square root** of the  Jensen–Shannon divergence and is a metric.
 /// Vector must be >= 0 and normalized to 1!
-/// The distance computation does not check that.
+/// **The distance computation does not check that**.
 #[derive(Default, Copy, Clone)]
 pub struct DistJensenShannon;
 
@@ -1168,7 +1168,7 @@ mod tests {
     #[test]
     fn test_feature_simd() {
         init_log();
-        log::info!("I have activated packed_simd_2");
+        log::info!("I have activated stdsimd");
     } // end of test_feature_simd
 
     #[test]
