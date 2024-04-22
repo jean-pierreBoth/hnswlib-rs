@@ -50,8 +50,8 @@ Compile with **cargo build --release --features "simdeez_f"** ....
 To compile this crate on a M1 chip just do not activate this feature.
 
 * It is nevertheless possible to experiment with std::simd. Compiling with the feature stdsimd
-  (**cargo build --release --features "stdsimd"**), activates the  portable_simd features on rust nightly. 
-  **Only the Hamming distance with the u32x16 and u64x8 types and DistL1,DistL2 and DistDot on f32 are provided**.
+  (**cargo build --release --features "stdsimd"**), activates the  portable_simd feature on rust nightly. **This requires nightly compiler**. 
+  Only the Hamming distance with the u32x16 and u64x8 types and DistL1,DistL2 and DistDot on f32 are provided.
 
 ### Julia interface
 
