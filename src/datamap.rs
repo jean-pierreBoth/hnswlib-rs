@@ -1,4 +1,5 @@
-//! This module provides a memory mapping of Data vectors filling the Hnsw structure. It is managed by the module [hnswio]
+//! This module provides a memory mapping of Data vectors filling the Hnsw structure.
+//! It is used by the module [hnswio] and also gives access to an iterator over data without loading the graph.
 //!
 //! We mmap the file and provide   
 //!   - a Hashmap from DataId to address  
