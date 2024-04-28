@@ -919,9 +919,11 @@ impl Description {
     }
 } // end of HnswIO impl for Descr
 
-/// This method is a preliminary to do a full reload from a dump.
-/// The method load_hnsw needs to know the typename , distance used, and construction parameters.
-/// So the reload is made in two steps.
+//
+
+/// This method is internally used by Hnswio.  
+/// It is make *pub* as it can be used to retrieve the description of a dump.
+/// It takes as input the graph part of the dump.
 pub fn load_description(io_in: &mut dyn Read) -> anyhow::Result<Description> {
     //
     let mut descr = Description {
