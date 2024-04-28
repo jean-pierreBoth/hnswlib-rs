@@ -70,7 +70,7 @@ num-traits = { version = "0.2" }
 
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
 hashbrown = { version = "0.14" }
-skiplist = { version = "0.5" }
+indexmap = { version = "2.2" }
 
 rand = { version = "0.8" }
 lazy_static = { version = "1.4" }
@@ -95,6 +95,7 @@ simdeez = { version = "1.0", optional = true }
 [dev-dependencies]
 hdf5 = { version = "0.8" }
 ndarray = { version = "0.15" }
+skiplist = { version = "0.5" }
 
 
 [features]

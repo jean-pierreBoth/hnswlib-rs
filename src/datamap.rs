@@ -4,14 +4,12 @@
 //!   - a Hashmap from DataId to address  
 //!   - an interface for retrieving just data vectors loaded in the hnsw structure.
 
-#![allow(unused)]
-
 use std::io::BufReader;
 
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
 
-use hashbrown::{hash_map::Keys, HashMap};
+use indexmap::map::IndexMap;
 use log::log_enabled;
 use mmap_rs::{Mmap, MmapOptions};
 
@@ -24,11 +22,11 @@ use crate::hnswio::MAGICDATAP;
 // possibly to be used in graph to spare memory?
 pub struct DataMap {
     /// File containing Points data
-    datapath: PathBuf,
+    _datapath: PathBuf,
     /// The mmap structure
     mmap: Mmap,
     /// map a dataId to an address where we get a bson encoded vector of type T
-    hmap: HashMap<DataId, usize>,
+    hmap: IndexMap<DataId, usize>,
     /// type name of Data
     t_name: String,
     /// dimension of data vector
@@ -156,7 +154,7 @@ impl DataMap {
         let nb_record = residual / record_size;
         log::debug!("record size : {}, nb_record : {}", record_size, nb_record);
         // allocate hmap with correct capacity
-        let mut hmap = HashMap::<DataId, usize>::with_capacity(nb_record);
+        let mut hmap = IndexMap::<DataId, usize>::with_capacity(nb_record);
         // fill hmap to have address of each data point in file
         let mut u64_slice = [0u8; std::mem::size_of::<u64>()];
         //
@@ -213,7 +211,7 @@ impl DataMap {
         log::debug!("\n end of DataMap::from_hnsw \n");
         //
         let datamap = DataMap {
-            datapath,
+            _datapath: datapath,
             mmap,
             hmap,
             t_name,
@@ -258,7 +256,8 @@ impl DataMap {
         }
     } // end of check_data_type
 
-    /// return the data corresponding to dataid. Access is done via mmap. returns None if address is invalid
+    /// return the data corresponding to dataid. Access is done using mmap.  
+    /// Function returns None if address is invalid
     pub fn get_data<'a, T: Clone + std::fmt::Debug>(&'a self, dataid: &DataId) -> Option<&'a [T]> {
         //
         log::trace!("in DataMap::get_data, dataid : {:?}", dataid);
@@ -285,8 +284,9 @@ impl DataMap {
         Some(slice_t)
     }
 
-    /// returns an iterator
-    pub fn get_dataid_iter(&self) -> Keys<DataId, usize> {
+    /// returns Keys in order they are in the file, thus optimizing file/memory access.  
+    /// Note that in case of parallel insertion this can be different from insertion odrer.
+    pub fn get_dataid_iter(&self) -> indexmap::map::Keys<DataId, usize> {
         return self.hmap.keys();
     }
 } // end of impl DataMap
@@ -379,10 +379,66 @@ mod tests {
         // test iterator from datamap
         let keys = datamap.get_dataid_iter();
         for k in keys {
-            let data = datamap.get_data::<f32>(k);
+            let _data = datamap.get_data::<f32>(k);
         }
         // rm files generated!
-        std::fs::remove_file("mmap_test.hnsw.data");
-        std::fs::remove_file("mmap_test.hnsw.graph");
+        let _ = std::fs::remove_file("mmap_test.hnsw.data");
+        let _ = std::fs::remove_file("mmap_test.hnsw.graph");
     } // end of test_file_mmap
+
+    #[test]
+    fn test_mmap_iter() {
+        log_init_test();
+        // generate a random test
+        let mut rng = rand::thread_rng();
+        let unif = Uniform::<u32>::new(0, 10000);
+        // 1000 vectors of size 10 f32
+        let nbcolumn = 50;
+        let nbrow = 11;
+        let mut xsi;
+        let mut data = Vec::with_capacity(nbcolumn);
+        for j in 0..nbcolumn {
+            data.push(Vec::with_capacity(nbrow));
+            for _ in 0..nbrow {
+                xsi = unif.sample(&mut rng);
+                data[j].push(xsi);
+            }
+            log::debug!("j : {:?}, data : {:?} ", j, &data[j]);
+        }
+        // define hnsw
+        let ef_construct = 25;
+        let nb_connection = 10;
+        let hnsw = Hnsw::<u32, dist::DistL1>::new(
+            nb_connection,
+            nbcolumn,
+            16,
+            ef_construct,
+            dist::DistL1 {},
+        );
+        for i in 0..data.len() {
+            hnsw.insert((&data[i], i));
+        }
+        // some loggin info
+        hnsw.dump_layer_info();
+        // dump in a file.  Must take care of name as tests runs in // !!!
+        let fname = String::from("mmap_order_test");
+        let _res = hnsw.file_dump(&fname);
+        // now we have check that datamap seems  ok, test reload of hnsw with mmap
+        let datamap: DataMap = DataMap::from_hnswdump::<u32>(".", &fname).unwrap();
+        // testing type check
+        assert!(datamap.check_data_type::<u32>());
+        assert!(!datamap.check_data_type::<f32>());
+        log::info!("Datamap iteration order checking");
+        let keys = datamap.get_dataid_iter();
+        let mut ukey = 0usize;
+        for dataid in keys {
+            let v = datamap.get_data::<u32>(dataid).unwrap();
+            assert_eq!(v, &data[*dataid], "dataid = {}, ukey = {}", dataid, ukey);
+            ukey += 1;
+        }
+        // rm files generated!
+        let _ = std::fs::remove_file("mmap_order_test.hnsw.data");
+        let _ = std::fs::remove_file("mmap_order_test.hnsw.graph");
+    }
+    //
 } // end of mod tests
