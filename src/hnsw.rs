@@ -25,8 +25,8 @@ use std::collections::HashSet;
 use log::debug;
 use log::trace;
 
-pub use crate::dist::Distance;
 pub use crate::filter::FilterT;
+pub use anndists::prelude::*;
 
 // TODO
 // Profiling.
@@ -1683,7 +1683,7 @@ where
 mod tests {
 
     use super::*;
-    use crate::dist;
+    use anndists::dist;
 
     #[test]
 

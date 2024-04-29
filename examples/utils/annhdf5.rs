@@ -204,10 +204,10 @@ impl AnnBenchmarkData {
     #[allow(unused)]
     pub fn do_l2_normalization(&mut self) {
         for i in 0..self.test_data.len() {
-            hnsw_rs::dist::l2_normalize(&mut self.test_data[i]);
+            anndists::dist::l2_normalize(&mut self.test_data[i]);
         }
         for i in 0..self.train_data.len() {
-            hnsw_rs::dist::l2_normalize(&mut self.train_data[i].0);
+            anndists::dist::l2_normalize(&mut self.train_data[i].0);
         }
     } // end of do_l2_normalization
 } // end of impl block

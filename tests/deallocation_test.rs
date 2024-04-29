@@ -1,6 +1,6 @@
-use env_logger::{Builder};
+use env_logger::Builder;
 
-use hnsw_rs::dist::DistL1;
+use anndists::dist::DistL1;
 use hnsw_rs::hnsw::Hnsw;
 
 // A test program to see if memory from insertions gets deallocated.
@@ -12,13 +12,7 @@ fn main() {
     //
     let mut counter: usize = 0;
     loop {
-        let hnsw: Hnsw<f32, DistL1> = Hnsw::new(
-            15,
-            100_000,
-            20,
-            500_000,
-            DistL1 {}
-        );
+        let hnsw: Hnsw<f32, DistL1> = Hnsw::new(15, 100_000, 20, 500_000, DistL1 {});
         let s1 = [1.0, 0.0, 0.0, 0.0];
         hnsw.insert_slice((&s1, 0));
         let s2 = [0.0, 1.0, 1.0];

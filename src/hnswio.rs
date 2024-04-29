@@ -1398,10 +1398,9 @@ impl<
 mod tests {
 
     use super::*;
-    use crate::dist;
 
     pub use crate::api::AnnT;
-    pub use crate::dist::*;
+    use anndists::dist;
 
     use rand::distributions::{Distribution, Uniform};
 

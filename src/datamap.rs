@@ -300,8 +300,8 @@ mod tests {
 
     use super::*;
 
-    use crate::dist;
     use crate::hnswio::HnswIo;
+    use anndists::dist;
 
     pub use crate::api::AnnT;
     use crate::prelude::*;
