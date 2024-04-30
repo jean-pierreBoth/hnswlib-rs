@@ -222,8 +222,10 @@ impl DataMap {
         return Ok(datamap);
     } // end of from_datas
 
+    //
+
     /// returns true if type T corresponds to type as retrieved in DataMap.
-    /// This function can be used before calling [Self::get_data()]
+    /// This function can (should!) be used before calling [Self::get_data()]
     pub fn check_data_type<T>(&self) -> bool
     where
         T: 'static + Clone + Sized + Send + Sync + std::fmt::Debug,
@@ -257,8 +259,12 @@ impl DataMap {
         }
     } // end of check_data_type
 
+    //
+
     /// return the data corresponding to dataid. Access is done using mmap.  
     /// Function returns None if address is invalid
+    /// This function requires you know the type T.  
+    /// **As mmap loading calls an unsafe function it is recommended to check the type name with  [Self::check_data_type()]**
     pub fn get_data<'a, T: Clone + std::fmt::Debug>(&'a self, dataid: &DataId) -> Option<&'a [T]> {
         //
         log::trace!("in DataMap::get_data, dataid : {:?}", dataid);
@@ -289,6 +295,11 @@ impl DataMap {
     /// Note that in case of parallel insertion this can be different from insertion odrer.
     pub fn get_dataid_iter(&self) -> indexmap::map::Keys<DataId, usize> {
         return self.hmap.keys();
+    }
+
+    /// returns full data type name
+    pub fn get_data_typename(&self) -> String {
+        return self.t_name.clone();
     }
 } // end of impl DataMap
 
