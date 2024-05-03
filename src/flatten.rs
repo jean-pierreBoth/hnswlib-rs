@@ -139,7 +139,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> From<&Hnsw<'b, T,
 mod tests {
 
     use super::*;
-    use anndists::dist;
+    use anndists::dist::distances::*;
 
     use std::path::PathBuf;
 
@@ -174,13 +174,7 @@ mod tests {
         // define hnsw
         let ef_construct = 25;
         let nb_connection = 10;
-        let hnsw = Hnsw::<f32, dist::DistL1>::new(
-            nb_connection,
-            nbcolumn,
-            16,
-            ef_construct,
-            dist::DistL1 {},
-        );
+        let hnsw = Hnsw::<f32, DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, DistL1 {});
         for i in 0..data.len() {
             hnsw.insert((&data[i], i));
         }
@@ -201,7 +195,7 @@ mod tests {
         // from now on we test with DistL1
         let directory = PathBuf::from(".");
         let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
-        let hnsw_loaded: Hnsw<NoData, dist::NoDist> = reloader.load_hnsw().unwrap();
+        let hnsw_loaded: Hnsw<NoData, NoDist> = reloader.load_hnsw().unwrap();
         let neighborhood_after_dump = FlatNeighborhood::from(&hnsw_loaded);
         let nbg_2_after = neighborhood_after_dump.get_neighbours(2).unwrap();
         println!("voisins du point 2 {:?}", nbg_2_after);
