@@ -11,6 +11,8 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::ptr;
 
+use anndists::dist::*;
+
 use crate::api::*;
 use crate::hnsw::*;
 use crate::hnswio::*;

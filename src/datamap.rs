@@ -14,8 +14,8 @@ use indexmap::map::IndexMap;
 use log::log_enabled;
 use mmap_rs::{Mmap, MmapOptions};
 
+use crate::hnsw::DataId;
 use crate::hnswio;
-use crate::prelude::DataId;
 
 use crate::hnswio::MAGICDATAP;
 /// This structure uses the data part of the dump of a Hnsw structure to retrieve the data.
@@ -32,6 +32,8 @@ pub struct DataMap {
     t_name: String,
     /// dimension of data vector
     dimension: usize,
+    ///
+    distname: String,
 } // end of DataMap
 
 impl DataMap {
@@ -60,6 +62,7 @@ impl DataMap {
             log::error!("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version > 0.1.19 of this crate");
             return Err(msg);
         }
+        let distname = hnsw_description.distname.clone();
         let t_name = hnsw_description.get_typename();
         // check typename coherence
         log::info!("got typename from reload : {:?}", t_name);
@@ -217,6 +220,7 @@ impl DataMap {
             hmap,
             t_name,
             dimension: descr_dimension,
+            distname,
         };
         //
         return Ok(datamap);
@@ -228,7 +232,7 @@ impl DataMap {
     /// This function can (should!) be used before calling [Self::get_data()]
     pub fn check_data_type<T>(&self) -> bool
     where
-        T: 'static + Clone + Sized + Send + Sync + std::fmt::Debug,
+        T: 'static + Sized,
     {
         // we check last part of name of type
         let tname_vec = self.t_name.rsplit_terminator("::").collect::<Vec<&str>>();
@@ -301,6 +305,11 @@ impl DataMap {
     pub fn get_data_typename(&self) -> String {
         return self.t_name.clone();
     }
+
+    /// returns full data type name
+    pub fn get_distname(&self) -> String {
+        return self.distname.clone();
+    }
 } // end of impl DataMap
 
 //=====================================================================================
@@ -312,7 +321,7 @@ mod tests {
     use super::*;
 
     use crate::hnswio::HnswIo;
-    use anndists::dist;
+    use anndists::dist::*;
 
     pub use crate::api::AnnT;
     use crate::prelude::*;
@@ -346,13 +355,7 @@ mod tests {
         // define hnsw
         let ef_construct = 25;
         let nb_connection = 10;
-        let hnsw = Hnsw::<f32, dist::DistL1>::new(
-            nb_connection,
-            nbcolumn,
-            16,
-            ef_construct,
-            dist::DistL1 {},
-        );
+        let hnsw = Hnsw::<f32, DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, DistL1 {});
         for i in 0..data.len() {
             hnsw.insert((&data[i], i));
         }
@@ -420,13 +423,7 @@ mod tests {
         // define hnsw
         let ef_construct = 25;
         let nb_connection = 10;
-        let hnsw = Hnsw::<u32, dist::DistL1>::new(
-            nb_connection,
-            nbcolumn,
-            16,
-            ef_construct,
-            dist::DistL1 {},
-        );
+        let hnsw = Hnsw::<u32, DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, DistL1 {});
         for i in 0..data.len() {
             hnsw.insert((&data[i], i));
         }

@@ -10,6 +10,7 @@ use hashbrown::HashMap;
 use std::cmp::Ordering;
 
 use crate::hnsw;
+use anndists::dist::distances::Distance;
 use hnsw::*;
 
 // an ordering of Neighbour of a Point
@@ -142,9 +143,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    pub use crate::api::AnnT;
+    use crate::api::AnnT;
     use crate::hnswio::*;
-    use anndists::prelude::*;
 
     use rand::distributions::{Distribution, Uniform};
 
@@ -201,7 +201,7 @@ mod tests {
         // from now on we test with DistL1
         let directory = PathBuf::from(".");
         let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
-        let hnsw_loaded: Hnsw<NoData, NoDist> = reloader.load_hnsw().unwrap();
+        let hnsw_loaded: Hnsw<NoData, dist::NoDist> = reloader.load_hnsw().unwrap();
         let neighborhood_after_dump = FlatNeighborhood::from(&hnsw_loaded);
         let nbg_2_after = neighborhood_after_dump.get_neighbours(2).unwrap();
         println!("voisins du point 2 {:?}", nbg_2_after);

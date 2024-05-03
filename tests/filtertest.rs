@@ -1,3 +1,4 @@
+use anndists::dist::*;
 use hnsw_rs::prelude::*;
 use rand::{distributions::Uniform, Rng};
 use std::iter;

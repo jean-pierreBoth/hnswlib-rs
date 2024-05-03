@@ -40,6 +40,8 @@ use rand::Rng;
 use anyhow::*;
 use std::any::type_name;
 
+use anndists::dist::distances::*;
+
 use self::hnsw::*;
 use crate::datamap::*;
 use crate::hnsw;

@@ -26,7 +26,7 @@ use log::debug;
 use log::trace;
 
 pub use crate::filter::FilterT;
-pub use anndists::prelude::*;
+use anndists::dist::distances::Distance;
 
 // TODO
 // Profiling.
