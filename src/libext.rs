@@ -11,7 +11,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::ptr;
 
-use anndists::dist::*;
+use anndists::dist::distances::*;
 
 use crate::api::*;
 use crate::hnsw::*;
@@ -281,37 +281,37 @@ generate_loadhnsw!(
     load_hnswdump_f32_DistL1,
     HnswApif32,
     f32,
-    anndists::dist::DistL1
+    anndists::dist::distances::DistL1
 );
 generate_loadhnsw!(
     load_hnswdump_f32_DistL2,
     HnswApif32,
     f32,
-    anndists::dist::DistL2
+    anndists::dist::distances::DistL2
 );
 generate_loadhnsw!(
     load_hnswdump_f32_DistCosine,
     HnswApif32,
     f32,
-    anndists::dist::DistCosine
+    anndists::dist::distances::DistCosine
 );
 generate_loadhnsw!(
     load_hnswdump_f32_DistDot,
     HnswApif32,
     f32,
-    anndists::dist::DistDot
+    anndists::dist::distances::DistDot
 );
 generate_loadhnsw!(
     load_hnswdump_f32_DistJensenShannon,
     HnswApif32,
     f32,
-    anndists::dist::DistJensenShannon
+    anndists::dist::distances::DistJensenShannon
 );
 generate_loadhnsw!(
     load_hnswdump_f32_DistJeffreys,
     HnswApif32,
     f32,
-    anndists::dist::DistJeffreys
+    anndists::dist::distances::DistJeffreys
 );
 
 // i32
@@ -319,19 +319,19 @@ generate_loadhnsw!(
     load_hnswdump_i32_DistL1,
     HnswApii32,
     i32,
-    anndists::dist::DistL1
+    anndists::dist::distances::DistL1
 );
 generate_loadhnsw!(
     load_hnswdump_i32_DistL2,
     HnswApii32,
     i32,
-    anndists::dist::DistL2
+    anndists::dist::distances::DistL2
 );
 generate_loadhnsw!(
     load_hnswdump_i32_DistHamming,
     HnswApii32,
     i32,
-    anndists::dist::DistHamming
+    anndists::dist::distances::DistHamming
 );
 
 // u32
@@ -339,25 +339,25 @@ generate_loadhnsw!(
     load_hnswdump_u32_DistL1,
     HnswApiu32,
     u32,
-    anndists::dist::DistL1
+    anndists::dist::distances::DistL1
 );
 generate_loadhnsw!(
     load_hnswdump_u32_DistL2,
     HnswApiu32,
     u32,
-    anndists::dist::DistL2
+    anndists::dist::distances::DistL2
 );
 generate_loadhnsw!(
     load_hnswdump_u32_DistHamming,
     HnswApiu32,
     u32,
-    anndists::dist::DistHamming
+    anndists::dist::distances::DistHamming
 );
 generate_loadhnsw!(
     load_hnswdump_u32_DistJaccard,
     HnswApiu32,
     u32,
-    anndists::dist::DistJaccard
+    anndists::dist::distances::DistJaccard
 );
 
 // u16
@@ -365,25 +365,25 @@ generate_loadhnsw!(
     load_hnswdump_u16_DistL1,
     HnswApiu16,
     u16,
-    anndists::dist::DistL1
+    anndists::dist::distances::DistL1
 );
 generate_loadhnsw!(
     load_hnswdump_u16_DistL2,
     HnswApiu16,
     u16,
-    anndists::dist::DistL2
+    anndists::dist::distances::DistL2
 );
 generate_loadhnsw!(
     load_hnswdump_u16_DistHamming,
     HnswApiu16,
     u16,
-    anndists::dist::DistHamming
+    anndists::dist::distances::DistHamming
 );
 generate_loadhnsw!(
     load_hnswdump_u16_DistLevenshtein,
     HnswApiu16,
     u16,
-    anndists::dist::DistLevenshtein
+    anndists::dist::distances::DistLevenshtein
 );
 
 // u8
@@ -391,25 +391,25 @@ generate_loadhnsw!(
     load_hnswdump_u8_DistL1,
     HnswApiu8,
     u8,
-    anndists::dist::DistL1
+    anndists::dist::distances::DistL1
 );
 generate_loadhnsw!(
     load_hnswdump_u8_DistL2,
     HnswApiu8,
     u8,
-    anndists::dist::DistL2
+    anndists::dist::distances::DistL2
 );
 generate_loadhnsw!(
     load_hnswdump_u8_DistHamming,
     HnswApiu8,
     u8,
-    anndists::dist::DistHamming
+    anndists::dist::distances::DistHamming
 );
 generate_loadhnsw!(
     load_hnswdump_u8_DistJaccard,
     HnswApiu8,
     u8,
-    anndists::dist::DistJaccard
+    anndists::dist::distances::DistJaccard
 );
 
 // Reload only graph
