@@ -1,4 +1,4 @@
-// gathers modules to include
+// gathers modules to include and re-exorts all of anndists!
 
 pub use crate::api::*;
 pub use crate::hnsw::*;
@@ -7,3 +7,5 @@ pub use crate::hnsw::*;
 pub use crate::filter::*;
 
 pub use crate::hnswio::*;
+
+pub use anndists::dist::distances::*;
