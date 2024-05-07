@@ -14,6 +14,9 @@ pub mod hnswio;
 pub mod libext;
 pub mod prelude;
 
+// we impose our version of anndists
+pub use anndists;
+
 lazy_static! {
     static ref LOG: u64 = {
         let res = init_log();

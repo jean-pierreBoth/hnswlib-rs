@@ -310,6 +310,11 @@ impl DataMap {
     pub fn get_distname(&self) -> String {
         return self.distname.clone();
     }
+
+    /// return the number of data in mmap
+    pub fn get_nb_data(&self) -> usize {
+        self.hmap.len()
+    }
 } // end of impl DataMap
 
 //=====================================================================================

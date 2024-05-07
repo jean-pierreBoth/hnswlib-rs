@@ -562,7 +562,7 @@ impl HnswIo {
         let distname = description.distname.clone();
         // We must ensure that the distance stored matches the one asked for in loading hnsw
         // for that we check for short names equality stripping
-        log::debug!("distance in description = {:?}", distname);
+        log::info!("distance in description = {:?}", distname);
         let d_type_name = type_name::<D>().to_string();
         let v: Vec<&str> = d_type_name.rsplit_terminator("::").collect();
         for s in v {
@@ -581,7 +581,7 @@ impl HnswIo {
             return Err(anyhow!(errmsg));
         }
         let t_type = description.t_name.clone();
-        log::debug!("T type name in dump = {:?}", t_type);
+        log::info!("T type name in dump = {:?}", t_type);
         //
         //
         let layer_point_indexation = self.load_point_indexation(graph_in, &description, data_in)?;
