@@ -205,7 +205,7 @@ impl DataMap {
             let slice_t = unsafe {
                 std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, dimension as usize)
             };
-            log::debug!(
+            log::trace!(
                 "deserialized v : {:?} address : {:?} ",
                 slice_t,
                 v_serialized.as_ptr() as *const T
