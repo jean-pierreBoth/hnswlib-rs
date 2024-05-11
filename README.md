@@ -36,7 +36,7 @@ The hnsw implementation provides:
 * Filtering: It is possible to add filters so only results which satisfies the filter is in the result set. The filtering is done during the search, so it is not a post filter. There is currently two ways of using the filter, one can add allowed ids in a sorted vector and send as a parameter, or one can define a function which will be called before an id is added to the result set.  
 Examples on both these strategies are in the examples or tests directory. One can also implement the trait Filterable for new types, if one would like the filter to be kept in a bitvector, for example.
 
-* Possibilty to use mmap on dumped data (not on graph part) which is useful for large data vectors and to compute clusters in streaming, see  [coreset](https://github.com/jean-pierreBoth/coreset) 
+* Possibilty to use mmap on dumped data (not on graph part) which is useful for large data vectors. This enables coreset and clusters computation in streaming, see  [coreset](https://github.com/jean-pierreBoth/coreset). 
 
 ## Implementation
 
