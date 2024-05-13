@@ -1658,6 +1658,17 @@ mod tests {
         for n in &search_res {
             log::info!("neighbour {:?}", n);
         }
+        if search_res[0].d_id != nb_in {
+            // with very low probability it could happen that we find a very near point!
+            // then distance should very small
+            log::info!(
+                "neighbour found for point id : {}, distance : {:.2e}, should have been id : {}, dist : {:.2e}",
+                search_res[0].d_id,
+                search_res[0].distance,
+                nb_in,
+                0.
+            );
+        }
         assert_eq!(search_res[0].d_id, nb_in);
         assert_eq!(search_res[0].distance, 0.);
         //

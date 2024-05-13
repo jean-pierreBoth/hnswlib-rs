@@ -36,24 +36,26 @@ The hnsw implementation provides:
 * Filtering: It is possible to add filters so only results which satisfies the filter is in the result set. The filtering is done during the search, so it is not a post filter. There is currently two ways of using the filter, one can add allowed ids in a sorted vector and send as a parameter, or one can define a function which will be called before an id is added to the result set.  
 Examples on both these strategies are in the examples or tests directory. One can also implement the trait Filterable for new types, if one would like the filter to be kept in a bitvector, for example.
 
-* Possibilty to use mmap on dumped data (not on graph part) which is useful for large data vectors. This enables coreset and clusters computation in streaming, see  [coreset](https://github.com/jean-pierreBoth/coreset). 
+* Possibilty to use mmap on dumped data (not on graph part) which is useful for large data vectors. This enables coreset and clusters computation in streaming, see  [coreset](https://github.com/jean-pierreBoth/coreset) and soon on [crates.io](https://crates.io/crates). 
 
 ## Implementation
 
-The graph construction and searches are multithreaded with the **parking_lot** crate (See **parallel_insert_data** and **parallel_search_neighbours** functions and also examples files).  
-Simd Avx2 implementation, currently based on the **simdeez** crate, is provided for most distances in the **f32** heavily used case and for the Hamming distance for **i32**. See *Building*.
+The graph construction and searches are multithreaded with the **parking_lot** crate (See **parallel_insert_data** and **parallel_search_neighbours** functions and also examples files). 
+Distances are provided by the crate [anndists](https://github.com/jean-pierreBoth/anndists), see *Building*.
 
 ## Building
 
 ### Simd
 
-* The simd provided by the simdeez crate is accessible with the feature "simdeez_f" for x86_64 processors.
-Compile with **cargo build --release --features "simdeez_f"** ....
+Two features activate simd in the crate **anndists** :
+
+* The feature "simdeez_f" provide simd for x86_64 processors.
+Compile with **cargo build --release --features "simdeez_f"** or change the default features in Cargo.toml.
 To compile this crate on a M1 chip just do not activate this feature.
 
-* It is nevertheless possible to experiment with std::simd. Compiling with the feature stdsimd
-  (**cargo build --release --features "stdsimd"**), activates the  portable_simd feature on rust nightly. **This requires nightly compiler**. 
-  Only the Hamming distance with the u32x16 and u64x8 types and DistL1,DistL2 and DistDot on f32 are provided.
+* The feature "stdsimd" provides portable simd through std::simd but **requires rust nightly**.  
+Setting this feature in features default (or by cargo command) activates the  portable_simd feature on rust nightly. 
+  Not all couples (Distance, type) are provided yet. (See the crate anndists)
 
 ### Julia interface
 
