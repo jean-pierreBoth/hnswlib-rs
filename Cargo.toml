@@ -87,8 +87,8 @@ env_logger = { version = "0.10" }
 anyhow = { version = "1.0" }
 
 #anndists = { path = "../anndists" }
-#anndist = { version = "0.1.2" }
-anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
+anndists = { version = "0.1.2" }
+# anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
