@@ -89,7 +89,7 @@ anyhow = { version = "1.0" }
 #anndists = { path = "../anndists" }
 #anndist = { version = "0.1.2" }
 anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
-
+mimalloc = { version = "0.1.42" }
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
 hdf5 = { version = "0.8" }
