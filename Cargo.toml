@@ -107,4 +107,4 @@ stdsimd = ["anndists/stdsimd"]
 simdeez_f = ["anndists/simdeez_f"]
 
 # microsoft malloc, performance improvement
-mimalloc = ["mimalloc"]
+use_mimalloc = ["mimalloc"]
