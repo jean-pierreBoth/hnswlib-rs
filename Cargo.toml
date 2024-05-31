@@ -89,7 +89,7 @@ anyhow = { version = "1.0" }
 #anndists = { path = "../anndists" }
 #anndist = { version = "0.1.2" }
 anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
-mimalloc = { version = "0.1.42" }
+mimalloc = { version = "0.1.42", optional = true }
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
 hdf5 = { version = "0.8" }
@@ -101,7 +101,10 @@ skiplist = { version = "0.5" }
 
 default = []
 
+# feature for std simd on nightly
 stdsimd = ["anndists/stdsimd"]
 # feature for simd on stable for x86*
 simdeez_f = ["anndists/simdeez_f"]
-# feature for std simd on nightly
+
+# microsoft malloc, performance improvement
+mimalloc = ["mimalloc"]
