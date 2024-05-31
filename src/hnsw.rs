@@ -27,10 +27,14 @@ use log::trace;
 
 pub use crate::filter::FilterT;
 use anndists::dist::distances::Distance;
+
+#[cfg(feature = "mimalloc")]
 use mimalloc::MiMalloc;
 
+#[cfg(feature = "mimalloc")]
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
 // TODO
 // Profiling.
 
