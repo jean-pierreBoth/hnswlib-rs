@@ -1,7 +1,6 @@
 //! Api for external language.  
 //! This file provides a trait to be used as an opaque pointer for C or Julia calls used in file libext.rs
 
-use std::io::prelude::*;
 use std::path::PathBuf;
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -81,15 +80,8 @@ where
         //
         let res = self.dump(DumpMode::Full, &mut dumpinit);
         //
-        let outgraph = &mut dumpinit.graph_out;
-        let outdata = &mut dumpinit.data_out;
-        outgraph.flush().unwrap();
-        outdata.flush().unwrap();
-        //
-        drop(dumpinit.graph_out);
-        drop(dumpinit.data_out);
-        //
-        log::info!("\n end of dump");
+        dumpinit.flush()?;
+        log::info!("end of dump");
         if res.is_ok() {
             return Ok(dumpname);
         } else {

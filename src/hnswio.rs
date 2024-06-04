@@ -238,6 +238,12 @@ impl DumpInit {
     pub fn get_basename(&self) -> &String {
         &self.basename
     }
+
+    pub fn flush(&mut self) -> Result<()> {
+        self.data_out.flush()?;
+        self.graph_out.flush()?;
+        Ok(())
+    }
 } // end impl for DumpInit
 
 //====================================================
