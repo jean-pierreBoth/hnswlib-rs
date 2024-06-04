@@ -186,14 +186,14 @@ mod tests {
         println!("voisins du point 2 {:?}", nbg_2_before);
         // dump in a file. Must take care of name as tests runs in // !!!
         let fname = String::from("dumpreloadtestflat");
-        let _res = hnsw.file_dump(&fname);
+        let directory = PathBuf::from(".");
+        let _res = hnsw.file_dump(&directory, &fname);
         // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
         //
         // reload
         log::debug!("\n\n  hnsw reload");
         // we will need a procedural macro to get from distance name to its instanciation.
         // from now on we test with DistL1
-        let directory = PathBuf::from(".");
         let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
         let hnsw_loaded: Hnsw<NoData, NoDist> = reloader.load_hnsw().unwrap();
         let neighborhood_after_dump = FlatNeighborhood::from(&hnsw_loaded);

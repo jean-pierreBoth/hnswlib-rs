@@ -234,7 +234,7 @@ macro_rules! generate_file_dump(
             log::info!("receiving request for file dump");
             let slice = unsafe { std::slice::from_raw_parts(filename, namelen) } ;
             let fstring  = String::from_utf8_lossy(slice).into_owned();
-            let res =  unsafe { (*hnsw_api).opaque.file_dump(&fstring) } ;
+            let res =  unsafe { (*hnsw_api).opaque.file_dump(&PathBuf::from("."), &fstring) } ;
             if res.is_ok() {
                 return 1;
             }

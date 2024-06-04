@@ -368,7 +368,7 @@ mod tests {
         hnsw.dump_layer_info();
         // dump in a file.  Must take care of name as tests runs in // !!!
         let fname = String::from("mmap_test");
-        let _res = hnsw.file_dump(&fname);
+        let _res = hnsw.file_dump(&PathBuf::from("."), &fname);
 
         let check_reload = false;
         if check_reload {
@@ -435,10 +435,11 @@ mod tests {
         // some loggin info
         hnsw.dump_layer_info();
         // dump in a file.  Must take care of name as tests runs in // !!!
-        let fname = String::from("mmap_order_test");
-        let _res = hnsw.file_dump(&fname);
+        let fname = "mmap_order_test";
+        let directory = PathBuf::from(".");
+        let _res = hnsw.file_dump(&directory, &fname);
         // now we have check that datamap seems  ok, test reload of hnsw with mmap
-        let datamap: DataMap = DataMap::from_hnswdump::<u32>(".", &fname).unwrap();
+        let datamap: DataMap = DataMap::from_hnswdump::<u32>(".", &fname.to_string()).unwrap();
         // testing type check
         assert!(datamap.check_data_type::<u32>());
         assert!(!datamap.check_data_type::<f32>());

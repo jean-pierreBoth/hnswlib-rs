@@ -148,15 +148,14 @@ pub struct DumpInit {
 
 impl DumpInit {
     // This structure will check existence of dumps of same name and generate a unique filename if necessary according to overwrite flag
-    pub fn new(dir: PathBuf, basename_default: String, overwrite: bool) -> Self {
+    pub fn new(dir: &PathBuf, basename_default: &str, overwrite: bool) -> Self {
         // if we cannot overwrite data files (in case of mmap in particular)
         // we will ensure we have a unique basename
-
         let basename = match overwrite {
-            true => basename_default,
+            true => basename_default.to_string(),
             false => {
                 // we check
-                let mut dataname = basename_default.clone();
+                let mut dataname = basename_default.to_string();
                 dataname.push_str(".hnsw.data");
                 let mut datapath = dir.clone();
                 datapath.push(dataname);
@@ -167,7 +166,7 @@ impl DumpInit {
                         let mut dataname: String;
                         let id: usize = rand::thread_rng().gen_range(0..10000);
                         let strid: String = id.to_string();
-                        unique_basename = basename_default.clone();
+                        unique_basename = basename_default.to_string();
                         unique_basename.push('-');
                         unique_basename.push_str(&strid);
                         dataname = unique_basename.clone();
@@ -181,7 +180,7 @@ impl DumpInit {
                     };
                     unique_basename
                 } else {
-                    basename_default
+                    basename_default.to_string()
                 }
             }
         };
@@ -1457,13 +1456,13 @@ mod tests {
         hnsw.dump_layer_info();
         // dump in a file.  Must take care of name as tests runs in // !!!
         let fname = String::from("dumpreloadtest1");
-        let _res = hnsw.file_dump(&fname);
+        let directory = PathBuf::from(".");
+        let _res = hnsw.file_dump(&directory, &fname);
         //
         // reload
         log::debug!("\n\n test_dump_reload_1 hnsw reload");
         // we will need a procedural macro to get from distance name to its instanciation.
         // from now on we test with DistL1
-        let directory = PathBuf::from(".");
         let mut reloader = HnswIo::new(directory, String::from("dumpreloadtest1"));
         let hnsw_loaded: Hnsw<f32, DistL1> = reloader.load_hnsw::<f32, DistL1>().unwrap();
         // test equality
@@ -1510,12 +1509,12 @@ mod tests {
         hnsw.dump_layer_info();
         // dump in a file.  Must take care of name as tests runs in // !!!
         let fname = String::from("dumpreloadtest_myfn");
-        let _res = hnsw.file_dump(&fname);
+        let directory = PathBuf::from(".");
+        let _res = hnsw.file_dump(&directory, &fname);
         // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
         //
         // reload
         log::debug!("\n\n  hnsw reload");
-        let directory = PathBuf::from(".");
         let reloader = HnswIo::new(directory, String::from("dumpreloadtest_myfn"));
         let mydist = dist::DistPtr::<f32, f32>::new(my_fn);
         let _hnsw_loaded: Hnsw<f32, DistPtr<f32, f32>> =
@@ -1561,12 +1560,12 @@ mod tests {
         hnsw.dump_layer_info();
         // dump in a file. Must take care of name as tests runs in // !!!
         let fname = String::from("dumpreloadtestgraph");
-        let _res = hnsw.file_dump(&fname);
+        let directory = PathBuf::from(".");
+        let _res = hnsw.file_dump(&directory, &fname);
         // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
         //
         // reload
         log::debug!("\n\n  hnsw reload");
-        let directory = PathBuf::from(".");
         let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestgraph"));
         let hnsw_loaded: Hnsw<NoData, NoDist> = reloader.load_hnsw().unwrap();
         // test equality
@@ -1616,12 +1615,12 @@ mod tests {
         hnsw.dump_layer_info();
         // dump in a file.  Must take care of name as tests runs in // !!!
         let fname = String::from("mmapreloadtest");
-        let dumpname = hnsw.file_dump(&fname).unwrap();
+        let directory = PathBuf::from(".");
+        let dumpname = hnsw.file_dump(&directory, &fname).unwrap();
         log::debug!("dump succeeded in file basename : {}", dumpname);
         //
         // reload reload_with_mmap
         log::debug!("\n\n  hnsw reload");
-        let directory = PathBuf::from(".");
         let mut reloader = HnswIo::new(directory.clone(), dumpname);
         // use mmap for points after half number of points
         let options = ReloadOptions::default().set_mmap_threshold(nbcolumn / 2);
@@ -1680,9 +1679,9 @@ mod tests {
         //
         // TODO: redump  and care about mmapped file, so we do not overwrite
         //
-        let dump_init = DumpInit::new(directory, fname, false);
+        let dump_init = DumpInit::new(&directory, &fname, false);
         log::info!("will use basename : {}", dump_init.get_basename());
-        let res = hnsw.file_dump(dump_init.get_basename());
+        let res = hnsw.file_dump(&directory, dump_init.get_basename());
         if res.is_err() {
             log::error!("hnsw.file_dump failed");
             std::panic!("hnsw.file_dump failed");
