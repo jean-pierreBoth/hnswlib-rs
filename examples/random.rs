@@ -23,7 +23,7 @@ fn main() {
         data.push(column);
     }
     // give an id to each data
-    let data_with_id = data.iter().zip(0..data.len()).collect();
+    let data_with_id = data.iter().zip(0..data.len()).collect::<Vec<_>>();
 
     let ef_c = 200;
     let max_nb_connection = 15;
@@ -50,7 +50,7 @@ fn main() {
     start = ProcessTime::now();
     begin_t = SystemTime::now();
     for _i in 0..data_with_id.len() {
-        hns.insert(data_with_id[_i]);
+        hns.insert((data_with_id[_i].0.as_slice(), data_with_id[_i].1))
     }
     cpu_time = start.elapsed();
     println!("\n\n serial hnsw data insertion {:?}", cpu_time);

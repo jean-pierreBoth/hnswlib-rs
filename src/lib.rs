@@ -18,15 +18,12 @@ pub mod prelude;
 pub use anndists;
 
 lazy_static! {
-    static ref LOG: u64 = {
-        let res = init_log();
-        res
-    };
+    static ref LOG: u64 = init_log();
 }
 
 // install a logger facility
 fn init_log() -> u64 {
     Builder::from_default_env().init();
     println!("\n ************** initializing logger *****************\n");
-    return 1;
+    1
 }
