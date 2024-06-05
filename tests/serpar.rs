@@ -87,7 +87,7 @@ mod tests {
         println!("\n\n test_serial nb_elem {:?}", nb_elem);
         //
         let data = gen_random_matrix_f32(dim, nb_elem);
-        let data_with_id = data.iter().zip(0..data.len()).collect();
+        let data_with_id = data.iter().zip(0..data.len()).collect::<Vec<_>>();
 
         let ef_c = 400;
         let max_nb_connection = 32;
@@ -209,7 +209,7 @@ mod tests {
         for i in 0..data.len() {
             l2_normalize(&mut data[i]);
         }
-        let data_with_id = data.iter().zip(0..data.len()).collect();
+        let data_with_id = data.iter().zip(0..data.len()).collect::<Vec<_>>();
         let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
         let mut hns = Hnsw::<f32, dist::DistDot>::new(
             max_nb_connection,

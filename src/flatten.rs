@@ -17,13 +17,14 @@ use hnsw::*;
 
 impl PartialEq for Neighbour {
     fn eq(&self, other: &Neighbour) -> bool {
-        return self.distance == other.distance;
+        self.distance == other.distance
     } // end eq
 }
 
 impl Eq for Neighbour {}
 
 // order points by distance to self.
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Neighbour {
     fn partial_cmp(&self, other: &Neighbour) -> Option<Ordering> {
         self.distance.partial_cmp(&other.distance)
@@ -57,15 +58,15 @@ pub struct FlatPoint {
 impl FlatPoint {
     /// returns the neighbours orderded by distance.
     pub fn get_neighbours(&self) -> &Vec<Neighbour> {
-        return &self.neighbours;
+        &self.neighbours
     }
     /// returns the origin id of the point
     pub fn get_id(&self) -> DataId {
-        return self.origin_id;
+        self.origin_id
     }
-    ///
+    //
     pub fn get_p_id(&self) -> PointId {
-        return self.p_id;
+        self.p_id
     }
 } // end impl block for FlatPoint
 
@@ -79,12 +80,11 @@ fn flatten_point<T: Clone + Send + Sync>(point: &Point<T>) -> FlatPoint {
         }
     }
     flat_neighbours.sort_unstable();
-    let fpoint = FlatPoint {
+    FlatPoint {
         origin_id: point.get_origin_id(),
         p_id: point.get_point_id(),
         neighbours: flat_neighbours,
-    };
-    fpoint
+    }
 } // end of flatten_point
 
 /// A structure providing neighbourhood information of a point stored in the Hnsw structure given its DataId.  
@@ -98,11 +98,11 @@ impl FlatNeighborhood {
     /// get neighbour of a point given its id.  
     /// The neighbours are sorted in increasing distance from data_id.
     pub fn get_neighbours(&self, p_id: DataId) -> Option<Vec<Neighbour>> {
-        let res = match self.hash_t.get(&p_id) {
-            Some(point) => Some(point.get_neighbours().clone()),
-            _ => None,
-        };
-        return res;
+        let res = self
+            .hash_t
+            .get(&p_id)
+            .map(|point| point.get_neighbours().clone());
+        res
     }
 } // end impl block for FlatNeighborhood
 
@@ -113,24 +113,16 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> From<&Hnsw<'b, T,
     /// Useful after reloading from a dump with T=NoData and D = NoDist as points are then reloaded with neighbourhood information only.
     fn from(hnsw: &Hnsw<T, D>) -> Self {
         let mut hash_t = HashMap::new();
-        let mut ptiter = hnsw.get_point_indexation().into_iter();
+        let pt_iter = hnsw.get_point_indexation().into_iter();
         //
-        loop {
-            if let Some(point) = ptiter.next() {
-                //    println!("point : {:?}", _point.p_id);
-                let res_insert = hash_t.insert(point.get_origin_id(), flatten_point(&point));
-                match res_insert {
-                    Some(old_point) => {
-                        println!("2 points with same origin id {:?}", old_point.origin_id);
-                        log::error!("2 points with same origin id {:?}", old_point.origin_id);
-                    }
-                    _ => (),
-                } // end match
-            } else {
-                break;
+        for point in pt_iter {
+            //    println!("point : {:?}", _point.p_id);
+            let res_insert = hash_t.insert(point.get_origin_id(), flatten_point(&point));
+            if let Some(old_point) = res_insert {
+                log::error!("2 points with same origin id {:?}", old_point.origin_id);
             }
-        } // end while
-        return FlatNeighborhood { hash_t };
+        }
+        FlatNeighborhood { hash_t }
     }
 } // e,d of Fom implementation
 

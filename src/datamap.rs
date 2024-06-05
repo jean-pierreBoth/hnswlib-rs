@@ -8,7 +8,7 @@
 use std::io::BufReader;
 
 use std::fs::{File, OpenOptions};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use indexmap::map::IndexMap;
 use log::log_enabled;
@@ -32,7 +32,7 @@ pub struct DataMap {
     t_name: String,
     /// dimension of data vector
     dimension: usize,
-    ///
+    //
     distname: String,
 } // end of DataMap
 
@@ -41,11 +41,14 @@ impl DataMap {
     /// The fname argument corresponds to the basename of the dump.  
     /// To reload from file fname.hnsw.data just pass fname as argument.
     /// The dir argument is the directory where the fname.hnsw.data and fname.hnsw.graph reside.
-    pub fn from_hnswdump<T: std::fmt::Debug>(dir: &str, fname: &String) -> Result<DataMap, String> {
+    pub fn from_hnswdump<T: std::fmt::Debug>(
+        dir: &Path,
+        file_name: &str,
+    ) -> Result<DataMap, String> {
         // reload description to have data type, and check for dump version
-        let mut graphpath = PathBuf::new();
+        let mut graphpath = PathBuf::from(dir);
         graphpath.push(dir);
-        let mut filename = fname.clone();
+        let mut filename = file_name.to_string();
         filename.push_str(".hnsw.graph");
         graphpath.push(filename);
         let graphfileres = OpenOptions::new().read(true).open(&graphpath);
@@ -82,7 +85,7 @@ impl DataMap {
         //
         let mut datapath = PathBuf::new();
         datapath.push(dir);
-        let mut filename = fname.clone();
+        let mut filename = file_name.to_string();
         filename.push_str(".hnsw.data");
         datapath.push(filename);
         //
@@ -132,8 +135,8 @@ impl DataMap {
             &mapped_slice[current_mmap_addr..current_mmap_addr + std::mem::size_of::<usize>()],
         );
         current_mmap_addr += std::mem::size_of::<usize>();
-        let dimension = usize::from_ne_bytes(usize_slice) as usize;
-        if dimension as usize != descr_dimension {
+        let dimension = usize::from_ne_bytes(usize_slice);
+        if dimension != descr_dimension {
             log::error!("description and data do not agree on dimension, data got : {:?}, description got : {:?}",dimension, descr_dimension);
             return Err(String::from(
                 "description and data do not agree on dimension",
@@ -195,16 +198,13 @@ impl DataMap {
             if log_enabled!(log::Level::Debug) && i == 0 {
                 log::debug!("serialized bytes len to reload {:?}", serialized_len);
             }
-            let mut v_serialized = Vec::<u8>::with_capacity(serialized_len);
-            // TODO avoid initialization
-            v_serialized.resize(serialized_len as usize, 0);
+            let mut v_serialized = vec![0; serialized_len];
             v_serialized.copy_from_slice(
                 &mapped_slice[current_mmap_addr..current_mmap_addr + serialized_len],
             );
             current_mmap_addr += serialized_len;
-            let slice_t = unsafe {
-                std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, dimension as usize)
-            };
+            let slice_t =
+                unsafe { std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, dimension) };
             log::trace!(
                 "deserialized v : {:?} address : {:?} ",
                 slice_t,
@@ -223,7 +223,7 @@ impl DataMap {
             distname,
         };
         //
-        return Ok(datamap);
+        Ok(datamap)
     } // end of from_datas
 
     //
@@ -252,14 +252,14 @@ impl DataMap {
         let datat_name_arg_last = datat_name_vec.last().unwrap();
         //
         if datat_name_arg_last == tname_last {
-            return true;
+            true
         } else {
             log::info!(
                 "data type in DataMap : {},  type arg = {}",
                 tname_last,
                 datat_name_arg_last
             );
-            return false;
+            false
         }
     } // end of check_data_type
 
@@ -272,12 +272,9 @@ impl DataMap {
     pub fn get_data<'a, T: Clone + std::fmt::Debug>(&'a self, dataid: &DataId) -> Option<&'a [T]> {
         //
         log::trace!("in DataMap::get_data, dataid : {:?}", dataid);
-        let address = self.hmap.get(dataid);
-        if address.is_none() {
-            return None;
-        }
-        log::debug!(" adress for id : {}, address : {:?}", dataid, address);
-        let mut current_mmap_addr = *address.unwrap();
+        let address = self.hmap.get(dataid)?;
+        log::debug!(" address for id : {}, address : {:?}", dataid, address);
+        let mut current_mmap_addr = *address;
         let mapped_slice = self.mmap.as_slice();
         let mut u64_slice = [0u8; std::mem::size_of::<u64>()];
         u64_slice.copy_from_slice(
@@ -289,7 +286,7 @@ impl DataMap {
         let slice_t = unsafe {
             std::slice::from_raw_parts(
                 mapped_slice[current_mmap_addr..].as_ptr() as *const T,
-                self.dimension as usize,
+                self.dimension,
             )
         };
         Some(slice_t)
@@ -303,12 +300,12 @@ impl DataMap {
 
     /// returns full data type name
     pub fn get_data_typename(&self) -> String {
-        return self.t_name.clone();
+        self.t_name.clone()
     }
 
     /// returns full data type name
     pub fn get_distname(&self) -> String {
-        return self.distname.clone();
+        self.distname.clone()
     }
 
     /// return the number of data in mmap
@@ -382,7 +379,7 @@ mod tests {
         }
         //
         // now we have check that datamap seems  ok, test reload of hnsw with mmap
-        let datamap: DataMap = DataMap::from_hnswdump::<f32>(".", &fname).unwrap();
+        let datamap: DataMap = DataMap::from_hnswdump::<f32>(&Path::new("."), &fname).unwrap();
         let nb_test = 30;
         log::info!("checking random access of id , nb test : {}", nb_test);
         for _ in 0..nb_test {
@@ -439,7 +436,8 @@ mod tests {
         let directory = PathBuf::from(".");
         let _res = hnsw.file_dump(&directory, &fname);
         // now we have check that datamap seems  ok, test reload of hnsw with mmap
-        let datamap: DataMap = DataMap::from_hnswdump::<u32>(".", &fname.to_string()).unwrap();
+        let datamap: DataMap =
+            DataMap::from_hnswdump::<u32>(&directory.as_path(), &fname.to_string()).unwrap();
         // testing type check
         assert!(datamap.check_data_type::<u32>());
         assert!(!datamap.check_data_type::<f32>());
