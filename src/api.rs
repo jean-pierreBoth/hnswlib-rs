@@ -8,6 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::hnsw::*;
 use crate::hnswio::*;
 use anndists::dist::distances::Distance;
+use log::info;
 
 pub trait AnnT {
     /// type of data vectors
@@ -69,7 +70,7 @@ where
 
     ///
     fn file_dump(&self, path: &Path, file_basename: &str) -> anyhow::Result<String> {
-        log::info!("in Hnsw::file_dump");
+        info!("In Hnsw::file_dump");
         //
         // do not overwrite if mmap is active
         let overwrite = !self.get_datamap_opt();
@@ -79,7 +80,7 @@ where
         let res = self.dump(DumpMode::Full, &mut dumpinit);
         //
         dumpinit.flush()?;
-        log::info!("end of dump");
+        info!("End of dump");
         if res.is_ok() {
             Ok(dumpname)
         } else {

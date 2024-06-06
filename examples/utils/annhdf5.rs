@@ -5,6 +5,7 @@
 use ndarray::Array2;
 
 use ::hdf5::*;
+use log::debug;
 
 // datasets
 //   . distances (nbojects, dim)   f32 matrix    for tests objects
@@ -66,8 +67,8 @@ impl AnnBenchmarkData {
         }
         let test_distances = res.unwrap();
         // a check for row order
-        log::debug!(
-            " first 2 distances for first test {:?} {:?}  ",
+        debug!(
+            "First 2 distances for first test {:?} {:?}  ",
             test_distances.get((0, 0)).unwrap(),
             test_distances.get((0, 1)).unwrap()
         );
@@ -95,8 +96,8 @@ impl AnnBenchmarkData {
             panic!("error reading neighbours dataset");
         }
         let test_neighbours = res.unwrap();
-        log::debug!(
-            " first 2 neighbours  for first test {:?} {:?}  ",
+        debug!(
+            "First 2 neighbours  for first test {:?} {:?}  ",
             test_neighbours.get((0, 0)).unwrap(),
             test_neighbours.get((0, 1)).unwrap()
         );
