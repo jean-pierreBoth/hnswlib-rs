@@ -264,8 +264,8 @@ struct LoadInit {
 ///
 /// See example in  tests::reload_with_mmap
 /// ```text
-///     let directory = PathBuf::from(".");
-///     let mut reloader = HnswIo::new(directory.clone(), String::from("mmapreloadtest"));
+///     let directory = Path::new(".");
+///     let mut reloader = HnswIo::new(directory, "mmapreloadtest");
 ///     let options = ReloadOptions::default().set_mmap(true);
 ///     reloader.set_options(options);
 ///     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
@@ -321,9 +321,9 @@ impl HnswIo {
     }
 
     /// same as preceding, avoids the call to [set_options](Self::set_options())
-    pub fn new_with_options(directory: PathBuf, basename: String, options: ReloadOptions) -> Self {
+    pub fn new_with_options(directory: &Path, basename: String, options: ReloadOptions) -> Self {
         HnswIo {
-            dir: directory,
+            dir: directory.to_path_buf(),
             basename,
             options,
             datamap: None,
@@ -336,15 +336,15 @@ impl HnswIo {
     /// It is an error to call set_values on an already defined Hswnio by any function other than [default](Self::default())
     pub fn set_values(
         &mut self,
-        directory: PathBuf,
+        directory: &Path,
         basename: String,
         options: ReloadOptions,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         if self.initialized {
             return Err(anyhow!("Hnswio already initialized"));
         };
         //
-        self.dir = directory;
+        self.dir = directory.to_path_buf();
         self.basename = basename;
         self.options = options;
         self.datamap = None;
@@ -355,7 +355,7 @@ impl HnswIo {
     } // end of set_values
 
     //
-    fn init(&self) -> anyhow::Result<LoadInit> {
+    fn init(&self) -> Result<LoadInit> {
         //
         info!("reloading from basename : {}", &self.basename);
         //
@@ -418,11 +418,12 @@ impl HnswIo {
         self.options = options;
     }
 
-    /// reload a previously dumped hnsw stucture
-    pub fn load_hnsw<T, D>(&mut self) -> Result<Hnsw<T, D>>
-        where
-            T: 'static + Serialize + DeserializeOwned + Clone + Sized + Send + Sync + std::fmt::Debug,
-            D: Distance<T> + Default + Send + Sync,
+    /// reload a previously dumped hnsw structure
+    pub fn load_hnsw<'b, 'a, T, D>(&'a mut self) -> Result<Hnsw<'b, T, D>>
+    where
+        T: 'static + Serialize + DeserializeOwned + Clone + Sized + Send + Sync + std::fmt::Debug,
+        D: Distance<T> + Default + Send + Sync,
+        'a: 'b,
     {
         //
         debug!("HnswIo::load_hnsw ");
@@ -745,9 +746,7 @@ impl HnswIo {
         //
         info!(
             "found entry point, origin_id {:?} , layer {:?}, rank in layer {:?} ",
-            origin_id,
-            layer,
-            rank_in_l
+            origin_id, layer, rank_in_l
         );
         let entry_point = Arc::clone(&points_by_layer[layer as usize][rank_in_l as usize]);
         info!(
@@ -970,8 +969,7 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
     descr.dimension = usize::from_ne_bytes(it_slice);
     info!(
         "nb_point {:?} dimension {:?} ",
-        descr.nb_point,
-        descr.dimension
+        descr.nb_point, descr.dimension
     );
     // distance name
     let mut it_slice = [0u8; std::mem::size_of::<usize>()];
@@ -1184,10 +1182,7 @@ type PointGraphInfo = (usize, PointId, Vec<Vec<Neighbour>>);
 
 // This function reads neighbourhood info and returns neighbourhood info.
 // It suppose and requires that the file graph_in is just at beginning of info related to origin_id
-fn load_point_graph(
-    graph_in: &mut dyn Read,
-    descr: &Description,
-) -> Result<PointGraphInfo> {
+fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<PointGraphInfo> {
     //
     trace!("in load_point_graph");
     // read and check magic
@@ -1213,8 +1208,7 @@ fn load_point_graph(
     let p_id = PointId(layer, rank_in_l);
     debug!(
         "in load_point_graph, got origin_id : {}, p_id : {:?}",
-        origin_id,
-        p_id
+        origin_id, p_id
     );
     //
     // Now  for each layer , read neighbours

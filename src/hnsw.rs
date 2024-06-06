@@ -22,8 +22,8 @@ use std::collections::binary_heap::BinaryHeap;
 #[allow(unused)]
 use std::collections::HashSet;
 
-use log::{debug, info};
 use log::trace;
+use log::{debug, info};
 
 pub use crate::filter::FilterT;
 use anndists::dist::distances::Distance;

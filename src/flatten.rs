@@ -11,8 +11,8 @@ use std::cmp::Ordering;
 
 use crate::hnsw;
 use anndists::dist::distances::Distance;
-use log::error;
 use hnsw::*;
+use log::error;
 
 // an ordering of Neighbour of a Point
 
