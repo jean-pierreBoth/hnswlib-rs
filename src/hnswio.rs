@@ -419,11 +419,10 @@ impl HnswIo {
     }
 
     /// reload a previously dumped hnsw stucture
-    pub fn load_hnsw<'b, 'a, T, D>(&'a mut self) -> anyhow::Result<Hnsw<'b, T, D>>
-    where
-        T: 'static + Serialize + DeserializeOwned + Clone + Sized + Send + Sync + std::fmt::Debug,
-        D: Distance<T> + Default + Send + Sync,
-        'a: 'b,
+    pub fn load_hnsw<T, D>(&mut self) -> Result<Hnsw<T, D>>
+        where
+            T: 'static + Serialize + DeserializeOwned + Clone + Sized + Send + Sync + std::fmt::Debug,
+            D: Distance<T> + Default + Send + Sync,
     {
         //
         debug!("HnswIo::load_hnsw ");
