@@ -11,6 +11,7 @@ use std::cmp::Ordering;
 
 use crate::hnsw;
 use anndists::dist::distances::Distance;
+use log::error;
 use hnsw::*;
 
 // an ordering of Neighbour of a Point
@@ -119,7 +120,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> From<&Hnsw<'b, T,
             //    println!("point : {:?}", _point.p_id);
             let res_insert = hash_t.insert(point.get_origin_id(), flatten_point(&point));
             if let Some(old_point) = res_insert {
-                log::error!("2 points with same origin id {:?}", old_point.origin_id);
+                error!("2 points with same origin id {:?}", old_point.origin_id);
             }
         }
         FlatNeighborhood { hash_t }
@@ -132,8 +133,7 @@ mod tests {
 
     use super::*;
     use anndists::dist::distances::*;
-
-    use std::path::PathBuf;
+    use log::debug;
 
     use crate::api::AnnT;
     use crate::hnswio::*;
@@ -177,20 +177,20 @@ mod tests {
         let nbg_2_before = neighborhood_before_dump.get_neighbours(2).unwrap();
         println!("voisins du point 2 {:?}", nbg_2_before);
         // dump in a file. Must take care of name as tests runs in // !!!
-        let fname = String::from("dumpreloadtestflat");
-        let directory = PathBuf::from(".");
-        let _res = hnsw.file_dump(&directory, &fname);
+        let fname = "dumpreloadtestflat";
+        let directory = tempfile::tempdir().unwrap();
+        let _res = hnsw.file_dump(directory.path(), fname);
         // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
         //
         // reload
-        log::debug!("\n\n  hnsw reload");
-        // we will need a procedural macro to get from distance name to its instanciation.
+        debug!("HNSW reload");
+        // we will need a procedural macro to get from distance name to its instantiation.
         // from now on we test with DistL1
-        let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
+        let mut reloader = HnswIo::new(directory.path(), fname);
         let hnsw_loaded: Hnsw<NoData, NoDist> = reloader.load_hnsw().unwrap();
         let neighborhood_after_dump = FlatNeighborhood::from(&hnsw_loaded);
         let nbg_2_after = neighborhood_after_dump.get_neighbours(2).unwrap();
-        println!("voisins du point 2 {:?}", nbg_2_after);
+        println!("Neighbors of point 2 {:?}", nbg_2_after);
         // test equality of neighborhood
         assert_eq!(nbg_2_after.len(), nbg_2_before.len());
         for i in 0..nbg_2_before.len() {
@@ -198,8 +198,5 @@ mod tests {
             assert_eq!(nbg_2_before[i].distance, nbg_2_after[i].distance);
         }
         check_graph_equality(&hnsw_loaded, &hnsw);
-        //
-        let _ = std::fs::remove_file("dumpreloadtestflat.hnsw.data");
-        let _ = std::fs::remove_file("dumpreloadtestflat.hnsw.graph");
     } // end of test_dump_reload
 } // end module test

@@ -47,6 +47,7 @@ use std::time::{Duration, SystemTime};
 
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
+use log::info;
 
 mod utils;
 
@@ -64,12 +65,12 @@ pub fn main() {
     // run bench
     let nb_elem = anndata.train_data.len();
     let knbn_max = anndata.test_distances.dim().1;
-    log::info!(
-        " train size : {}, test size : {}",
+    info!(
+        "Train size : {}, test size : {}",
         nb_elem,
         anndata.test_data.len()
     );
-    log::info!(" nb neighbours answers for test data : {} \n\n", knbn_max);
+    info!("Nb neighbours answers for test data : {} \n\n", knbn_max);
     //
     let max_nb_connection = 48;
     let ef_c = 800;

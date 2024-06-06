@@ -95,6 +95,7 @@ anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
 hdf5 = { version = "0.8" }
 ndarray = { version = "0.15" }
 skiplist = { version = "0.5" }
+tempfile = "3"
 
 
 [features]

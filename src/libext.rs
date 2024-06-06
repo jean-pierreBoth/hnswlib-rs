@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::ptr;
 
 use anndists::dist::distances::*;
+use log::{debug, error, info, trace, warn};
 
 use crate::api::*;
 use crate::hnsw::*;
@@ -95,16 +96,16 @@ macro_rules! generate_insert(
         ///
         #[no_mangle]
         pub unsafe extern "C" fn $function_name(hnsw_api : *mut $api_name, len:usize, data : *const $type_val, id : usize) {
-        log::trace!("entering insert, type {:?} vec len is {:?}, id : {:?} ", stringify!($type_val), len, id);
+        trace!("entering insert, type {:?} vec len is {:?}, id : {:?} ", stringify!($type_val), len, id);
         //  construct vector: Rust clones and take ownership.
         let data_v : Vec<$type_val>;
         unsafe {
             let slice = std::slice::from_raw_parts(data, len);
             data_v = Vec::from(slice);
-            log::trace!("calling insert data");
+            trace!("calling insert data");
             (*hnsw_api).opaque.insert_data(&data_v, id);
         }
-        log::trace!("exiting insert for type {:?}", stringify!($type_val));
+        trace!("exiting insert for type {:?}", stringify!($type_val));
         }  // end of insert
     )
 );
@@ -118,19 +119,19 @@ macro_rules! generate_parallel_insert(
         pub unsafe extern "C" fn $function_name(hnsw_api : *mut $api_name, nb_vec: usize, vec_len : usize,
                         datas : *mut *const $type_val, ids : *const usize) {
             //
-            log::trace!("entering parallel_insert type {:?}  , vec len is {:?}, nb_vec : {:?}", stringify!($type_val), vec_len, nb_vec);
+            trace!("entering parallel_insert type {:?}  , vec len is {:?}, nb_vec : {:?}", stringify!($type_val), vec_len, nb_vec);
             let data_ids : Vec<usize>;
             let data_ptrs : Vec<*const $type_val>;
             unsafe {
                 let slice = std::slice::from_raw_parts(ids, nb_vec);
                 data_ids = Vec::from(slice);
             }
-            // log::debug!("got ids");
+            // debug!("got ids");
             unsafe {
                 let slice = std::slice::from_raw_parts(datas, nb_vec);
                 data_ptrs = Vec::from(slice);
             }
-            // log::debug!("got data ptrs");
+            // debug!("got data ptrs");
             let mut data_v = Vec::<Vec<$type_val>>::with_capacity(nb_vec);
             for i in 0..nb_vec {
                 unsafe {
@@ -139,14 +140,14 @@ macro_rules! generate_parallel_insert(
                     data_v.push(v);
                 }
             }
-            // log::debug!("sending request");
+            // debug!("sending request");
             let mut request : Vec<(&Vec<$type_val>, usize)> = Vec::with_capacity(nb_vec);
             for i in 0..nb_vec {
                 request.push((&data_v[i], data_ids[i]));
             }
             //
             unsafe { (*hnsw_api).opaque.parallel_insert_data(&request); };
-            log::trace!("exiting parallel_insert");
+            trace!("exiting parallel_insert");
         } // end of parallel_insert
     )
 );
@@ -160,17 +161,17 @@ macro_rules! generate_search_neighbours(
         pub unsafe extern "C" fn $function_name(hnsw_api : *const $api_name, len:usize, data : *const $type_val,
                                 knbn : usize, ef_search : usize) ->  *const Neighbourhood_api {
             //
-            log::trace!("entering search_neighbours type {:?}, vec len is {:?}, id : {:?} ef_search {:?}", stringify!($type_val), len, knbn, ef_search);
+            trace!("entering search_neighbours type {:?}, vec len is {:?}, id : {:?} ef_search {:?}", stringify!($type_val), len, knbn, ef_search);
             let data_v : Vec<$type_val>;
             let neighbours : Vec<Neighbour>;
             unsafe {
                 let slice = std::slice::from_raw_parts(data, len);
                 data_v = Vec::from(slice);
-                log::trace!("calling search neighbours {:?}", data_v);
+                trace!("calling search neighbours {:?}", data_v);
                 neighbours =  (*hnsw_api).opaque.search_neighbours(&data_v, knbn, ef_search);
             }
             let neighbours_api : Vec<Neighbour_api> = neighbours.iter().map(|n| Neighbour_api::from(n)).collect();
-            log::trace!(" got nb neighbours {:?}", neighbours_api.len());
+            trace!(" got nb neighbours {:?}", neighbours_api.len());
             // for i in 0..neighbours_api.len() {
             //    println!(" id {:?}  dist : {:?} ", neighbours_api[i].id, neighbours_api[i].d);
             // }
@@ -181,7 +182,7 @@ macro_rules! generate_search_neighbours(
                     nbgh : nbgh_i,
                     neighbours : neighbours_ptr,
             };
-            log::trace!("search_neighbours returning nb neighbours {:?} id ptr {:?} ", nbgh_i, neighbours_ptr);
+            trace!("search_neighbours returning nb neighbours {:?} id ptr {:?} ", nbgh_i, neighbours_ptr);
             Box::into_raw(Box::new(answer))
         }
     )
@@ -198,7 +199,7 @@ macro_rules! generate_parallel_search_neighbours(
                             data : *mut *const $type_val, knbn : usize, ef_search : usize) ->  *const Vec_api<Neighbourhood_api> {
             //
             // must build a Vec<Vec<f32> to build request
-            log::trace!("recieving // search request for type: {:?} with {:?} vectors", stringify!($type_val), nb_vec);
+            trace!("recieving // search request for type: {:?} with {:?} vectors", stringify!($type_val), nb_vec);
             let neighbours : Vec<Vec<Neighbour> >;
             let mut data_v = Vec::<Vec<$type_val>>::with_capacity(nb_vec);
             unsafe {
@@ -209,7 +210,7 @@ macro_rules! generate_parallel_search_neighbours(
                     let v = Vec::from(slice_i);
                     data_v.push(v);
                 }
-            // log::debug!(" reconstructed input vectors");
+            // debug!(" reconstructed input vectors");
             neighbours =  (*hnsw_api).opaque.parallel_search_neighbours(&data_v, knbn, ef_search);
             }
             // construct a vector of Neighbourhood_api
@@ -226,7 +227,7 @@ macro_rules! generate_parallel_search_neighbours(
                     };
                 neighbour_lists.push(v_answer);
             }
-            log::trace!(" reconstructed output  pointers to vectors");
+            trace!(" reconstructed output  pointers to vectors");
             let neighbour_lists_ptr = neighbour_lists.as_ptr();
             std::mem::forget(neighbour_lists);
             let answer = Vec_api::<Neighbourhood_api> {
@@ -274,10 +275,10 @@ macro_rules! generate_loadhnsw(
             //
             unsafe {
                 if RELOADER_OPT.is_some() {
-                    log::error!("api can have nonly one mmap active");
+                    error!("api can have nonly one mmap active");
                     return ptr::null();
                 }
-                RELOADER_OPT = Some(HnswIo::new(PathBuf::from("."), filename.clone()));
+                RELOADER_OPT = Some(HnswIo::new(std::path::Path::new("."), &filename));
                 let hnsw_loaded_res = RELOADER_OPT.as_mut().unwrap().load_hnsw::<$type_val, $type_dist>();
 
                 if let Ok(hnsw_loaded) = hnsw_loaded_res {
@@ -285,7 +286,7 @@ macro_rules! generate_loadhnsw(
                     return Box::into_raw(Box::new(api));
                 }
                 else {
-                    log::warn!("an error occured, could not reload data from {:?}", filename);
+                    warn!("an error occured, could not reload data from {:?}", filename);
                     return ptr::null();
                 }
             }
@@ -450,13 +451,13 @@ pub unsafe extern "C" fn init_hnsw_f32(
     namelen: usize,
     cdistname: *const u8,
 ) -> *const HnswApif32 {
-    log::info!("entering init_hnsw_f32");
+    info!("entering init_hnsw_f32");
     let slice = unsafe { std::slice::from_raw_parts(cdistname, namelen) };
     let dname = String::from_utf8_lossy(slice).into_owned();
     // map distname to sthg. This whole block will go to a macro
     match dname.as_str() {
         "DistL1" => {
-            log::info!(" received DistL1");
+            info!(" received DistL1");
             let h = Hnsw::<f32, DistL1>::new(max_nb_conn, 10000, 16, ef_const, DistL1 {});
             let api = HnswApif32 {
                 opaque: Box::new(h),
@@ -507,7 +508,7 @@ pub unsafe extern "C" fn init_hnsw_f32(
             Box::into_raw(Box::new(api))
         }
         _ => {
-            log::warn!("init_hnsw_f32 received unknow distance {:?} ", dname);
+            warn!("init_hnsw_f32 received unknow distance {:?} ", dname);
             ptr::null::<HnswApif32>()
         }
     } // znd match
@@ -526,13 +527,13 @@ pub unsafe extern "C" fn new_hnsw_f32(
     max_elements: usize,
     max_layer: usize,
 ) -> *const HnswApif32 {
-    log::debug!("entering new_hnsw_f32");
+    debug!("entering new_hnsw_f32");
     let slice = unsafe { std::slice::from_raw_parts(cdistname, namelen) };
     let dname = String::from_utf8_lossy(slice);
     // map distname to sthg. This whole block will go to a macro
     match dname.as_ref() {
         "DistL1" => {
-            log::info!(" received DistL1");
+            info!(" received DistL1");
             let h =
                 Hnsw::<f32, DistL1>::new(max_nb_conn, max_elements, max_layer, ef_const, DistL1 {});
             let api = HnswApif32 {
@@ -601,7 +602,7 @@ pub unsafe extern "C" fn new_hnsw_f32(
             Box::into_raw(Box::new(api))
         }
         _ => {
-            log::warn!("init_hnsw_f32 received unknow distance {:?} ", dname);
+            warn!("init_hnsw_f32 received unknow distance {:?} ", dname);
             ptr::null::<HnswApif32>()
         }
     } // znd match
@@ -630,7 +631,7 @@ pub extern "C" fn init_hnsw_ptrdist_f32(
     ef_const: usize,
     c_func: extern "C" fn(*const f32, *const f32, c_ulonglong) -> f32,
 ) -> *const HnswApif32 {
-    log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
+    info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<f32>::new(c_func);
     let h = Hnsw::<f32, DistCFFI<f32>>::new(max_nb_conn, 10000, 16, ef_const, c_dist);
     let api = HnswApif32 {
@@ -649,16 +650,16 @@ pub unsafe extern "C" fn insert_f32(
     data: *const f32,
     id: usize,
 ) {
-    log::trace!("entering insert_f32, vec len is {:?}, id : {:?} ", len, id);
+    trace!("entering insert_f32, vec len is {:?}, id : {:?} ", len, id);
     //  construct vector: Rust clones and take ownership.
     let data_v: Vec<f32>;
     unsafe {
         let slice = std::slice::from_raw_parts(data, len);
         data_v = Vec::from(slice);
-        //    log::debug!("calling insert data");
+        //    debug!("calling insert data");
         (*hnsw_api).opaque.insert_data(&data_v, id);
     }
-    // log::trace!("exiting insert_f32");
+    // trace!("exiting insert_f32");
 } // end of insert_f32
 
 /// # Safety
@@ -673,7 +674,7 @@ pub unsafe extern "C" fn parallel_insert_f32(
     ids: *const usize,
 ) {
     //
-    // log::debug!("entering parallel_insert_f32 , vec len is {:?}, nb_vec : {:?}", vec_len, nb_vec);
+    // debug!("entering parallel_insert_f32 , vec len is {:?}, nb_vec : {:?}", vec_len, nb_vec);
     let data_ids: Vec<usize>;
     let data_ptrs: Vec<*const f32>;
     unsafe {
@@ -684,7 +685,7 @@ pub unsafe extern "C" fn parallel_insert_f32(
         let slice = std::slice::from_raw_parts(datas, nb_vec);
         data_ptrs = Vec::from(slice);
     }
-    // log::debug!("got data ptrs");
+    // debug!("got data ptrs");
     let mut data_v = Vec::<Vec<f32>>::with_capacity(nb_vec);
     #[allow(clippy::needless_range_loop)]
     for i in 0..nb_vec {
@@ -694,7 +695,7 @@ pub unsafe extern "C" fn parallel_insert_f32(
             data_v.push(v);
         }
     }
-    // log::debug!("sending request");
+    // debug!("sending request");
     let mut request: Vec<(&Vec<f32>, usize)> = Vec::with_capacity(nb_vec);
     for i in 0..nb_vec {
         request.push((&data_v[i], data_ids[i]));
@@ -703,7 +704,7 @@ pub unsafe extern "C" fn parallel_insert_f32(
     unsafe {
         (*hnsw_api).opaque.parallel_insert_data(&request);
     };
-    log::trace!("exiting parallel_insert");
+    trace!("exiting parallel_insert");
 } // end of parallel_insert_f32
 
 /// # Safety
@@ -718,7 +719,7 @@ pub unsafe extern "C" fn search_neighbours_f32(
     ef_search: usize,
 ) -> *const Neighbourhood_api {
     //
-    log::trace!(
+    trace!(
         "entering search_neighbours , vec len is {:?}, id : {:?} ef_search {:?}",
         len,
         knbn,
@@ -729,13 +730,13 @@ pub unsafe extern "C" fn search_neighbours_f32(
     unsafe {
         let slice = std::slice::from_raw_parts(data, len);
         data_v = Vec::from(slice);
-        log::trace!("calling search neighbours {:?}", data_v);
+        trace!("calling search neighbours {:?}", data_v);
         neighbours = (*hnsw_api)
             .opaque
             .search_neighbours(&data_v, knbn, ef_search);
     }
     let neighbours_api: Vec<Neighbour_api> = neighbours.iter().map(Neighbour_api::from).collect();
-    log::trace!(" got nb neighbours {:?}", neighbours_api.len());
+    trace!(" got nb neighbours {:?}", neighbours_api.len());
     // for i in 0..neighbours_api.len() {
     //    println!(" id {:?}  dist : {:?} ", neighbours_api[i].id, neighbours_api[i].d);
     // }
@@ -746,7 +747,7 @@ pub unsafe extern "C" fn search_neighbours_f32(
         nbgh: nbgh_i,
         neighbours: neighbours_ptr,
     };
-    log::trace!(
+    trace!(
         "search_neighbours returning nb neighbours {:?} id ptr {:?} ",
         nbgh_i,
         neighbours_ptr
@@ -770,12 +771,12 @@ pub unsafe extern "C" fn init_hnsw_i32(
     namelen: usize,
     cdistname: *const u8,
 ) -> *const HnswApii32 {
-    log::info!("entering init_hnsw_i32");
+    info!("entering init_hnsw_i32");
     let slice = unsafe { std::slice::from_raw_parts(cdistname, namelen) };
     let dname = String::from_utf8_lossy(slice);
     // map distname to sthing. This whole block will go to a macro
     if dname == "DistL1" {
-        log::info!(" received DistL1");
+        info!(" received DistL1");
         let h = Hnsw::<i32, DistL1>::new(max_nb_conn, 10000, 16, ef_const, DistL1 {});
         let api = HnswApii32 {
             opaque: Box::new(h),
@@ -803,7 +804,7 @@ pub extern "C" fn init_hnsw_ptrdist_i32(
     ef_const: usize,
     c_func: extern "C" fn(*const i32, *const i32, c_ulonglong) -> f32,
 ) -> *const HnswApii32 {
-    log::debug!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
+    debug!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<i32>::new(c_func);
     let h = Hnsw::<i32, DistCFFI<i32>>::new(max_nb_conn, 10000, 16, ef_const, c_dist);
     let api = HnswApii32 {
@@ -834,12 +835,12 @@ pub unsafe extern "C" fn init_hnsw_u32(
     namelen: usize,
     cdistname: *const u8,
 ) -> *const HnswApiu32 {
-    log::debug!("entering init_hnsw_u32");
+    debug!("Entering init_hnsw_u32");
     let slice = unsafe { std::slice::from_raw_parts(cdistname, namelen) };
     let dname = String::from_utf8_lossy(slice);
     // map distname to sthg. This whole block will go to a macro
     if dname == "DistL1" {
-        log::debug!(" received DistL1");
+        debug!("Received DistL1");
         let h = Hnsw::<u32, DistL1>::new(max_nb_conn, 10000, 16, ef_const, DistL1 {});
         let api = HnswApiu32 {
             opaque: Box::new(h),
@@ -874,7 +875,7 @@ pub extern "C" fn init_hnsw_ptrdist_u32(
     ef_const: usize,
     c_func: extern "C" fn(*const u32, *const u32, c_ulonglong) -> f32,
 ) -> *const HnswApiu32 {
-    log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
+    info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u32>::new(c_func);
     let h = Hnsw::<u32, DistCFFI<u32>>::new(max_nb_conn, 10000, 16, ef_const, c_dist);
     let api = HnswApiu32 {
@@ -905,12 +906,12 @@ pub unsafe extern "C" fn init_hnsw_u16(
     namelen: usize,
     cdistname: *const u8,
 ) -> *const HnswApiu16 {
-    log::info!("entering init_hnsw_u16");
+    info!("entering init_hnsw_u16");
     let slice = unsafe { std::slice::from_raw_parts(cdistname, namelen) };
     let dname = String::from_utf8_lossy(slice);
     // map distname to sthg. This whole block will go to a macro
     if dname == "DistL1" {
-        log::info!(" received DistL1");
+        info!(" received DistL1");
         let h = Hnsw::<u16, DistL1>::new(max_nb_conn, 10000, 16, ef_const, DistL1 {});
         let api = HnswApiu16 {
             opaque: Box::new(h),
@@ -957,12 +958,12 @@ pub unsafe extern "C" fn new_hnsw_u16(
     max_elements: usize,
     max_layer: usize,
 ) -> *const HnswApiu16 {
-    log::info!("entering init_hnsw_u16");
+    info!("entering init_hnsw_u16");
     let slice = unsafe { std::slice::from_raw_parts(cdistname, namelen) };
     let dname = String::from_utf8_lossy(slice);
     // map distname to sthg. This whole block will go to a macro
     if dname == "DistL1" {
-        log::info!(" received DistL1");
+        info!(" received DistL1");
         let h = Hnsw::<u16, DistL1>::new(max_nb_conn, max_elements, max_layer, ef_const, DistL1 {});
         let api = HnswApiu16 {
             opaque: Box::new(h),
@@ -1020,7 +1021,7 @@ pub extern "C" fn init_hnsw_ptrdist_u16(
     ef_const: usize,
     c_func: extern "C" fn(*const u16, *const u16, c_ulonglong) -> f32,
 ) -> *const HnswApiu16 {
-    log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
+    info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u16>::new(c_func);
     let h = Hnsw::<u16, DistCFFI<u16>>::new(max_nb_conn, 10000, 16, ef_const, c_dist);
     let api = HnswApiu16 {
@@ -1049,12 +1050,12 @@ pub unsafe extern "C" fn init_hnsw_u8(
     namelen: usize,
     cdistname: *const u8,
 ) -> *const HnswApiu8 {
-    log::debug!("entering init_hnsw_u8");
+    debug!("entering init_hnsw_u8");
     let slice = unsafe { std::slice::from_raw_parts(cdistname, namelen) };
     let dname = String::from_utf8_lossy(slice);
     // map distname to sthg. This whole block will go to a macro
     if dname == "DistL1" {
-        log::info!(" received DistL1");
+        info!(" received DistL1");
         let h = Hnsw::<u8, DistL1>::new(max_nb_conn, 10000, 16, ef_const, DistL1 {});
         let api = HnswApiu8 {
             opaque: Box::new(h),
@@ -1088,7 +1089,7 @@ pub extern "C" fn init_hnsw_ptrdist_u8(
     ef_const: usize,
     c_func: extern "C" fn(*const u8, *const u8, c_ulonglong) -> f32,
 ) -> *const HnswApiu8 {
-    log::info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
+    info!("init_ hnsw_ptrdist: ptr  {:?}", c_func);
     let c_dist = DistCFFI::<u8>::new(c_func);
     let h = Hnsw::<u8, DistCFFI<u8>>::new(max_nb_conn, 10000, 16, ef_const, c_dist);
     let api = HnswApiu8 {
@@ -1194,7 +1195,7 @@ pub unsafe extern "C" fn load_hnsw_description(
                 ffi_description.t_name = t_name_ptr;
                 Box::into_raw(Box::new(ffi_description))
             } else {
-                log::error!(
+                error!(
                     "could not get descrption of hnsw from file {:?}",
                     fpath.as_os_str()
                 );
@@ -1206,7 +1207,7 @@ pub unsafe extern "C" fn load_hnsw_description(
             }
         }
         Err(_e) => {
-            log::error!(
+            error!(
                 "no such file, load_hnsw_description: could not open file {:?}",
                 fpath.as_os_str()
             );
