@@ -3,6 +3,7 @@ use env_logger::Builder;
 use std::time::{Duration, SystemTime};
 
 use anndists::dist::*;
+use log::info;
 
 // search in paralle mode 8 core i7-10875H  @2.3Ghz time 100 neighbours
 
@@ -42,12 +43,12 @@ pub fn main() {
     // run bench
     let knbn_max = anndata.test_distances.dim().1;
     let nb_elem = anndata.train_data.len();
-    log::info!(
+    info!(
         " train size : {}, test size : {}",
         nb_elem,
         anndata.test_data.len()
     );
-    log::info!(" nb neighbours answers for test data : {} \n\n", knbn_max);
+    info!(" nb neighbours answers for test data : {}", knbn_max);
     //
     let max_nb_connection = 64;
     let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
@@ -64,7 +65,7 @@ pub fn main() {
     let mut hnsw = Hnsw::<f32, DistL2>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistL2 {});
     //
     let extend_flag = false;
-    log::info!("extend flag = {:?} ", extend_flag);
+    info!("extend flag = {:?} ", extend_flag);
     hnsw.set_extend_candidates(extend_flag);
     //
     // parallel insertion

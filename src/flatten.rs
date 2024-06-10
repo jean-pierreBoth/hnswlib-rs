@@ -12,18 +12,20 @@ use std::cmp::Ordering;
 use crate::hnsw;
 use anndists::dist::distances::Distance;
 use hnsw::*;
+use log::error;
 
 // an ordering of Neighbour of a Point
 
 impl PartialEq for Neighbour {
     fn eq(&self, other: &Neighbour) -> bool {
-        return self.distance == other.distance;
+        self.distance == other.distance
     } // end eq
 }
 
 impl Eq for Neighbour {}
 
 // order points by distance to self.
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Neighbour {
     fn partial_cmp(&self, other: &Neighbour) -> Option<Ordering> {
         self.distance.partial_cmp(&other.distance)
@@ -57,15 +59,15 @@ pub struct FlatPoint {
 impl FlatPoint {
     /// returns the neighbours orderded by distance.
     pub fn get_neighbours(&self) -> &Vec<Neighbour> {
-        return &self.neighbours;
+        &self.neighbours
     }
     /// returns the origin id of the point
     pub fn get_id(&self) -> DataId {
-        return self.origin_id;
+        self.origin_id
     }
-    ///
+    //
     pub fn get_p_id(&self) -> PointId {
-        return self.p_id;
+        self.p_id
     }
 } // end impl block for FlatPoint
 
@@ -79,12 +81,11 @@ fn flatten_point<T: Clone + Send + Sync>(point: &Point<T>) -> FlatPoint {
         }
     }
     flat_neighbours.sort_unstable();
-    let fpoint = FlatPoint {
+    FlatPoint {
         origin_id: point.get_origin_id(),
         p_id: point.get_point_id(),
         neighbours: flat_neighbours,
-    };
-    fpoint
+    }
 } // end of flatten_point
 
 /// A structure providing neighbourhood information of a point stored in the Hnsw structure given its DataId.  
@@ -98,11 +99,11 @@ impl FlatNeighborhood {
     /// get neighbour of a point given its id.  
     /// The neighbours are sorted in increasing distance from data_id.
     pub fn get_neighbours(&self, p_id: DataId) -> Option<Vec<Neighbour>> {
-        let res = match self.hash_t.get(&p_id) {
-            Some(point) => Some(point.get_neighbours().clone()),
-            _ => None,
-        };
-        return res;
+        let res = self
+            .hash_t
+            .get(&p_id)
+            .map(|point| point.get_neighbours().clone());
+        res
     }
 } // end impl block for FlatNeighborhood
 
@@ -113,24 +114,16 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> From<&Hnsw<'b, T,
     /// Useful after reloading from a dump with T=NoData and D = NoDist as points are then reloaded with neighbourhood information only.
     fn from(hnsw: &Hnsw<T, D>) -> Self {
         let mut hash_t = HashMap::new();
-        let mut ptiter = hnsw.get_point_indexation().into_iter();
+        let pt_iter = hnsw.get_point_indexation().into_iter();
         //
-        loop {
-            if let Some(point) = ptiter.next() {
-                //    println!("point : {:?}", _point.p_id);
-                let res_insert = hash_t.insert(point.get_origin_id(), flatten_point(&point));
-                match res_insert {
-                    Some(old_point) => {
-                        println!("2 points with same origin id {:?}", old_point.origin_id);
-                        log::error!("2 points with same origin id {:?}", old_point.origin_id);
-                    }
-                    _ => (),
-                } // end match
-            } else {
-                break;
+        for point in pt_iter {
+            //    println!("point : {:?}", _point.p_id);
+            let res_insert = hash_t.insert(point.get_origin_id(), flatten_point(&point));
+            if let Some(old_point) = res_insert {
+                error!("2 points with same origin id {:?}", old_point.origin_id);
             }
-        } // end while
-        return FlatNeighborhood { hash_t };
+        }
+        FlatNeighborhood { hash_t }
     }
 } // e,d of Fom implementation
 
@@ -140,8 +133,7 @@ mod tests {
 
     use super::*;
     use anndists::dist::distances::*;
-
-    use std::path::PathBuf;
+    use log::debug;
 
     use crate::api::AnnT;
     use crate::hnswio::*;
@@ -185,20 +177,20 @@ mod tests {
         let nbg_2_before = neighborhood_before_dump.get_neighbours(2).unwrap();
         println!("voisins du point 2 {:?}", nbg_2_before);
         // dump in a file. Must take care of name as tests runs in // !!!
-        let fname = String::from("dumpreloadtestflat");
-        let _res = hnsw.file_dump(&fname);
+        let fname = "dumpreloadtestflat";
+        let directory = tempfile::tempdir().unwrap();
+        let _res = hnsw.file_dump(directory.path(), fname);
         // This will dump in 2 files named dumpreloadtest.hnsw.graph and dumpreloadtest.hnsw.data
         //
         // reload
-        log::debug!("\n\n  hnsw reload");
-        // we will need a procedural macro to get from distance name to its instanciation.
+        debug!("HNSW reload");
+        // we will need a procedural macro to get from distance name to its instantiation.
         // from now on we test with DistL1
-        let directory = PathBuf::from(".");
-        let mut reloader = HnswIo::new(directory, String::from("dumpreloadtestflat"));
+        let mut reloader = HnswIo::new(directory.path(), fname);
         let hnsw_loaded: Hnsw<NoData, NoDist> = reloader.load_hnsw().unwrap();
         let neighborhood_after_dump = FlatNeighborhood::from(&hnsw_loaded);
         let nbg_2_after = neighborhood_after_dump.get_neighbours(2).unwrap();
-        println!("voisins du point 2 {:?}", nbg_2_after);
+        println!("Neighbors of point 2 {:?}", nbg_2_after);
         // test equality of neighborhood
         assert_eq!(nbg_2_after.len(), nbg_2_before.len());
         for i in 0..nbg_2_before.len() {
@@ -206,8 +198,5 @@ mod tests {
             assert_eq!(nbg_2_before[i].distance, nbg_2_after[i].distance);
         }
         check_graph_equality(&hnsw_loaded, &hnsw);
-        //
-        let _ = std::fs::remove_file("dumpreloadtestflat.hnsw.data");
-        let _ = std::fs::remove_file("dumpreloadtestflat.hnsw.graph");
     } // end of test_dump_reload
 } // end module test

@@ -165,7 +165,7 @@ fn filter_l2() {
         data.push(column);
     }
     // give an id to each data
-    let data_with_id = data.iter().zip(0..data.len()).collect();
+    let data_with_id = data.iter().zip(0..data.len()).collect::<Vec<_>>();
 
     let ef_c = 200;
     let max_nb_connection = 15;
