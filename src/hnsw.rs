@@ -1701,25 +1701,21 @@ mod tests {
             ef_construct,
             dist::DistL1 {},
         );
-        for i in 0..data.len() {
-            hns.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hns.insert((d, i));
         }
         let cpu_time = start.elapsed();
         println!(" test_insert_iter_point time inserting {:?}", cpu_time);
 
         hns.dump_layer_info();
         // now check iteration
-        let mut ptiter = hns.get_point_indexation().into_iter();
+        let ptiter = hns.get_point_indexation().into_iter();
         let mut nb_dumped = 0;
-        loop {
-            if let Some(_point) = ptiter.next() {
-                //    println!("point : {:?}", _point.p_id);
-                nb_dumped += 1;
-            } else {
-                break;
-            }
-        } // end while
-          //
+        for _point in ptiter {
+            //    println!("point : {:?}", _point.p_id);
+            nb_dumped += 1;
+        }
+        //
         assert_eq!(nb_dumped, nbcolumn);
     } // end of test_iter_point
 
@@ -1753,8 +1749,8 @@ mod tests {
             ef_construct,
             dist::DistL1 {},
         );
-        for i in 0..data.len() {
-            hns.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hns.insert((d, i));
         }
         let cpu_time = start.elapsed();
         println!(" test_insert_iter_point time inserting {:?}", cpu_time);
@@ -1763,17 +1759,13 @@ mod tests {
         // now check iteration
         let layer_num = 0;
         let nbpl = hns.get_point_indexation().get_layer_nb_point(layer_num);
-        let mut layer_iter = hns.get_point_indexation().get_layer_iterator(layer_num);
+        let layer_iter = hns.get_point_indexation().get_layer_iterator(layer_num);
         //
         let mut nb_dumped = 0;
-        loop {
-            if let Some(_point) = layer_iter.next() {
-                //    println!("point : {:?}", _point.p_id);
-                nb_dumped += 1;
-            } else {
-                break;
-            }
-        } // end while
+        for _point in layer_iter {
+            //    println!("point : {:?}", _point.p_id);
+            nb_dumped += 1;
+        }
         println!(
             "test_iter_layerpoint : nb point in layer {} , nb found {}",
             nbpl, nb_dumped

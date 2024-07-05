@@ -358,8 +358,8 @@ mod tests {
         let ef_construct = 25;
         let nb_connection = 10;
         let hnsw = Hnsw::<f32, DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, DistL1 {});
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i));
         }
         // some loggin info
         hnsw.dump_layer_info();
@@ -424,28 +424,25 @@ mod tests {
         let ef_construct = 25;
         let nb_connection = 10;
         let hnsw = Hnsw::<u32, DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, DistL1 {});
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i));
         }
         // some loggin info
         hnsw.dump_layer_info();
         // dump in a file.  Must take care of name as tests runs in // !!!
         let fname = "mmap_order_test";
         let directory = tempfile::tempdir().unwrap();
-        let _res = hnsw.file_dump(directory.path(), &fname);
+        let _res = hnsw.file_dump(directory.path(), fname);
         // now we have check that datamap seems  ok, test reload of hnsw with mmap
-        let datamap: DataMap =
-            DataMap::from_hnswdump::<u32>(directory.path(), &fname.to_string()).unwrap();
+        let datamap: DataMap = DataMap::from_hnswdump::<u32>(directory.path(), fname).unwrap();
         // testing type check
         assert!(datamap.check_data_type::<u32>());
         assert!(!datamap.check_data_type::<f32>());
         info!("Datamap iteration order checking");
         let keys = datamap.get_dataid_iter();
-        let mut ukey = 0usize;
-        for dataid in keys {
+        for (i, dataid) in keys.enumerate() {
             let v = datamap.get_data::<u32>(dataid).unwrap();
-            assert_eq!(v, &data[*dataid], "dataid = {}, ukey = {}", dataid, ukey);
-            ukey += 1;
+            assert_eq!(v, &data[*dataid], "dataid = {}, ukey = {}", dataid, i);
         }
         // rm files generated!
         let _ = std::fs::remove_file("mmap_order_test.hnsw.data");

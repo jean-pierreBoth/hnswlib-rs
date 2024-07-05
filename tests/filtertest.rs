@@ -1,3 +1,6 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::range_zip_with_len)]
+
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
 use rand::{distributions::Uniform, Rng};
@@ -19,19 +22,14 @@ fn generate_random_string(len: usize) -> String {
 fn search_closure_filter(
     word: &str,
     hns: &Hnsw<u16, DistLevenshtein>,
-    words: &Vec<String>,
-    filter_vector: &Vec<usize>,
+    words: &[String],
+    filter_vector: &[usize],
 ) {
     // transform string to u16 values
     let vec: Vec<u16> = word.chars().map(|c| c as u16).collect();
     // now create a closure using this filter_vector
     // here we can off course implement more advanced filter logic
-    let filter = |id: &usize| -> bool {
-        match filter_vector.binary_search(id) {
-            Ok(_) => true,
-            Err(_) => false,
-        }
-    };
+    let filter = |id: &usize| -> bool { filter_vector.binary_search(id).is_ok() };
 
     // Now let us do the search by using the defined clojure, which in turn uses our vector
     // ids not in the vector will not be indluced in the search results
@@ -65,11 +63,9 @@ fn filter_levenstein() {
         words.push(tw);
     }
 
-    let mut i = 0;
-    for w in &words {
+    for (i, w) in words.iter().enumerate() {
         let vec: Vec<u16> = w.chars().map(|c| c as u16).collect();
         hns.insert((&vec, i));
-        i = i + 1;
         if i % 1000 == 0 {
             println!("Inserting: {:?}", i);
         }
@@ -158,10 +154,7 @@ fn filter_l2() {
     let unif = Uniform::<f32>::new(0., 1.);
     let mut data = Vec::with_capacity(nb_elem);
     for _ in 0..nb_elem {
-        let column = (0..dim)
-            .into_iter()
-            .map(|_| rng.sample(unif))
-            .collect::<Vec<f32>>();
+        let column = (0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
         data.push(column);
     }
     // give an id to each data
@@ -176,10 +169,7 @@ fn filter_l2() {
     //
     let ef_search = 30;
     let knbn = 10;
-    let vec_tosearch = (0..dim)
-        .into_iter()
-        .map(|_| rng.sample(unif))
-        .collect::<Vec<f32>>();
+    let vec_tosearch = (0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
     //
     // Create a sorted vector of ids
     // the ids in the vector will be used as a filter

@@ -1,3 +1,6 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::range_zip_with_len)]
+
 use cpu_time::ProcessTime;
 use rand::distributions::Uniform;
 use rand::prelude::*;
@@ -16,10 +19,7 @@ fn main() {
     let unif = Uniform::<f32>::new(0., 1.);
     let mut data = Vec::with_capacity(nb_elem);
     for _ in 0..nb_elem {
-        let column = (0..dim)
-            .into_iter()
-            .map(|_| rng.sample(unif))
-            .collect::<Vec<f32>>();
+        let column = (0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
         data.push(column);
     }
     // give an id to each data

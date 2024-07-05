@@ -1,3 +1,5 @@
+#![allow(clippy::range_zip_with_len)]
+
 //! some testing utilities.  
 //! run with to get output statistics : cargo test --release -- --nocapture --test test_parallel.  
 //! serial test corresponds to random-10nn-euclidean(k=10)
@@ -15,11 +17,7 @@ use serde::{de::DeserializeOwned, Serialize};
 pub fn gen_random_vector_f32(nbrow: usize) -> Vec<f32> {
     let mut rng = thread_rng();
     let unif = Uniform::<f32>::new(0., 1.);
-    let vec = (0..nbrow)
-        .into_iter()
-        .map(|_| rng.sample(unif))
-        .collect::<Vec<f32>>();
-    vec
+    (0..nbrow).map(|_| rng.sample(unif)).collect::<Vec<f32>>()
 }
 
 /// return nbcolumn vectors of dimension nbrow
@@ -28,20 +26,17 @@ pub fn gen_random_matrix_f32(nbrow: usize, nbcolumn: usize) -> Vec<Vec<f32>> {
     let unif = Uniform::<f32>::new(0., 1.);
     let mut data = Vec::with_capacity(nbcolumn);
     for _ in 0..nbcolumn {
-        let column = (0..nbrow)
-            .into_iter()
-            .map(|_| rng.sample(unif))
-            .collect::<Vec<f32>>();
+        let column = (0..nbrow).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
         data.push(column);
     }
-    return data;
+    data
 }
 
 fn brute_force_neighbours<T: Serialize + DeserializeOwned + Copy + Send + Sync>(
     nb_neighbours: usize,
     refdata: &PointIndexation<T>,
     distance: PointDistance<T>,
-    data: &Vec<T>,
+    data: &[T],
 ) -> OrderedSkipList<PointIdWithOrder> {
     let mut neighbours = OrderedSkipList::<PointIdWithOrder>::with_capacity(refdata.get_nb_point());
 
@@ -107,8 +102,8 @@ mod tests {
             hns.parallel_insert(&data_with_id);
         } else {
             println!("serial insertion");
-            for i in 0..data.len() {
-                hns.insert((&data[i], i));
+            for (i, d) in data.iter().enumerate() {
+                hns.insert((d, i));
             }
         }
         let mut cpu_time: Duration = start.elapsed();
@@ -179,8 +174,7 @@ mod tests {
           //
 
         let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
-        let mean_search_time =
-            (search_times.iter().sum::<f32>() as f32) / (search_times.len() as f32);
+        let mean_search_time = (search_times.iter().sum::<f32>()) / (search_times.len() as f32);
         println!(
             "\n mean fraction (of knbn) returned by search {:?} ",
             (nb_returned.iter().sum::<usize>() as f32) / ((nb_returned.len() * knbn) as f32)
@@ -206,8 +200,8 @@ mod tests {
         //
         //
         let mut data = gen_random_matrix_f32(dim, nb_elem);
-        for i in 0..data.len() {
-            l2_normalize(&mut data[i]);
+        for v in &mut data {
+            l2_normalize(v);
         }
         let data_with_id = data.iter().zip(0..data.len()).collect::<Vec<_>>();
         let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
@@ -318,8 +312,7 @@ mod tests {
           //
 
         let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
-        let mean_search_time =
-            (search_times.iter().sum::<f32>() as f32) / (search_times.len() as f32);
+        let mean_search_time = (search_times.iter().sum::<f32>()) / (search_times.len() as f32);
         println!(
             "\n nb search {:?} recall rate  is {:?} search time inverse {:?} ",
             nbtest,

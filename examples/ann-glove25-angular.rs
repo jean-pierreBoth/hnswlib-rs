@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 use cpu_time::ProcessTime;
 use std::time::{Duration, SystemTime};
 
@@ -180,7 +182,7 @@ pub fn search<Dist>(
         let recall = knn_neighbours_d.iter().filter(|d| *d <= &max_dist).count();
         recalls.push(recall);
         let mut ratio = 0.;
-        if knn_neighbours_d.len() >= 1 {
+        if !knn_neighbours_d.is_empty() {
             ratio = knn_neighbours_d[knn_neighbours_d.len() - 1] / max_dist;
         }
         last_distances_ratio.push(ratio);

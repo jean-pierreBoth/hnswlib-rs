@@ -29,6 +29,6 @@ fn main() {
         if counter % 1_000_000 == 0 {
             println!("counter : {}", counter)
         }
-        counter = counter + 1;
+        counter += 1;
     }
 }

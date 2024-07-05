@@ -31,11 +31,9 @@ fn main() {
     }
     words.push(String::from("abcdj"));
     //
-    let mut i = 0;
-    for w in &words {
+    for (i, w) in words.iter().enumerate() {
         let vec: Vec<u16> = w.chars().map(|c| c as u16).collect();
         hns.insert((&vec, i));
-        i = i + 1;
     }
     // create a filter
     let mut filter: Vec<usize> = Vec::new();

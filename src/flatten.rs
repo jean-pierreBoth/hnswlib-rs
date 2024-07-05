@@ -167,8 +167,8 @@ mod tests {
         let ef_construct = 25;
         let nb_connection = 10;
         let hnsw = Hnsw::<f32, DistL1>::new(nb_connection, nbcolumn, 16, ef_construct, DistL1 {});
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i));
         }
         // some loggin info
         hnsw.dump_layer_info();

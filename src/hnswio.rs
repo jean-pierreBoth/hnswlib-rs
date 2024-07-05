@@ -1372,7 +1372,7 @@ mod tests {
 
     fn my_fn(v1: &[f32], v2: &[f32]) -> f32 {
         let norm_l1: f32 = v1.iter().zip(v2.iter()).map(|t| (*t.0 - *t.1).abs()).sum();
-        norm_l1 as f32
+        norm_l1
     }
 
     #[test]
@@ -1404,8 +1404,8 @@ mod tests {
             ef_construct,
             dist::DistL1 {},
         );
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i));
         }
         // some loggin info
         hnsw.dump_layer_info();
@@ -1454,8 +1454,8 @@ mod tests {
             ef_construct,
             mydist,
         );
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i));
         }
         // some loggin info
         hnsw.dump_layer_info();
@@ -1502,8 +1502,8 @@ mod tests {
             ef_construct,
             dist::DistL1 {},
         );
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i));
         }
         // some loggin info
         hnsw.dump_layer_info();
@@ -1554,8 +1554,8 @@ mod tests {
             ef_construct,
             dist::DistL1 {},
         );
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i));
         }
         // some loggin info
         hnsw.dump_layer_info();
@@ -1593,8 +1593,8 @@ mod tests {
             first_with_mmap
         );
         let nb_in = hnsw.get_nb_point();
-        for i in 0..data.len() {
-            hnsw.insert((&data[i], i + nb_in));
+        for (i, d) in data.iter().enumerate() {
+            hnsw.insert((d, i + nb_in));
         }
         //
         let search_res = hnsw.search(&first, 5, ef_construct);
@@ -1625,7 +1625,7 @@ mod tests {
         //
         // TODO: redump  and care about mmapped file, so we do not overwrite
         //
-        let dump_init = DumpInit::new(directory.path(), &fname, false);
+        let dump_init = DumpInit::new(directory.path(), fname, false);
         info!("will use basename : {}", dump_init.get_basename());
         let res = hnsw.file_dump(directory.path(), dump_init.get_basename());
         if res.is_err() {
@@ -1663,8 +1663,8 @@ mod tests {
             Hnsw::<f32, dist::DistL1>::new(nb_connection, 0, 16, ef_construct, dist::DistL1 {});
         let fname = "empty_db";
         let directory = tempfile::tempdir()?;
-        let _res = hnsw.file_dump(directory.path(), &fname);
-        let mut reloader = HnswIo::new(directory.path(), &fname);
+        let _res = hnsw.file_dump(directory.path(), fname);
+        let mut reloader = HnswIo::new(directory.path(), fname);
         let hnsw_loaded_res = reloader.load_hnsw::<f32, DistL1>();
         assert!(hnsw_loaded_res.is_err());
         Ok(())
