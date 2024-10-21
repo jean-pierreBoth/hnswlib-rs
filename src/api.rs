@@ -80,7 +80,7 @@ where
         let res = self.dump(DumpMode::Full, &mut dumpinit);
         //
         dumpinit.flush()?;
-        info!("End of dump");
+        info!("\n End of dump, file basename : {}\n", &dumpname);
         if res.is_ok() {
             Ok(dumpname)
         } else {
