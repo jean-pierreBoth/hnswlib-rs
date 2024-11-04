@@ -514,7 +514,7 @@ impl HnswIo {
 
     /// reload a previously dumped hnsw structure
     /// This function makes reload of a Hnsw dump with a given Dist.  
-    /// It is dedicated to distance of type  [crate::dist::DistPtr] that cannot implement Default.  
+    /// It is dedicated to distance of type DistPtr (see crate [anndist](https://crates.io/crates/anndists)) that cannot implement Default.  
     /// **It is the user responsability to reload with the same function as used in the dump**
     ///
     pub fn load_hnsw_with_dist<'b, 'a, T, D>(&'a self, f: D) -> anyhow::Result<Hnsw<'b, T, D>>
