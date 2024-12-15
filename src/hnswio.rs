@@ -332,6 +332,10 @@ impl HnswIo {
         }
     }
 
+    /// return basename of dump
+    pub fn get_basename(&self) -> &str {
+        &self.basename
+    }
     /// this method enables effective initialization after default allocation.
     /// It is an error to call set_values on an already defined Hswnio by any function other than [default](Self::default())
     pub fn set_values(

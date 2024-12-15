@@ -18,6 +18,31 @@ use crate::api::*;
 use crate::hnsw::*;
 use crate::hnswio::*;
 
+//========== Hnswio
+
+pub struct Hnswio_api {
+    pub(crate) loader: Box<HnswIo>,
+}
+
+impl Hnswio_api {
+    pub fn new(hnswio: HnswIo) -> Hnswio_api {
+        Hnswio_api {
+            loader: Box::new(hnswio),
+        }
+    }
+}
+
+/// returns a pointer to a Hnswio
+/// args corresponds to string giving base filename of dump, supposed to be in current directory
+pub unsafe extern "C" fn get_hnswio(flen: usize, name: *const u8) -> *const Hnswio_api {
+    let slice = unsafe { std::slice::from_raw_parts(name, flen) };
+    let filename = String::from_utf8_lossy(slice).into_owned();
+    let hnswio = HnswIo::new(std::path::Path::new("."), &filename);
+    let api = Hnswio_api::new(hnswio);
+    Box::into_raw(Box::new(api))
+}
+
+//=================
 // the export macro makes the macro global in crate and accecssible via crate::declare_myapi_type!
 #[macro_export]
 macro_rules! declare_myapi_type(
@@ -260,35 +285,28 @@ macro_rules! generate_file_dump(
     )
 );
 
-static mut RELOADER_OPT: Option<HnswIo> = None;
+//======= Reload stuff
 
 #[allow(unused_macros)]
 macro_rules! generate_loadhnsw(
     ($function_name:ident, $api_name:ty, $type_val:ty, $type_dist : ty) => (
-        /// # Safety
+        /// function to reload from a previous dump (knowing data type and distance used).
+        /// This function takes as argument a pointer to Hnswio_api that drives the reloading.
+        /// The pointer is provided by the function [get_hnswio()](get_hnswio).
+        ///
         /// The function is unsafe because it dereferences a raw pointer
         ///
         #[no_mangle]
-        pub unsafe extern "C" fn $function_name(flen : usize, name : *const u8)  -> *const $api_name {
-            let  slice = unsafe { std::slice::from_raw_parts(name, flen)} ;
-            let filename = String::from_utf8_lossy(slice).into_owned();
+        pub unsafe extern "C" fn $function_name(hnswio_c : *mut Hnswio_api)  -> *const $api_name {
             //
-            unsafe {
-                if RELOADER_OPT.is_some() {
-                    error!("api can have nonly one mmap active");
-                    return ptr::null();
-                }
-                RELOADER_OPT = Some(HnswIo::new(std::path::Path::new("."), &filename));
-                let hnsw_loaded_res = RELOADER_OPT.as_mut().unwrap().load_hnsw::<$type_val, $type_dist>();
-
-                if let Ok(hnsw_loaded) = hnsw_loaded_res {
-                    let api = <$api_name>::new(Box::new(hnsw_loaded));
-                    return Box::into_raw(Box::new(api));
-                }
-                else {
-                    warn!("an error occured, could not reload data from {:?}", filename);
-                    return ptr::null();
-                }
+            let hnsw_loaded_res = (*hnswio_c).loader.load_hnsw::<$type_val, $type_dist>();
+            if let Ok(hnsw_loaded) = hnsw_loaded_res {
+                let api = <$api_name>::new(Box::new(hnsw_loaded));
+                return Box::into_raw(Box::new(api));
+            }
+            else {
+                warn!("an error occured, could not reload data from {:?}", (*hnswio_c).loader.get_basename());
+                return ptr::null();
             }
         }  // end of load_hnswdump_
      )

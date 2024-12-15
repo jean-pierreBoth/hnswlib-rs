@@ -317,6 +317,7 @@ use rand::prelude::*;
 pub struct LayerGenerator {
     rng: Arc<Mutex<rand::rngs::StdRng>>,
     unif: Uniform<f64>,
+    // drives number of levels generated ~ S
     scale: f64,
     maxlevel: usize,
 }
@@ -354,8 +355,9 @@ impl LayerGenerator {
     }
 
     /// just to try some variations on exponential level sampling. Unused.
-    pub fn set_scale_modification(&mut self, scale_modification: f64) {
-        self.scale = 1. / ((1. / self.scale) + scale_modification.ln());
+    fn set_scale_modification(&mut self, scale_modification: f64) {
+        self.scale *= scale_modification;
+        log::info!("using scale for sampling levels : {:.2e}", self.scale);
     }
 } // end impl for LayerGenerator
 
@@ -834,28 +836,34 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         self.datamap_opt
     }
 
-    // multiplicative factor applied to default scale. Must between 0.5 and 1.
-    // more  than 1. gives more occupied layers. This is just to experiment
+    /// By default the levels are sampled using an exponential law of parameter 1./ln(max_nb_conn)
+    /// so the number of levels used is around ln(max_nb_conn) + 1.  
+    /// Reducing the scale reduce the number of levels generated and can provide better precision (reduce memory but with some more cpu used)
+    /// The factor must between 0.2 and 1.
+    // This is just to experiment
     // parameters variations on the algorithm but not general use.
     #[allow(unused)]
-    fn set_scale_modification(&mut self, scale_modification: f64) {
-        println!("\n Scale modification factor {:?}, scale value : {:?} (factor must be between 0.5 and 2.)",
-                    scale_modification, self.layer_indexed_points.layer_g.scale);
+    pub fn set_scale_modification(&mut self, scale_modification: f64) {
         //
-        if (0.5..=2.).contains(&scale_modification) {
-            self.layer_indexed_points
-                .layer_g
-                .set_scale_modification(scale_modification);
+        let min_factor = 0.2;
+        println!("\n  Current scale value : {:.2e}, Scale modification factor asked : {:.2e},(modification factor must be between {:.2e} and 1.)",
+            self.layer_indexed_points.layer_g.scale, scale_modification, min_factor);
+        //
+        if scale_modification >= 1. {
             println!(
-                " New scale value {:?}",
-                self.layer_indexed_points.layer_g.scale
-            );
-        } else {
-            println!(
-                "\n Scale modification arg {:?} not valid , factor must be between 0.5 and 2.)",
+                "\n Scale modification arg {:.2e} not valid , factor must be less than 1.)",
                 scale_modification
             );
+        } else if scale_modification < min_factor {
+            println!(
+                "\n Scale modification arg {:.2e} not valid , factor must be greater than {:.2e}, using {:.2e})",
+                scale_modification, min_factor, min_factor
+            );
         }
+        //
+        self.layer_indexed_points
+            .layer_g
+            .set_scale_modification(scale_modification.max(min_factor));
     } // end of set_scale_modification
 
     // here we could pass a point_id_with_order instead of entry_point_id: PointId

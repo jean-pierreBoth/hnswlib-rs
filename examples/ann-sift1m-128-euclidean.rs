@@ -69,6 +69,7 @@ pub fn main() {
     let extend_flag = false;
     info!("extend flag = {:?} ", extend_flag);
     hnsw.set_extend_candidates(extend_flag);
+    //    hnsw.set_scale_modification(0.25);
     //
     // parallel insertion
     let start = ProcessTime::now();

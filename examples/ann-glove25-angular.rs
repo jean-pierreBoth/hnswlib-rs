@@ -56,6 +56,7 @@ mod utils;
 use utils::*;
 
 pub fn main() {
+    let _ = env_logger::builder().is_test(true).try_init().unwrap();
     let parallel = true;
     //
     let fname = String::from("/home/jpboth/Data/ANN/glove-25-angular.hdf5");
@@ -91,6 +92,7 @@ pub fn main() {
     let mut hnsw =
         Hnsw::<f32, DistDot>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistDot {});
     hnsw.set_extend_candidates(true);
+    //    hnsw.set_scale_modification(0.25);
     // parallel insertion
     let start = ProcessTime::now();
     let now = SystemTime::now();
