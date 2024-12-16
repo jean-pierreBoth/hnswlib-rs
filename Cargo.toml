@@ -20,7 +20,7 @@ lto = true
 opt-level = 3
 
 [lib]
-# cargo rustc --lib -- --crate-type dylib [or staticlib] or rlib (default)
+# cargo rustc --lib -- --crate-type cdylib [or staticlib] or rlib (default)
 # if we want to avoid specifying in advance crate-type 
 path = "src/lib.rs"
 #crate-type = ["cdylib"]

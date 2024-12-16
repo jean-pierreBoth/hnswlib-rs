@@ -20,26 +20,14 @@ use crate::hnswio::*;
 
 //========== Hnswio
 
-pub struct Hnswio_api {
-    pub(crate) loader: Box<HnswIo>,
-}
-
-impl Hnswio_api {
-    pub fn new(hnswio: HnswIo) -> Hnswio_api {
-        Hnswio_api {
-            loader: Box::new(hnswio),
-        }
-    }
-}
-
 /// returns a pointer to a Hnswio
 /// args corresponds to string giving base filename of dump, supposed to be in current directory
-pub unsafe extern "C" fn get_hnswio(flen: usize, name: *const u8) -> *const Hnswio_api {
-    let slice = unsafe { std::slice::from_raw_parts(name, flen) };
+#[no_mangle]
+pub unsafe extern "C" fn get_hnswio(flen: u64, name: *const u8) -> *const HnswIo {
+    let slice = unsafe { std::slice::from_raw_parts(name, flen as usize) };
     let filename = String::from_utf8_lossy(slice).into_owned();
     let hnswio = HnswIo::new(std::path::Path::new("."), &filename);
-    let api = Hnswio_api::new(hnswio);
-    Box::into_raw(Box::new(api))
+    Box::into_raw(Box::new(hnswio))
 }
 
 //=================
@@ -297,15 +285,15 @@ macro_rules! generate_loadhnsw(
         /// The function is unsafe because it dereferences a raw pointer
         ///
         #[no_mangle]
-        pub unsafe extern "C" fn $function_name(hnswio_c : *mut Hnswio_api)  -> *const $api_name {
+        pub unsafe extern "C" fn $function_name(hnswio_c : *mut HnswIo)  -> *const $api_name {
             //
-            let hnsw_loaded_res = (*hnswio_c).loader.load_hnsw::<$type_val, $type_dist>();
+            let hnsw_loaded_res = (*hnswio_c).load_hnsw::<$type_val, $type_dist>();
             if let Ok(hnsw_loaded) = hnsw_loaded_res {
                 let api = <$api_name>::new(Box::new(hnsw_loaded));
                 return Box::into_raw(Box::new(api));
             }
             else {
-                warn!("an error occured, could not reload data from {:?}", (*hnswio_c).loader.get_basename());
+                warn!("an error occured, could not reload data from {:?}", (*hnswio_c).get_basename());
                 return ptr::null();
             }
         }  // end of load_hnswdump_
