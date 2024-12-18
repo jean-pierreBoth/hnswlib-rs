@@ -1,7 +1,8 @@
 - version 0.3.1
  
   Possibility to reduce the number of levels used Hnsw structure with the function hnsw::modify_level_scale.
-  This often increases significantly recall while incurring a moderate cpu cost.
+  This often increases significantly recall while incurring a moderate cpu cost. It is also possible
+  to have same recall with smaller max_nb_conn parameters so reducing memory usage. See README.md at [bigann](https://github.com/jean-pierreBoth/bigann).  
   Modification inspired by the [paper](https://arxiv.org/abs/2412.01940)
 
   Clippy cleaning and minor arguments change (PathBuf to Path String to &str) in dump/reload
