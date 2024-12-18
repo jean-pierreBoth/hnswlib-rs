@@ -1,8 +1,18 @@
+- version 0.3.1
+ 
+  Possibility to reduce the number of levels used Hnsw structure with the function hnsw::modify_level_scale.
+  This often increases significantly recall while incurring a moderate cpu cost.
+  Modification inspired by the [paper](https://arxiv.org/abs/2412.01940)
+
+  Clippy cleaning and minor arguments change (PathBuf to Path String to &str) in dump/reload
+  with the help of bwsw (https://github.com/bwsw)
+
+
 - **version 0.3.0**:
  
    The distances implementation is now in a separate crate [anndsits](https://crates.io/crates/anndists). Using hnsw_rs::prelude:::*   should make the change transparent. 
    
-   The mmap implentation makes it possible to use the [coreset](https://github.com/jean-pierreBoth/coreset) crate to compute coreset and clusters of data stored in hnsw dumps.
+   The mmap implementation makes it possible to use the [coreset](https://github.com/jean-pierreBoth/coreset) crate to compute coreset and clusters of data stored in hnsw dumps.
 
 - version 0.2.1:
   

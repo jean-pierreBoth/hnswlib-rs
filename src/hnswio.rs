@@ -57,6 +57,10 @@ const MAGICDESCR_2: u32 = 0x002a677f;
 // This help use mmap as we can return directly a slice.
 const MAGICDESCR_3: u32 = 0x002a6771;
 
+// magic for v4
+// we dump level scale modififcation factor
+const MAGICDESCR_4: u32 = 0x002a6779;
+
 // magic at beginning of a layer dump
 const MAGICLAYER: u32 = 0x000a676f;
 // magic head of data file and before each data vector
@@ -936,13 +940,20 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
     io_in.read_exact(&mut it_slice)?;
     let magic = u32::from_ne_bytes(it_slice);
     debug!(" magic {:X} ", magic);
-    if magic != MAGICDESCR_2 && magic != MAGICDESCR_3 {
-        info!("bad magic");
-        return Err(anyhow!("bad magic at descr beginning"));
-    } else if magic == MAGICDESCR_2 {
-        descr.format_version = 2;
-    } else if magic == MAGICDESCR_3 {
-        descr.format_version = 3;
+    match magic {
+        MAGICDESCR_2 => {
+            descr.format_version = 2;
+        }
+        MAGICDESCR_3 => {
+            descr.format_version = 3;
+        }
+        MAGICDESCR_4 => {
+            descr.format_version = 4;
+        }
+        _ => {
+            error!("bad magic");
+            return Err(anyhow!("bad magic at descr beginning"));
+        }
     }
     let mut it_slice = [0u8; std::mem::size_of::<u8>()];
     io_in.read_exact(&mut it_slice)?;

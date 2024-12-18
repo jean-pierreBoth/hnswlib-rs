@@ -92,7 +92,7 @@ pub fn main() {
     let mut hnsw =
         Hnsw::<f32, DistDot>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistDot {});
     hnsw.set_extend_candidates(true);
-    //    hnsw.set_scale_modification(0.25);
+    //    hnsw.modify_level_scale(0.25);
     // parallel insertion
     let start = ProcessTime::now();
     let now = SystemTime::now();

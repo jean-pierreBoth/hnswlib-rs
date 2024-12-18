@@ -843,7 +843,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     // This is just to experiment
     // parameters variations on the algorithm but not general use.
     #[allow(unused)]
-    pub fn set_scale_modification(&mut self, scale_modification: f64) {
+    pub fn modify_level_scale(&mut self, scale_modification: f64) {
         //
         let min_factor = 0.2;
         println!("\n  Current scale value : {:.2e}, Scale modification factor asked : {:.2e},(modification factor must be between {:.2e} and 1.)",

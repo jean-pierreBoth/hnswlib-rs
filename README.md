@@ -119,7 +119,7 @@ With a i9-13900HX 24 cores laptop we get the following results:
 3. sift1m benchmark: (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 15000 req/s with a recall rate of 0.9907 or at 8300 req/s with a recall rate of 0.9959, depending on the parameters.
   
 Moreover a tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
-gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/) benchmark and can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
+gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/neurips21.html) or [IRISA](http://corpus-texmex.irisa.fr/)benchmark and can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
 
 Some lines extracted from this Mnist benchmark show how it works for f32 and L2 norm
 
