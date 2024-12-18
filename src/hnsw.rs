@@ -332,6 +332,21 @@ impl LayerGenerator {
             maxlevel,
         }
     }
+
+    // new when we know scale used. Should replace the one without scale
+    pub(crate) fn new_with_scale(
+        max_nb_connection: usize,
+        scale_factor: f64,
+        maxlevel: usize,
+    ) -> Self {
+        let scale_default = 1. / (max_nb_connection as f64).ln();
+        LayerGenerator {
+            rng: Arc::new(Mutex::new(StdRng::from_entropy())),
+            unif: Uniform::<f64>::new(0., 1.),
+            scale: scale_default * scale_factor,
+            maxlevel,
+        }
+    }
     //
     // l=0 most densely packed layer
     // if S is scale we sample so that P(l=n) = exp(-n/S) - exp(- (n+1)/S)
@@ -358,6 +373,11 @@ impl LayerGenerator {
     fn set_scale_modification(&mut self, scale_modification: f64) {
         self.scale *= scale_modification;
         log::info!("using scale for sampling levels : {:.2e}", self.scale);
+    }
+
+    ///
+    fn get_level_scale(&self) -> f64 {
+        self.scale
     }
 } // end impl for LayerGenerator
 
@@ -430,8 +450,8 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
         for i in 0..max_layer {
             // recall that range are right extremeity excluded
             // compute fraction of points going into layer i and do expected memory reservation
-            let frac =
-                (-(i as f64) / (max_layer as f64)).exp() - (-((i + 1) as f64) / (max_layer as f64));
+            let s = 1. / (max_nb_connection as f64).ln();
+            let frac = (-(i as f64) / s).exp() - (-((i + 1) as f64) / s);
             let expected_size = ((frac * max_elements as f64).round()) as usize;
             points_by_layer.push(Vec::with_capacity(expected_size));
         }
@@ -454,6 +474,11 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
             None => 0,
         }
     }
+
+    pub fn get_level_scale(&self) -> f64 {
+        self.layer_g.get_level_scale()
+    }
+
     fn debug_dump(&self) {
         println!(" debug dump of PointIndexation");
         let max_level_observed = self.get_max_level_observed();

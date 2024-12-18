@@ -767,7 +767,11 @@ impl HnswIo {
             max_nb_connection: descr.max_nb_connection as usize,
             max_layer: NB_LAYER_MAX as usize,
             points_by_layer: Arc::new(RwLock::new(points_by_layer)),
-            layer_g: LayerGenerator::new(descr.max_nb_connection as usize, NB_LAYER_MAX as usize),
+            layer_g: LayerGenerator::new_with_scale(
+                descr.max_nb_connection as usize,
+                descr.level_scale,
+                NB_LAYER_MAX as usize,
+            ),
             nb_point: Arc::new(RwLock::new(nb_points_loaded)), // CAVEAT , we should increase , the whole thing is to be able to increment graph ?
             entry_point: Arc::new(RwLock::new(Some(entry_point))),
         };
@@ -843,6 +847,8 @@ pub struct Description {
     pub dumpmode: u8,
     /// max number of connections in layers != 0
     pub max_nb_connection: u8,
+    /// scale used in level sampling
+    pub level_scale: f64,
     /// number of observed layers
     pub nb_layer: u8,
     /// search parameter
@@ -877,6 +883,7 @@ impl Description {
         out.write_all(&mode.to_ne_bytes())?;
         // dump of max_nb_connection as u8!!
         out.write_all(&self.max_nb_connection.to_ne_bytes())?;
+        // TODO: with MAGICDESCR_4 we must dump self.level_scale
         out.write_all(&self.nb_layer.to_ne_bytes())?;
         if self.nb_layer != NB_LAYER_MAX {
             println!("dump of Description, nb_layer != NB_MAX_LAYER");
@@ -928,6 +935,7 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
         format_version: 0,
         dumpmode: 0,
         max_nb_connection: 0,
+        level_scale: 1.0f64,
         nb_layer: 0,
         ef: 0,
         nb_point: 0,
@@ -964,6 +972,13 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
     io_in.read_exact(&mut it_slice)?;
     descr.max_nb_connection = u8::from_ne_bytes(it_slice);
     info!(" max_nb_connection {:?} ", descr.max_nb_connection);
+    //
+    if descr.format_version == 4 {
+        // we read modification for level sampling
+        let mut it_slice = [0u8; std::mem::size_of::<f64>()];
+        io_in.read_exact(&mut it_slice)?;
+        descr.level_scale = f64::from_ne_bytes(it_slice);
+    }
     //
     let mut it_slice = [0u8; std::mem::size_of::<u8>()];
     io_in.read_exact(&mut it_slice)?;
@@ -1344,12 +1359,13 @@ impl<
             _ => 0,
         };
         let datadim: usize = self.layer_indexed_points.get_data_dimension();
-
+        let level_scale = self.layer_indexed_points.get_level_scale();
         let description = Description {
             format_version: 3,
             //  value is 1 for Full 0 for Light
             dumpmode,
             max_nb_connection: self.get_max_nb_connection(),
+            level_scale,
             nb_layer: self.get_max_level() as u8,
             ef: self.get_ef_construction(),
             nb_point: self.get_nb_point(),
