@@ -20,6 +20,9 @@ use std::time::{Duration, SystemTime};
 // 24 core Core(TM) i9-13900HX simdeez
 //     24           400         24           1              0          0        0.977        62000        1.001
 
+// 24 core Core(TM) i9-13900HX simdeez with modify_level_scale at 0.5
+//     24           400         24           0.5              0          0      0.990        58722        1.000
+
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
 use log::info;
@@ -59,7 +62,7 @@ pub fn main() {
     let mut hnsw = Hnsw::<f32, DistL2>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistL2 {});
     hnsw.set_extend_candidates(false);
     //
-    //    hnsw.modify_level_scale(0.25);
+    hnsw.modify_level_scale(0.5);
     // parallel insertion
     let mut start = ProcessTime::now();
     let mut now = SystemTime::now();

@@ -14,7 +14,6 @@ use std::time::{Duration, SystemTime};
 //  24            400         32            1.           0          0          0.898        8662
 //  24            400         64            1.           1          0          0.930        4711        1.0027
 //  24            400         64            1.           1          1          0.921        4550        1.0039
-//  24            400         64            0.5          0          0          0.916        4896        1.0046
 //  24           1600         48            1            1          0          0.924        5380        1.0034
 
 //  32            400         48            1            1          0          0.93         4706        1.0026
@@ -25,7 +24,6 @@ use std::time::{Duration, SystemTime};
 //  24            400         48            1            1          0          0.92         6036.       1.0038
 //  48            800         48            1            1          0          0.935        4018        1.002
 //  48            800         64            1            1          0          0.942        3091        1.0014
-//  48            800         64            0.5          1          0          0.9395       3234        1.00167
 //  48            800         64            1            1          1          0.9435       2640        1.00126
 
 // k = 100
@@ -46,6 +44,19 @@ use std::time::{Duration, SystemTime};
 // 24 core Core(TM) i9-13900HX simdeez     knbn = 100
 // ==================================================
 //  48            800        128            1            1          0          0.979        12000     1.002
+
+// results with scale modification 0.5
+//====================================
+
+// 24 core Core(TM) i9-13900HX simdeez     knbn = 10
+// ==================================================
+//  24            800         48            0.5            1          0          0.931        40700     1.002
+//  48            800         48            0.5            1          0          0.941        30001     1.001
+
+// 24 core Core(TM) i9-13900HX simdeez     knbn = 100
+// ==================================================
+//  24            800        128            0.5            1          0          0.974        16521     1.002
+//  48            800        128            0.5            1          0          0.985        11484     1.001
 
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
@@ -75,7 +86,7 @@ pub fn main() {
     );
     info!("Nb neighbours answers for test data : {} \n\n", knbn_max);
     //
-    let max_nb_connection = 48;
+    let max_nb_connection = 24;
     let ef_c = 800;
     println!(
         " max_nb_conn : {:?}, ef_construction : {:?} ",
@@ -91,8 +102,10 @@ pub fn main() {
     // Hnsw allocation
     let mut hnsw =
         Hnsw::<f32, DistDot>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistDot {});
+    //
     hnsw.set_extend_candidates(true);
-    //    hnsw.modify_level_scale(0.25);
+    hnsw.modify_level_scale(0.5);
+    //
     // parallel insertion
     let start = ProcessTime::now();
     let now = SystemTime::now();

@@ -27,6 +27,12 @@ use log::info;
 //     64           1600        64            1              0          0        0.9907       15258       1.0004
 //     64           1600       128            1              0          0        0.9957       8296        1.0002
 
+// 24 core Core(TM) i9-13900HX simdeez with level scale modification factor 0.5
+//=============================================================================
+
+//     48           1600        64            0.5              0          0        0.9938       14073       1.0002
+//     48           1600       128            0.5              0          0        0.9992       7906        1.0000
+
 use hnsw_rs::prelude::*;
 
 mod utils;
@@ -52,7 +58,7 @@ pub fn main() {
     );
     info!(" nb neighbours answers for test data : {}", knbn_max);
     //
-    let max_nb_connection = 64;
+    let max_nb_connection = 48;
     let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
     let ef_c = 1600;
     //
@@ -69,7 +75,7 @@ pub fn main() {
     let extend_flag = false;
     info!("extend flag = {:?} ", extend_flag);
     hnsw.set_extend_candidates(extend_flag);
-    //    hnsw.modify_level_scale(0.25);
+    hnsw.modify_level_scale(0.25);
     //
     // parallel insertion
     let start = ProcessTime::now();
