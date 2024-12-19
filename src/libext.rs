@@ -22,6 +22,8 @@ use crate::hnswio::*;
 
 /// returns a pointer to a Hnswio
 /// args corresponds to string giving base filename of dump, supposed to be in current directory
+/// # Safety
+/// pointer must be char* pointer to the string
 #[no_mangle]
 pub unsafe extern "C" fn get_hnswio(flen: u64, name: *const u8) -> *const HnswIo {
     let slice = unsafe { std::slice::from_raw_parts(name, flen as usize) };
@@ -101,7 +103,6 @@ super::declare_myapi_type!(HnswApif64, f64);
 //===================================================================================================
 //  These are the macros to generate trait implementation for useful numeric types
 #[allow(unused_macros)]
-
 macro_rules! generate_insert(
 ($function_name:ident, $api_name:ty, $type_val:ty) => (
         /// # Safety
@@ -281,7 +282,7 @@ macro_rules! generate_loadhnsw(
         /// function to reload from a previous dump (knowing data type and distance used).
         /// This function takes as argument a pointer to Hnswio_api that drives the reloading.
         /// The pointer is provided by the function [get_hnswio()](get_hnswio).
-        ///
+        /// # Safety
         /// The function is unsafe because it dereferences a raw pointer
         ///
         #[no_mangle]

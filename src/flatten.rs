@@ -107,7 +107,7 @@ impl FlatNeighborhood {
     }
 } // end impl block for FlatNeighborhood
 
-impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> From<&Hnsw<'b, T, D>>
+impl<T: Clone + Send + Sync, D: Distance<T> + Send + Sync> From<&Hnsw<'_, T, D>>
     for FlatNeighborhood
 {
     /// extract from the Hnsw strucure a hashtable mapping original DataId into a FlatPoint structure gathering its neighbourhood information.  

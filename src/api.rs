@@ -36,7 +36,7 @@ pub trait AnnT {
     fn file_dump(&self, path: &Path, file_basename: &str) -> anyhow::Result<String>;
 }
 
-impl<'b, T, D> AnnT for Hnsw<'b, T, D>
+impl<T, D> AnnT for Hnsw<'_, T, D>
 where
     T: Serialize + DeserializeOwned + Clone + Send + Sync,
     D: Distance<T> + Send + Sync,
@@ -63,12 +63,9 @@ where
         self.parallel_search(data, knbn, ef_s)
     }
 
-    /// The main entry point to do a dump.  
-    /// It will generate two files one for the graph part of the data. The other for the real data points of the structure.
-    /// The names of file are $filename.hnsw.graph for the graph and $filename.hnsw.data.
-    ///
-
-    ///
+    // The main entry point to do a dump.
+    // It will generate two files one for the graph part of the data. The other for the real data points of the structure.
+    // The names of file are $filename.hnsw.graph for the graph and $filename.hnsw.data.
     fn file_dump(&self, path: &Path, file_basename: &str) -> anyhow::Result<String> {
         info!("In Hnsw::file_dump");
         //

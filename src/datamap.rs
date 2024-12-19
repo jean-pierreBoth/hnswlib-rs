@@ -295,7 +295,7 @@ impl DataMap {
     /// returns Keys in order they are in the file, thus optimizing file/memory access.  
     /// Note that in case of parallel insertion this can be different from insertion odrer.
     pub fn get_dataid_iter(&self) -> indexmap::map::Keys<DataId, usize> {
-        return self.hmap.keys();
+        self.hmap.keys()
     }
 
     /// returns full data type name

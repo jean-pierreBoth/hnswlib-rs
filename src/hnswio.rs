@@ -312,6 +312,7 @@ pub struct HnswIo {
 impl HnswIo {
     /// - directory is directory containing the dumped files,
     /// - basename is used to build $basename.hnsw.data and $basename.hnsw.graph
+    ///
     ///  default is to use default ReloadOptions.
     pub fn new(directory: &Path, basename: &str) -> Self {
         HnswIo {
@@ -1055,7 +1056,7 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
 ///  1. The value MAGICDATAP (u32)
 ///  2. origin_id as a u64
 ///  3. The vector of data (the length is known from Description)
-
+///
 fn dump_point<T: Serialize + Clone + Sized + Send + Sync, W: Write>(
     point: &Point<T>,
     mode: DumpMode,
@@ -1295,7 +1296,7 @@ fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<Poin
 // . list of point of layer
 // dump entry point
 //
-impl<'b, T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointIndexation<'b, T> {
+impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointIndexation<'_, T> {
     fn dump(&self, mode: DumpMode, dumpinit: &mut DumpInit) -> Result<i32> {
         let graphout = &mut dumpinit.graph_out;
         let dataout = &mut dumpinit.data_out;
@@ -1343,10 +1344,9 @@ impl<'b, T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for Poin
 //
 
 impl<
-        'b,
         T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync,
         D: Distance<T> + Send + Sync,
-    > HnswIoT for Hnsw<'b, T, D>
+    > HnswIoT for Hnsw<'_, T, D>
 {
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw

@@ -75,7 +75,7 @@ impl PartialOrd for PointIdWithOrder {
     } // end cmp
 } // end impl PartialOrd
 
-impl<'b, T: Send + Sync + Clone + Copy> From<&PointWithOrder<'b, T>> for PointIdWithOrder {
+impl<T: Send + Sync + Clone + Copy> From<&PointWithOrder<'_, T>> for PointIdWithOrder {
     fn from(point: &PointWithOrder<T>) -> PointIdWithOrder {
         PointIdWithOrder::new(point.point_ref.p_id, point.dist_to_ref)
     }
@@ -270,23 +270,23 @@ pub(crate) struct PointWithOrder<'b, T: Clone + Send + Sync> {
     dist_to_ref: f32,
 }
 
-impl<'b, T: Clone + Send + Sync> PartialEq for PointWithOrder<'b, T> {
+impl<T: Clone + Send + Sync> PartialEq for PointWithOrder<'_, T> {
     fn eq(&self, other: &PointWithOrder<T>) -> bool {
         self.dist_to_ref == other.dist_to_ref
     } // end eq
 }
 
-impl<'b, T: Clone + Send + Sync> Eq for PointWithOrder<'b, T> {}
+impl<T: Clone + Send + Sync> Eq for PointWithOrder<'_, T> {}
 
 // order points by distance to self.
 #[allow(clippy::non_canonical_partial_ord_impl)]
-impl<'b, T: Clone + Send + Sync> PartialOrd for PointWithOrder<'b, T> {
+impl<T: Clone + Send + Sync> PartialOrd for PointWithOrder<'_, T> {
     fn partial_cmp(&self, other: &PointWithOrder<T>) -> Option<Ordering> {
         self.dist_to_ref.partial_cmp(&other.dist_to_ref)
     } // end cmp
 } // end impl PartialOrd
 
-impl<'b, T: Clone + Send + Sync> Ord for PointWithOrder<'b, T> {
+impl<T: Clone + Send + Sync> Ord for PointWithOrder<'_, T> {
     fn cmp(&self, other: &PointWithOrder<T>) -> Ordering {
         if !self.dist_to_ref.is_nan() && !other.dist_to_ref.is_nan() {
             self.dist_to_ref.partial_cmp(&other.dist_to_ref).unwrap()
@@ -375,7 +375,7 @@ impl LayerGenerator {
         log::info!("using scale for sampling levels : {:.2e}", self.scale);
     }
 
-    ///
+    //
     fn get_level_scale(&self) -> f64 {
         self.scale
     }
@@ -406,7 +406,7 @@ pub struct PointIndexation<'b, T: Clone + Send + Sync> {
 // A point indexation may contain circular references. To deallocate these after a point indexation goes out of scope,
 // implement the Drop trait.
 
-impl<'b, T: Clone + Send + Sync> Drop for PointIndexation<'b, T> {
+impl<T: Clone + Send + Sync> Drop for PointIndexation<'_, T> {
     fn drop(&mut self) {
         let cpu_start = ProcessTime::now();
         let sys_now = SystemTime::now();
@@ -643,7 +643,7 @@ impl<'a, 'b, T: Clone + Send + Sync> IterPoint<'a, 'b, T> {
 } // end of block impl IterPoint
 
 /// iterator for layer 0 to upper layer.
-impl<'a, 'b, T: Clone + Send + Sync> Iterator for IterPoint<'a, 'b, T> {
+impl<'b, T: Clone + Send + Sync> Iterator for IterPoint<'_, 'b, T> {
     type Item = Arc<Point<'b, T>>;
     //
     fn next(&mut self) -> Option<Self::Item> {
@@ -711,7 +711,7 @@ impl<'a, 'b, T: Clone + Send + Sync> IterPointLayer<'a, 'b, T> {
 } // end of block impl IterPointLayer
 
 /// iterator for layer 0 to upper layer.
-impl<'a, 'b, T: Clone + Send + Sync + 'b> Iterator for IterPointLayer<'a, 'b, T> {
+impl<'b, T: Clone + Send + Sync + 'b> Iterator for IterPointLayer<'_, 'b, T> {
     type Item = Arc<Point<'b, T>>;
     //
     fn next(&mut self) -> Option<Self::Item> {
