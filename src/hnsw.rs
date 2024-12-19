@@ -861,14 +861,16 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         self.datamap_opt
     }
 
-    /// By default the levels are sampled using an exponential law of parameter 1./ln(max_nb_conn)
-    /// so the number of levels used is around ln(max_nb_conn) + 1.  
-    /// Reducing the scale reduce the number of levels generated and can provide better precision (reduce memory but with some more cpu used)
+    /// By default the levels are sampled using an exponential law of parameter ln(max_nb_conn)
+    /// so the probability of having more than l levels decrease as exp(-l * ln(max_nb_conn))  
+    /// Reducing the scale change the parameter of the exponential to ln(max_nb_conn)/scale.
+    /// This reduce the number of levels generated and can provide better precision, reduce memory but with some more cpu used
     /// The factor must between 0.2 and 1.
-    // This is just to experiment
-    // parameters variations on the algorithm but not general use.
-    #[allow(unused)]
     pub fn modify_level_scale(&mut self, scale_modification: f64) {
+        //
+        if self.get_nb_point() > 0 {
+            println!("using modify_level_scale is possible at creation of a Hnsw structure to ensure coherence between runs")
+        }
         //
         let min_factor = 0.2;
         println!("\n  Current scale value : {:.2e}, Scale modification factor asked : {:.2e},(modification factor must be between {:.2e} and 1.)",
