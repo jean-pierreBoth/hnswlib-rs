@@ -79,8 +79,10 @@ Upon insertion, the level ***l*** of a new point is sampled with an exponential 
 so that level 0 is the most densely populated layer, upper layers being exponentially less populated as level increases.  
 The nearest neighbour of the point is searched in lookup tables from the upper level to the level just above its layer (***l***), so we should arrive near the new point at its level at a relatively low cost. Then the ***max_nb_connection*** nearest neighbours are searched in neighbours of neighbours table (with a reverse updating of tables) recursively from its layer ***l*** down to the most populated level 0.  
 
-The scale parameter of the exponential law depends on the maximum number of connection possible for a point (parameter ***max_nb_connection***) to others.  
-Explicitly the scale parameter is chosen as : `scale=1/ln(max_nb_connection)`.
+The parameter of the exponential law to sample point levels is set to `ln(max_nb_connection)/scale`. 
+By default *scale* is set to 1. It is possible to reduce the *scale* parameter and thus reduce the number of levels used (See Hnsw::modify_level_scale) without increasing max_nb_connection.      
+This often provide beter recalls without increasing *max_nb_connection* which increase memory usage. (See examples)
+
 
 The main parameters occuring in constructing the graph or in searching are:
 
@@ -119,7 +121,7 @@ With a i9-13900HX 24 cores laptop we get the following results:
 3. sift1m benchmark: (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 15000 req/s with a recall rate of 0.9907 or at 8300 req/s with a recall rate of 0.9959, depending on the parameters.
   
 Moreover a tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
-gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/neurips21.html) or [IRISA](http://corpus-texmex.irisa.fr/)benchmark and can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
+gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/neurips21.html) benchmark. The benchmark is also described at [IRISA](http://corpus-texmex.irisa.fr/). This crate can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
 
 Some lines extracted from this Mnist benchmark show how it works for f32 and L2 norm
 

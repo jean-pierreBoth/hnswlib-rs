@@ -62,7 +62,7 @@ pub fn main() {
     let mut hnsw = Hnsw::<f32, DistL2>::new(max_nb_connection, nb_elem, nb_layer, ef_c, DistL2 {});
     hnsw.set_extend_candidates(false);
     //
-    hnsw.modify_level_scale(0.5);
+    hnsw.modify_level_scale(0.25);
     // parallel insertion
     let mut start = ProcessTime::now();
     let mut now = SystemTime::now();

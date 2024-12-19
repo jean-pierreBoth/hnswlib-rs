@@ -874,7 +874,7 @@ impl Description {
     ///
     fn dump<W: Write>(&self, argmode: DumpMode, out: &mut BufWriter<W>) -> Result<i32> {
         info!("in dump of description");
-        out.write_all(&MAGICDESCR_3.to_ne_bytes())?;
+        out.write_all(&MAGICDESCR_4.to_ne_bytes())?;
         let mode: u8 = match argmode {
             DumpMode::Full => 1,
             _ => 0,
@@ -883,7 +883,9 @@ impl Description {
         out.write_all(&mode.to_ne_bytes())?;
         // dump of max_nb_connection as u8!!
         out.write_all(&self.max_nb_connection.to_ne_bytes())?;
-        // TODO: with MAGICDESCR_4 we must dump self.level_scale
+        // with MAGICDESCR_4 we must dump self.level_scale
+        out.write_all(&self.level_scale.to_ne_bytes())?;
+        //
         out.write_all(&self.nb_layer.to_ne_bytes())?;
         if self.nb_layer != NB_LAYER_MAX {
             println!("dump of Description, nb_layer != NB_MAX_LAYER");
@@ -1150,7 +1152,7 @@ where
     let v: Vec<T> = if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
         match descr.format_version {
             2 => bincode::deserialize(&v_serialized).unwrap(),
-            3 => {
+            3 | 4 => {
                 let slice_t = unsafe {
                     std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, descr.dimension)
                 };
