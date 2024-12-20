@@ -81,7 +81,7 @@ The nearest neighbour of the point is searched in lookup tables from the upper l
 
 The parameter of the exponential law to sample point levels is set to `ln(max_nb_connection)/scale`. 
 By default *scale* is set to 1. It is possible to reduce the *scale* parameter and thus reduce the number of levels used (See Hnsw::modify_level_scale) without increasing max_nb_connection.      
-This often provide beter recalls without increasing *max_nb_connection* which increase memory usage. (See examples)
+This often provide better recalls without increasing *max_nb_connection* and thus spare memory usage. (See examples)
 
 
 The main parameters occuring in constructing the graph or in searching are:

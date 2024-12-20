@@ -326,10 +326,10 @@ impl HnswIo {
     }
 
     /// same as preceding, avoids the call to [set_options](Self::set_options())
-    pub fn new_with_options(directory: &Path, basename: String, options: ReloadOptions) -> Self {
+    pub fn new_with_options(directory: &Path, basename: &str, options: ReloadOptions) -> Self {
         HnswIo {
             dir: directory.to_path_buf(),
-            basename,
+            basename: basename.to_string(),
             options,
             datamap: None,
             nb_point_loaded: Arc::new(AtomicUsize::new(0)),
@@ -446,6 +446,7 @@ impl HnswIo {
         let data_in = &mut init.datafile;
         let graph_in = &mut init.graphfile;
         let description = init.descr;
+        info!("format version : {}", description.format_version);
         //  In datafile , we must read MAGICDATAP and dimension and check
         let mut it_slice = [0u8; std::mem::size_of::<u32>()];
         data_in.read_exact(&mut it_slice)?;
@@ -495,6 +496,7 @@ impl HnswIo {
             if datamap_res.is_err() {
                 error!("load_hnsw could not initialize mmap")
             } else {
+                info!("reload using mmap");
                 self.datamap = Some(datamap_res.unwrap());
             }
         }
@@ -981,6 +983,7 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
         let mut it_slice = [0u8; std::mem::size_of::<f64>()];
         io_in.read_exact(&mut it_slice)?;
         descr.level_scale = f64::from_ne_bytes(it_slice);
+        info!(" level scale : {:.2e}", descr.level_scale);
     }
     //
     let mut it_slice = [0u8; std::mem::size_of::<u8>()];

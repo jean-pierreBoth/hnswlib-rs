@@ -861,10 +861,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         self.datamap_opt
     }
 
-    /// By default the levels are sampled using an exponential law of parameter ln(max_nb_conn)
-    /// so the probability of having more than l levels decrease as exp(-l * ln(max_nb_conn))  
-    /// Reducing the scale change the parameter of the exponential to ln(max_nb_conn)/scale.
-    /// This reduce the number of levels generated and can provide better precision, reduce memory but with some more cpu used
+    /// By default the levels are sampled using an exponential law of parameter **ln(max_nb_conn)**
+    /// so the probability of having more than l levels decrease as **exp(-l * ln(max_nb_conn))**.  
+    /// Reducing the scale change the parameter of the exponential to **ln(max_nb_conn)/scale**.
+    /// This reduce the number of levels generated and can provide better precision, reduce memory with marginally more cpu used.  
     /// The factor must between 0.2 and 1.
     pub fn modify_level_scale(&mut self, scale_modification: f64) {
         //
