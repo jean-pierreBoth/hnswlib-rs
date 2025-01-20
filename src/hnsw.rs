@@ -876,9 +876,9 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         println!("\n  Current scale value : {:.2e}, Scale modification factor asked : {:.2e},(modification factor must be between {:.2e} and 1.)",
             self.layer_indexed_points.layer_g.scale, scale_modification, min_factor);
         //
-        if scale_modification >= 1. {
+        if scale_modification > 1. {
             println!(
-                "\n Scale modification arg {:.2e} not valid , factor must be less than 1.)",
+                "\n Scale modification not applied, modification arg {:.2e} not valid , factor must be less than 1.)",
                 scale_modification
             );
         } else if scale_modification < min_factor {
@@ -890,7 +890,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         //
         self.layer_indexed_points
             .layer_g
-            .set_scale_modification(scale_modification.max(min_factor));
+            .set_scale_modification(scale_modification.max(min_factor).min(1.));
     } // end of set_scale_modification
 
     // here we could pass a point_id_with_order instead of entry_point_id: PointId
