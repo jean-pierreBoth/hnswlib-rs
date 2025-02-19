@@ -930,11 +930,6 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         // we will store positive distances in this one
         let mut return_points = BinaryHeap::<Arc<PointWithOrder<T>>>::with_capacity(skiplist_size);
         //
-        if self.layer_indexed_points.points_by_layer.read()[layer as usize].is_empty() {
-            // at the beginning we can have nothing in layer
-            trace!("search layer {:?}, empty layer", layer);
-            return return_points;
-        }
         if entry_point.p_id.1 < 0 {
             trace!("search layer negative point id : {:?}", entry_point.p_id);
             return return_points;
@@ -1066,6 +1061,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         let level = new_point.p_id.0;
         let mut enter_point_copy = None;
         let mut max_level_observed = 0;
+        if enter_point_copy.is_none() {
+            self.layer_indexed_points.check_entry_point(&new_point);
+        }
+
         // entry point has been set in
         {
             // I open a read lock on an option
@@ -1076,14 +1075,9 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         "Hnsw  stored first point , direct return  {:?} ",
                         new_point.p_id
                     );
-                    return;
                 }
                 max_level_observed = enter_point_copy.as_ref().unwrap().p_id.0;
             }
-        }
-        if enter_point_copy.is_none() {
-            self.layer_indexed_points.check_entry_point(&new_point);
-            return;
         }
         let mut dist_to_entry = self
             .dist_f
@@ -1703,7 +1697,17 @@ where
 mod tests {
 
     use super::*;
-    use anndists::dist;
+    use anndists::dist::{self, DistL1};
+
+    #[test]
+    fn test_insert() {
+        for _ in 0..10 {
+            let hnsw: Hnsw<f32, DistL1> = Hnsw::new(15, 100_000, 20, 500_000, DistL1 {});
+            hnsw.insert((&[1.0, 0.0, 0.0, 0.0], 0));
+            let result = hnsw.search(&[1.0, 0.0, 0.0, 0.0], 2, 10);
+            assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0))]);
+        }
+    }
 
     #[test]
 
