@@ -1504,8 +1504,17 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         } // end on for on layers
           // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
         let ef = ef_arg.max(knbn);
-        // now search with asked ef in layer 0
-        let neighbours_heap = self.search_layer(data, pivot, ef, 0, filter);
+        log::debug!("pivot changed , current pivot {:?}", pivot.get_point_id());
+        // search lowest non empty layer (in case of search with incomplete lower layer at beginning of hnsw filling)
+        let mut l = 0u8;
+        let layer_to_search = loop {
+            if self.get_point_indexation().get_layer_nb_point(l as usize) > 0 {
+                break l;
+            }
+            l = l + 1;
+        };
+        // now search with asked ef in lower layer
+        let neighbours_heap = self.search_layer(data, pivot, ef, layer_to_search, filter);
         // go from heap of points with negative dist to a sorted vec of increasing points with > 0 distances.
         let neighbours = neighbours_heap.into_sorted_vec();
         // get the min of K and ef points into a vector.
@@ -1705,8 +1714,11 @@ mod tests {
     use super::*;
     use anndists::dist;
 
-    #[test]
+    fn log_init_test() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
 
+    #[test]
     fn test_iter_point() {
         //
         println!("\n\n test_iter_point");
@@ -1808,4 +1820,18 @@ mod tests {
         //
         assert_eq!(nb_dumped, nbpl);
     } // end of test_iter_layerpoint
+
+    // we should find point even if it is in layer >= 1
+    #[test]
+    fn test_sparse_search() {
+        log_init_test();
+        //
+        for _ in 0..800 {
+            let hnsw: Hnsw<f32, dist::DistL1> =
+                Hnsw::new(15, 100_000, 20, 500_000, dist::DistL1 {});
+            hnsw.insert((&[1.0, 0.0, 0.0, 0.0], 0));
+            let result = hnsw.search(&[1.0, 0.0, 0.0, 0.0], 2, 10);
+            assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0))]);
+        }
+    }
 } // end of module test
