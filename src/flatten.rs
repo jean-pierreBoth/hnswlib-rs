@@ -138,7 +138,7 @@ mod tests {
     use crate::api::AnnT;
     use crate::hnswio::*;
 
-    use rand::distributions::{Distribution, Uniform};
+    use rand::distr::{Distribution, Uniform};
 
     fn log_init_test() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -149,8 +149,8 @@ mod tests {
         println!("\n\n test_dump_reload_graph_flatten");
         log_init_test();
         // generate a random test
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         // 1000 vectors of size 10 f32
         let nbcolumn = 1000;
         let nbrow = 10;

@@ -308,7 +308,7 @@ impl<'b, T: Clone + Send + Sync> PointWithOrder<'b, T> {
 //============================================================================================
 
 //  LayerGenerator
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::prelude::*;
 
 /// a struct to randomly generate a level for an item according to an exponential law
@@ -326,8 +326,8 @@ impl LayerGenerator {
     pub fn new(max_nb_connection: usize, maxlevel: usize) -> Self {
         let scale = 1. / (max_nb_connection as f64).ln();
         LayerGenerator {
-            rng: Arc::new(Mutex::new(StdRng::from_entropy())),
-            unif: Uniform::<f64>::new(0., 1.),
+            rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
+            unif: Uniform::<f64>::new(0., 1.).unwrap(),
             scale,
             maxlevel,
         }
@@ -341,8 +341,8 @@ impl LayerGenerator {
     ) -> Self {
         let scale_default = 1. / (max_nb_connection as f64).ln();
         LayerGenerator {
-            rng: Arc::new(Mutex::new(StdRng::from_entropy())),
-            unif: Uniform::<f64>::new(0., 1.),
+            rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
+            unif: Uniform::<f64>::new(0., 1.).unwrap(),
             scale: scale_default * scale_factor,
             maxlevel,
         }
@@ -364,7 +364,7 @@ impl LayerGenerator {
         // we redispatch possibly sampled level  >= maxlevel to required range
         if ulevel >= self.maxlevel {
             // This occurs with very low probability. Cf commentary above.
-            ulevel = protected_rng.sample(Uniform::<usize>::new(0, self.maxlevel));
+            ulevel = protected_rng.sample(Uniform::<usize>::new(0, self.maxlevel).unwrap());
         }
         ulevel
     }
@@ -1723,8 +1723,8 @@ mod tests {
         //
         println!("\n\n test_iter_point");
         //
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         let nbcolumn = 5000;
         let nbrow = 10;
         let mut xsi;
@@ -1771,8 +1771,8 @@ mod tests {
         //
         println!("\n\n test_iter_point");
         //
-        let mut rng = thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         let nbcolumn = 5000;
         let nbrow = 10;
         let mut xsi;

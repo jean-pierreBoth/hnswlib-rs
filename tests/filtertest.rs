@@ -3,7 +3,7 @@
 
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
-use rand::{distributions::Uniform, Rng};
+use rand::{distr::Uniform, Rng};
 use std::iter;
 
 // Shows two ways to do filtering, by a sorted vector or with a closure
@@ -13,8 +13,8 @@ use std::iter;
 // Used to create a random string
 fn generate_random_string(len: usize) -> String {
     const CHARSET: &[u8] = b"abcdefghij";
-    let mut rng = rand::thread_rng();
-    let one_char = || CHARSET[rng.gen_range(0..CHARSET.len())] as char;
+    let mut rng = rand::rng();
+    let one_char = || CHARSET[rng.random_range(0..CHARSET.len())] as char;
     iter::repeat_with(one_char).take(len).collect()
 }
 
@@ -150,8 +150,8 @@ fn filter_l2() {
     let nb_elem = 5000;
     let dim = 25;
     // generate nb_elem colmuns vectors of dimension dim
-    let mut rng = rand::thread_rng();
-    let unif = Uniform::<f32>::new(0., 1.);
+    let mut rng = rand::rng();
+    let unif = Uniform::<f32>::new(0., 1.).unwrap();
     let mut data = Vec::with_capacity(nb_elem);
     for _ in 0..nb_elem {
         let column = (0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>();

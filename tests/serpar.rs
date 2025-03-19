@@ -5,7 +5,7 @@
 //! serial test corresponds to random-10nn-euclidean(k=10)
 //! parallel test corresponds to random data in 25 dimensions k = 10, dist Cosine
 
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::prelude::*;
 
 use skiplist::OrderedSkipList;
@@ -15,15 +15,15 @@ use hnsw_rs::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 
 pub fn gen_random_vector_f32(nbrow: usize) -> Vec<f32> {
-    let mut rng = thread_rng();
-    let unif = Uniform::<f32>::new(0., 1.);
+    let mut rng = rand::rng();
+    let unif = Uniform::<f32>::new(0., 1.).unwrap();
     (0..nbrow).map(|_| rng.sample(unif)).collect::<Vec<f32>>()
 }
 
 /// return nbcolumn vectors of dimension nbrow
 pub fn gen_random_matrix_f32(nbrow: usize, nbcolumn: usize) -> Vec<Vec<f32>> {
-    let mut rng = thread_rng();
-    let unif = Uniform::<f32>::new(0., 1.);
+    let mut rng = rand::rng();
+    let unif = Uniform::<f32>::new(0., 1.).unwrap();
     let mut data = Vec::with_capacity(nbcolumn);
     for _ in 0..nbcolumn {
         let column = (0..nbrow).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
@@ -119,8 +119,8 @@ mod tests {
         for _itest in 0..nbtest {
             //
             let mut r_vec = Vec::<f32>::with_capacity(dim);
-            let mut rng = thread_rng();
-            let unif = Uniform::<f32>::new(0., 1.);
+            let mut rng = rand::rng();
+            let unif = Uniform::<f32>::new(0., 1.).unwrap();
             for _ in 0..dim {
                 r_vec.push(rng.sample(unif));
             }
@@ -240,8 +240,8 @@ mod tests {
         let mut search_times = Vec::<f32>::with_capacity(nbtest);
         for _itest in 0..nbtest {
             let mut r_vec = Vec::<f32>::with_capacity(dim);
-            let mut rng = thread_rng();
-            let unif = Uniform::<f32>::new(0., 1.);
+            let mut rng = rand::rng();
+            let unif = Uniform::<f32>::new(0., 1.).unwrap();
             for _ in 0..dim {
                 r_vec.push(rng.sample(unif));
             }

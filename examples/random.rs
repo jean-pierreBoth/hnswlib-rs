@@ -2,7 +2,7 @@
 #![allow(clippy::range_zip_with_len)]
 
 use cpu_time::ProcessTime;
-use rand::distributions::Uniform;
+use rand::distr::Uniform;
 use rand::prelude::*;
 use std::time::{Duration, SystemTime};
 
@@ -15,8 +15,8 @@ fn main() {
     let nb_elem = 500000;
     let dim = 25;
     // generate nb_elem colmuns vectors of dimension dim
-    let mut rng = thread_rng();
-    let unif = Uniform::<f32>::new(0., 1.);
+    let mut rng = rand::rng();
+    let unif = rand::distr::StandardUniform;
     let mut data = Vec::with_capacity(nb_elem);
     for _ in 0..nb_elem {
         let column = (0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
@@ -69,8 +69,8 @@ fn main() {
     //
     for _iter in 0..100 {
         let mut r_vec = Vec::<f32>::with_capacity(dim);
-        let mut rng = thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         for _ in 0..dim {
             r_vec.push(rng.sample(unif));
         }

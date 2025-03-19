@@ -328,7 +328,7 @@ mod tests {
     pub use crate::api::AnnT;
     use crate::prelude::*;
 
-    use rand::distributions::{Distribution, Uniform};
+    use rand::distr::{Distribution, Uniform};
 
     fn log_init_test() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -339,8 +339,8 @@ mod tests {
         println!("\n\n test_file_mmap");
         log_init_test();
         // generate a random test
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         // 1000 vectors of size 10 f32
         let nbcolumn = 50;
         let nbrow = 11;
@@ -385,7 +385,7 @@ mod tests {
         info!("Checking random access of id , nb test : {}", nb_test);
         for _ in 0..nb_test {
             // sample an id in 0..nb_data
-            let unif = Uniform::<usize>::new(0, nbcolumn);
+            let unif = Uniform::<usize>::new(0, nbcolumn).unwrap();
             let id = unif.sample(&mut rng);
             let d = datamap.get_data::<f32>(&id);
             assert!(d.is_some());
@@ -405,8 +405,8 @@ mod tests {
     fn test_mmap_iter() {
         log_init_test();
         // generate a random test
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<u32>::new(0, 10000);
+        let mut rng = rand::rng();
+        let unif = Uniform::<u32>::new(0, 10000).unwrap();
         // 1000 vectors of size 10 f32
         let nbcolumn = 50;
         let nbrow = 11;

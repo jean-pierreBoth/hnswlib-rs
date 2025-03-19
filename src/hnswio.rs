@@ -166,7 +166,7 @@ impl DumpInit {
                     let unique_basename = loop {
                         let mut unique_basename;
                         let mut dataname: String;
-                        let id: usize = rand::thread_rng().gen_range(0..10000);
+                        let id: usize = rand::rng().random_range(0..10000);
                         let strid: String = id.to_string();
                         unique_basename = basename_default.to_string();
                         unique_basename.push('-');
@@ -1400,7 +1400,7 @@ mod tests {
     use anndists::dist;
     use log::error;
 
-    use rand::distributions::{Distribution, Uniform};
+    use rand::distr::{Distribution, Uniform};
 
     fn log_init_test() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -1416,8 +1416,8 @@ mod tests {
         println!("\n\n test_dump_reload_1");
         log_init_test();
         // generate a random test
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         // 1000 vectors of size 10 f32
         let nbcolumn = 1000;
         let nbrow = 10;
@@ -1465,8 +1465,8 @@ mod tests {
         println!("\n\n test_dump_reload_myfn");
         log_init_test();
         // generate a random test
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         // 1000 vectors of size 10 f32
         let nbcolumn = 1000;
         let nbrow = 10;
@@ -1514,8 +1514,8 @@ mod tests {
         println!("\n\n test_dump_reload_graph_only");
         log_init_test();
         // generate a random test
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         // 1000 vectors of size 10 f32
         let nbcolumn = 1000;
         let nbrow = 10;
@@ -1563,8 +1563,8 @@ mod tests {
         println!("\n\n hnswio tests : reload_with_mmap");
         log_init_test();
         // generate a random test
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         // 100 vectors of size 10 f32
         let nbcolumn = 100;
         let nbrow = 10;
@@ -1672,8 +1672,8 @@ mod tests {
 
     #[test]
     fn test_bincode() {
-        let mut rng = rand::thread_rng();
-        let unif = Uniform::<f32>::new(0., 1.);
+        let mut rng = rand::rng();
+        let unif = Uniform::<f32>::new(0., 1.).unwrap();
         let size = 10;
         let mut xsi;
         let mut data = Vec::with_capacity(size);
