@@ -92,7 +92,10 @@ anndists = { version = "0.1.2" }
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
-hdf5 = { version = "0.8" }
+# hdf5 = { version = "0.8" }
+# metno is needed as hdf5 is blocked to hdfsys 1.12
+hdf5 = {package = "hdf5-metno", version = "0.10.0" }
+
 ndarray = { version = "0.15" }
 skiplist = { version = "0.5" }
 tempfile = { version = "3" }
