@@ -99,11 +99,9 @@ impl FlatNeighborhood {
     /// get neighbour of a point given its id.  
     /// The neighbours are sorted in increasing distance from data_id.
     pub fn get_neighbours(&self, p_id: DataId) -> Option<Vec<Neighbour>> {
-        let res = self
-            .hash_t
+        self.hash_t
             .get(&p_id)
-            .map(|point| point.get_neighbours().clone());
-        res
+            .map(|point| point.get_neighbours().clone())
     }
 } // end impl block for FlatNeighborhood
 

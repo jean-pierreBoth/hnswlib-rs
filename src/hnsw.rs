@@ -12,15 +12,15 @@ use std::cmp::Ordering;
 
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use rayon::prelude::*;
-use std::sync::mpsc::channel;
 use std::sync::Arc;
+use std::sync::mpsc::channel;
 
 use std::any::type_name;
 
 use hashbrown::HashMap;
-use std::collections::binary_heap::BinaryHeap;
 #[allow(unused)]
 use std::collections::HashSet;
+use std::collections::binary_heap::BinaryHeap;
 
 use log::trace;
 use log::{debug, info};
@@ -145,11 +145,10 @@ impl<'b, T: Clone + Send + Sync + 'b> PointData<'b, T> {
     }
 
     fn get_v(&self) -> &[T] {
-        let data = match self {
+        match self {
             PointData::V(v) => v.as_slice(),
             PointData::S(s) => s,
-        };
-        data
+        }
     } // end of get_v
 } // end of impl block for PointData
 
@@ -511,7 +510,7 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
             trace!("definitive pushing of point {:?}", p_id);
             points_by_layer_ref[p_id.0 as usize].push(Arc::clone(&new_point));
         } // close write lock on points_by_layer
-          //
+        //
         let nb_point;
         {
             let mut lock_nb_point = self.nb_point.write();
@@ -570,11 +569,10 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
     /// returns the size of data vector in graph if any, else return 0
     pub fn get_data_dimension(&self) -> usize {
         let ep = self.entry_point.read();
-        let dim = match ep.as_ref() {
+        match ep.as_ref() {
             Some(point) => point.get_v().len(),
             None => 0,
-        };
-        dim
+        }
     }
 
     /// returns (**by cloning**) the data inside a point given it PointId, or None if PointId is not coherent.  
@@ -869,12 +867,16 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     pub fn modify_level_scale(&mut self, scale_modification: f64) {
         //
         if self.get_nb_point() > 0 {
-            println!("using modify_level_scale is possible at creation of a Hnsw structure to ensure coherence between runs")
+            println!(
+                "using modify_level_scale is possible at creation of a Hnsw structure to ensure coherence between runs"
+            )
         }
         //
         let min_factor = 0.2;
-        println!("\n  Current scale value : {:.2e}, Scale modification factor asked : {:.2e},(modification factor must be between {:.2e} and 1.)",
-            self.layer_indexed_points.layer_g.scale, scale_modification, min_factor);
+        println!(
+            "\n  Current scale value : {:.2e}, Scale modification factor asked : {:.2e},(modification factor must be between {:.2e} and 1.)",
+            self.layer_indexed_points.layer_g.scale, scale_modification, min_factor
+        );
         //
         if scale_modification > 1. {
             println!(
@@ -919,9 +921,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         //
         trace!(
             "entering search_layer with entry_point_id {:?} layer : {:?} ef {:?} ",
-            entry_point.p_id,
-            layer,
-            ef
+            entry_point.p_id, layer, ef
         );
         //
         // here we allocate a binary_heap on values not on reference beccause we want to return
@@ -972,8 +972,14 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             if -(c.dist_to_ref) > f.dist_to_ref {
                 // this comparison requires that we are sure that distances compared are distances to the same point :
                 // This is the case we compare distance to point passed as arg.
-                trace!("Fast return from search_layer, nb points : {:?} \n \t c {:?} \n \t f {:?} dists: {:?}  {:?}",
-                                return_points.len(), c.point_ref.p_id, f.point_ref.p_id, -(c.dist_to_ref), f.dist_to_ref);
+                trace!(
+                    "Fast return from search_layer, nb points : {:?} \n \t c {:?} \n \t f {:?} dists: {:?}  {:?}",
+                    return_points.len(),
+                    c.point_ref.p_id,
+                    f.point_ref.p_id,
+                    -(c.dist_to_ref),
+                    f.dist_to_ref
+                );
                 if filter.is_none() || (filter.is_some() && return_points.len() >= ef) {
                     return return_points;
                 }
@@ -1033,7 +1039,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                 }
             } // end of for on neighbours_c
         } // end of while in candidates
-          //
+        //
         trace!(
             "return from search_layer, nb points : {:?}",
             return_points.len()
@@ -1181,10 +1187,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                 }
             }
         } // for l
-          //
-          // new_point has been inserted at the beginning in table
-          // so that we can call reverse_update_neighborhoodwe consitently
-          // now reverse update of neighbours.
+        //
+        // new_point has been inserted at the beginning in table
+        // so that we can call reverse_update_neighborhoodwe consitently
+        // now reverse update of neighbours.
         self.reverse_update_neighborhood_simple(Arc::clone(&new_point));
         //
         self.layer_indexed_points.check_entry_point(&new_point);
@@ -1335,7 +1341,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                 candidates.push(Arc::new(PointWithOrder::new(p_point, -dist_topoint)));
             }
         } // end if extend_candidates
-          //
+        //
         let mut discarded_points = BinaryHeap::<Arc<PointWithOrder<T>>>::new();
         while !candidates.is_empty() && neighbours_vec.len() < nb_neighbours_asked {
             // compare distances of e to data. we do not need to recompute dists!
@@ -1502,7 +1508,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                 pivot = Arc::clone(new_pivot.as_ref().unwrap());
             }
         } // end on for on layers
-          // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
+        // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
         let ef = ef_arg.max(knbn);
         log::debug!("pivot changed , current pivot {:?}", pivot.get_point_id());
         // search lowest non empty layer (in case of search with incomplete lower layer at beginning of hnsw filling)
@@ -1511,7 +1517,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             if self.get_point_indexation().get_layer_nb_point(l as usize) > 0 {
                 break l;
             }
-            l = l + 1;
+            l += 1;
         };
         // now search with asked ef in lower layer
         let neighbours_heap = self.search_layer(data, pivot, ef, layer_to_search, filter);

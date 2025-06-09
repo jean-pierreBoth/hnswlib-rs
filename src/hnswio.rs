@@ -16,7 +16,7 @@
 // and layer (u8) and rank_in_layer:i32.
 // In the data file the point dump consist in the triplet: (MAGICDATAP, origin_id , array of values.)
 //
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::sync::atomic::{AtomicUsize, Ordering};
 //
 use std::time::SystemTime;
@@ -79,10 +79,10 @@ pub(crate) trait HnswIoT {
 
 /// Describe options accessible for reload
 ///
-///  - datamap : a bool for mmap uasge.  
-///         The data point can be reloaded via mmap of data file dump.  
-///         This can be useful when data points consist in large vectors (as in genomic sketching)
-///         as in this case data needs more space than the graph.  
+///  - datamap : a bool for mmap usage.  
+///    The data point can be reloaded via mmap of data file dump.  
+///    This can be useful when data points consist in large vectors (as in genomic sketching)
+///    as in this case data needs more space than the graph.  
 ///
 ///  - mmap_threshold : the number of itmes above which we use mmap. Default is 0, meaning always use mmap data
 ///    Can be useful for search speed in hnsw if we have part of data resident in memory.
@@ -727,7 +727,7 @@ impl HnswIo {
                     let n_pwo = PointWithOrder::<T>::new(n_point, n.distance);
                     point.neighbours.write()[l].push(Arc::new(n_pwo));
                 } // end of for n
-                  //  must sort
+                //  must sort
                 point.neighbours.write()[l].sort_unstable();
             } // end of for l
             nbp += 1;
@@ -735,9 +735,9 @@ impl HnswIo {
                 debug!("reloading nb_points neighbourhood completed : {}", nbp);
             }
         } // end loop in neighbourhood_map
-          //
-          // get id of entry_point
-          // load entry point
+        //
+        // get id of entry_point
+        // load entry point
         info!(
             "end of layer loading, allocating PointIndexation, nb points loaded {:?}",
             nb_points_loaded
@@ -1051,7 +1051,7 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
 ///  1. The value MAGICPOINT
 ///  2. its identity ( a usize  rank in original data , hash value or else , and PointId)
 ///  3. for each layer dump of the number of neighbours followed by :
-///      for each neighbour dump of its identity (: usize) and then distance (): u32) to point dumped.
+///     for each neighbour dump of its identity (: usize) and then distance (): u32) to point dumped.
 ///
 /// identity of a point is in full mode the triplet origin_id (: usize), layer (: u8) rank_in_layer (: u32)
 ///                           light mode only origin_id (: usize)
@@ -1346,10 +1346,8 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
 //
 //
 
-impl<
-        T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync,
-        D: Distance<T> + Send + Sync,
-    > HnswIoT for Hnsw<'_, T, D>
+impl<T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync, D: Distance<T> + Send + Sync>
+    HnswIoT for Hnsw<'_, T, D>
 {
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
@@ -1650,10 +1648,7 @@ mod tests {
             // then distance should very small
             info!(
                 "neighbour found for point id : {}, distance : {:.2e}, should have been id : {}, dist : {:.2e}",
-                search_res[0].d_id,
-                search_res[0].distance,
-                nb_in,
-                0.
+                search_res[0].d_id, search_res[0].distance, nb_in, 0.
             );
         }
         assert_eq!(search_res[0].d_id, nb_in);

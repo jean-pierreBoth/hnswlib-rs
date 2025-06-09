@@ -8,7 +8,7 @@ readme = "README.md"
 keywords = ["algorithms", "ann", "hnsw"]
 repository = "https://github.com/jean-pierreBoth/hnswlib-rs"
 documentation = "https://docs.rs/hnsw_rs"
-edition = "2021"
+edition = "2024"
 
 
 # declare a feature with no dependancy to get some modulated debug print
@@ -70,7 +70,7 @@ num-traits = { version = "0.2" }
 
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
 hashbrown = { version = "0.15" }
-indexmap = { version = "2.2" }
+indexmap = { version = "2.9" }
 
 rand = { version = "0.9" }
 lazy_static = { version = "1.4" }
@@ -96,7 +96,7 @@ anndists = { version = "0.1.2" }
 # metno is needed as hdf5 is blocked to hdfsys 1.12
 hdf5 = {package = "hdf5-metno", version = "0.10.0" }
 
-ndarray = { version = "0.15" }
+ndarray = { version = "0.16" }
 skiplist = { version = "0.5" }
 tempfile = { version = "3" }
 

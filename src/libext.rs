@@ -24,7 +24,7 @@ use crate::hnswio::*;
 /// args corresponds to string giving base filename of dump, supposed to be in current directory
 /// # Safety
 /// pointer must be char* pointer to the string
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn get_hnswio(flen: u64, name: *const u8) -> *const HnswIo {
     let slice = unsafe { std::slice::from_raw_parts(name, flen as usize) };
     let filename = String::from_utf8_lossy(slice).into_owned();
@@ -108,7 +108,7 @@ macro_rules! generate_insert(
         /// # Safety
         /// The function is unsafe because it dereferences a raw pointer
         ///
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $function_name(hnsw_api : *mut $api_name, len:usize, data : *const $type_val, id : usize) {
         trace!("entering insert, type {:?} vec len is {:?}, id : {:?} ", stringify!($type_val), len, id);
         //  construct vector: Rust clones and take ownership.
@@ -129,7 +129,7 @@ macro_rules! generate_parallel_insert(
         /// # Safety
         /// The function is unsafe because it dereferences a raw pointer
         ///
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $function_name(hnsw_api : *mut $api_name, nb_vec: usize, vec_len : usize,
                         datas : *mut *const $type_val, ids : *const usize) {
             //
@@ -171,7 +171,7 @@ macro_rules! generate_search_neighbours(
         /// # Safety
         /// The function is unsafe because it dereferences a raw pointer
         ///
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $function_name(hnsw_api : *const $api_name, len:usize, data : *const $type_val,
                                 knbn : usize, ef_search : usize) ->  *const Neighbourhood_api {
             //
@@ -204,7 +204,7 @@ macro_rules! generate_search_neighbours(
 
 macro_rules! generate_parallel_search_neighbours(
 ($function_name:ident, $api_name:ty, $type_val:ty) => (
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         /// search nb_vec of size vec_len. The the searches will be done in // as far as possible.
         /// # Safety
         /// The function is unsafe because it dereferences a raw pointer
@@ -260,7 +260,7 @@ macro_rules! generate_file_dump(
         /// # Safety
         /// The function is unsafe because it dereferences a raw pointer
         ///
-    #[no_mangle]
+    #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $function_name(hnsw_api : *const $api_name, namelen : usize, filename :*const u8) -> i64 {
             log::info!("receiving request for file dump");
             let slice = unsafe { std::slice::from_raw_parts(filename, namelen) } ;
@@ -285,10 +285,12 @@ macro_rules! generate_loadhnsw(
         /// # Safety
         /// The function is unsafe because it dereferences a raw pointer
         ///
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $function_name(hnswio_c : *mut HnswIo)  -> *const $api_name {
             //
+            unsafe {
             let hnsw_loaded_res = (*hnswio_c).load_hnsw::<$type_val, $type_dist>();
+
             if let Ok(hnsw_loaded) = hnsw_loaded_res {
                 let api = <$api_name>::new(Box::new(hnsw_loaded));
                 return Box::into_raw(Box::new(api));
@@ -297,6 +299,7 @@ macro_rules! generate_loadhnsw(
                 warn!("an error occured, could not reload data from {:?}", (*hnswio_c).get_basename());
                 return ptr::null();
             }
+        }
         }  // end of load_hnswdump_
      )
 );
@@ -451,7 +454,7 @@ generate_loadhnsw!(
 /// # Safety
 /// The function is unsafe because it dereferences a raw pointer
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn init_hnsw_f32(
     max_nb_conn: usize,
     ef_const: usize,
@@ -525,7 +528,7 @@ pub unsafe extern "C" fn init_hnsw_f32(
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn new_hnsw_f32(
     max_nb_conn: usize,
     ef_const: usize,
@@ -613,26 +616,30 @@ pub unsafe extern "C" fn new_hnsw_f32(
             ptr::null::<HnswApif32>()
         }
     } // znd match
-      //
+    //
 } // end of new_hnsw_f32
 
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn drop_hnsw_f32(p: *const HnswApif32) {
-    let _raw = Box::from_raw(p as *mut HnswApif32);
+    unsafe {
+        let _raw = Box::from_raw(p as *mut HnswApif32);
+    }
 }
 
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn drop_hnsw_u16(p: *const HnswApiu16) {
-    let _raw = Box::from_raw(p as *mut HnswApiu16);
+    unsafe {
+        let _raw = Box::from_raw(p as *mut HnswApiu16);
+    }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn init_hnsw_ptrdist_f32(
     max_nb_conn: usize,
     ef_const: usize,
@@ -650,7 +657,7 @@ pub extern "C" fn init_hnsw_ptrdist_f32(
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn insert_f32(
     hnsw_api: *mut HnswApif32,
     len: usize,
@@ -672,7 +679,7 @@ pub unsafe extern "C" fn insert_f32(
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn parallel_insert_f32(
     hnsw_api: *mut HnswApif32,
     nb_vec: usize,
@@ -717,7 +724,7 @@ pub unsafe extern "C" fn parallel_insert_f32(
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn search_neighbours_f32(
     hnsw_api: *const HnswApif32,
     len: usize,
@@ -728,9 +735,7 @@ pub unsafe extern "C" fn search_neighbours_f32(
     //
     trace!(
         "entering search_neighbours , vec len is {:?}, id : {:?} ef_search {:?}",
-        len,
-        knbn,
-        ef_search
+        len, knbn, ef_search
     );
     let data_v: Vec<f32>;
     let neighbours: Vec<Neighbour>;
@@ -756,8 +761,7 @@ pub unsafe extern "C" fn search_neighbours_f32(
     };
     trace!(
         "search_neighbours returning nb neighbours {:?} id ptr {:?} ",
-        nbgh_i,
-        neighbours_ptr
+        nbgh_i, neighbours_ptr
     );
     Box::into_raw(Box::new(answer))
 }
@@ -771,7 +775,7 @@ generate_file_dump!(file_dump_f32, HnswApif32, f32);
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn init_hnsw_i32(
     max_nb_conn: usize,
     ef_const: usize,
@@ -805,7 +809,7 @@ pub unsafe extern "C" fn init_hnsw_i32(
     ptr::null::<HnswApii32>()
 } // end of init_hnsw_i32
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn init_hnsw_ptrdist_i32(
     max_nb_conn: usize,
     ef_const: usize,
@@ -835,7 +839,7 @@ generate_file_dump!(file_dump_i32, HnswApii32, i32);
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn init_hnsw_u32(
     max_nb_conn: usize,
     ef_const: usize,
@@ -876,7 +880,7 @@ pub unsafe extern "C" fn init_hnsw_u32(
     ptr::null::<HnswApiu32>()
 } // end of init_hnsw_i32
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn init_hnsw_ptrdist_u32(
     max_nb_conn: usize,
     ef_const: usize,
@@ -906,7 +910,7 @@ super::declare_myapi_type!(HnswApiu16, u16);
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn init_hnsw_u16(
     max_nb_conn: usize,
     ef_const: usize,
@@ -956,7 +960,7 @@ pub unsafe extern "C" fn init_hnsw_u16(
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn new_hnsw_u16(
     max_nb_conn: usize,
     ef_const: usize,
@@ -1022,7 +1026,7 @@ pub unsafe extern "C" fn new_hnsw_u16(
     ptr::null::<HnswApiu16>()
 } // end of init_hnsw_u16
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn init_hnsw_ptrdist_u16(
     max_nb_conn: usize,
     ef_const: usize,
@@ -1050,7 +1054,7 @@ super::declare_myapi_type!(HnswApiu8, u8);
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn init_hnsw_u8(
     max_nb_conn: usize,
     ef_const: usize,
@@ -1090,7 +1094,7 @@ pub unsafe extern "C" fn init_hnsw_u8(
     ptr::null::<HnswApiu8>()
 } // end of init_hnsw_u16
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn init_hnsw_ptrdist_u8(
     max_nb_conn: usize,
     ef_const: usize,
@@ -1163,7 +1167,7 @@ impl DescriptionFFI {
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 ///
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn load_hnsw_description(
     flen: usize,
     name: *const u8,
@@ -1230,7 +1234,7 @@ pub unsafe extern "C" fn load_hnsw_description(
 //============ log initialization ============//
 
 /// to initialize rust logging from Julia
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn init_rust_log() {
     let _res = env_logger::Builder::from_default_env().try_init();
 }

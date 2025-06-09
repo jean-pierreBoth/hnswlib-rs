@@ -17,7 +17,7 @@ use log::info;
 
 //     64           1600        64           1              0          0        0.9877       3419.      1.0005
 
-// search in paralle mode 8 core i7-10875H  @2.3Ghz time for 10 neighbours
+// search in parallel mode 8 core i7-10875H  @2.3Ghz time for 10 neighbours
 
 //     64           1600        64            1              0          0        0.9907       6100       1.0004
 //     64           1600        128           1              0          0        0.9959       3077.      1.0001
@@ -32,6 +32,11 @@ use log::info;
 
 //     48           1600        64            0.5              0          0        0.9938       14073       1.0002
 //     48           1600       128            0.5              0          0        0.9992       7906        1.0000
+
+// with an AMD ryzen 9 7950X 16-Core simdeez with level scale modification factor 0.5
+//=============================================================================
+//     48           1600        64            0.5              0          0        0.9938       17000       1.0002
+//     48           1600       128            0.5              0          0        0.9992       9600        1.0000
 
 use hnsw_rs::prelude::*;
 
