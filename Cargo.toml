@@ -86,8 +86,8 @@ env_logger = { version = "0.11" }
 
 anyhow = { version = "1.0" }
 
-#anndists = { path = "../anndists" }
-anndists = { version = "0.1.2" }
+# anndists = { path = "../anndists" }
+anndists = { version = "0.1" }
 # anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
@@ -97,7 +97,7 @@ anndists = { version = "0.1.2" }
 hdf5 = {package = "hdf5-metno", version = "0.10.0" }
 
 ndarray = { version = "0.16" }
-skiplist = { version = "0.5" }
+skiplist = { version = "0.6" }
 tempfile = { version = "3" }
 
 
