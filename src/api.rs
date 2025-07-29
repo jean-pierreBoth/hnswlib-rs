@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::hnsw::*;
 use crate::hnswio::*;
@@ -74,7 +74,11 @@ where
         let mut dumpinit = DumpInit::new(path, file_basename, overwrite);
         let dumpname = dumpinit.get_basename().clone();
         //
-        let res = self.dump(DumpMode::Full, &mut dumpinit);
+        let res = self.dump(
+            DumpMode::Full,
+            &mut dumpinit.graph_out,
+            &mut dumpinit.data_out,
+        );
         //
         dumpinit.flush()?;
         info!("\n End of dump, file basename : {}\n", &dumpname);
