@@ -51,6 +51,7 @@ pub fn main() {
     let parallel = true;
 
     // dataset
+    // wget http://ann-benchmarks.com/sift-128-euclidean.hdf5
     let fname = String::from("./sift-128-euclidean.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     let anndata = annhdf5::AnnBenchmarkData::new(fname).unwrap();

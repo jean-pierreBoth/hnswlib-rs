@@ -32,7 +32,7 @@ use utils::*;
 
 pub fn main() {
     let mut parallel = true;
-    //
+    // wget http://ann-benchmarks.com/fashion-mnist-784-euclidean.hdf5
     let fname = String::from("./fashion-mnist-784-euclidean.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
