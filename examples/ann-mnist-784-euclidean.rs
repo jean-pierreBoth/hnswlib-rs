@@ -32,8 +32,8 @@ use utils::*;
 
 pub fn main() {
     let mut parallel = true;
-    //
-    let fname = String::from("/home/jpboth/Data/ANN/fashion-mnist-784-euclidean.hdf5");
+    // wget http://ann-benchmarks.com/fashion-mnist-784-euclidean.hdf5
+    let fname = String::from("./fashion-mnist-784-euclidean.hdf5");
     println!("\n\n test_load_hdf5 {:?}", fname);
     // now recall that data are stored in row order.
     let anndata = annhdf5::AnnBenchmarkData::new(fname).unwrap();

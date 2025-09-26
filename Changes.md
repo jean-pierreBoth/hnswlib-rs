@@ -1,5 +1,5 @@
 - version 0.3.2
-  update dependencies to ndarray 0.16 , rand 0.9  indexmap 2.9, hdf5. edition=2024
+  update dependencies to ndarray 0.16 , rand 0.9  indexmap 2.9. edition=2024
 
 - version 0.3.1
  
