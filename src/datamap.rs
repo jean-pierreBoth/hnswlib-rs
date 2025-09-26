@@ -61,9 +61,7 @@ impl DataMap {
         // we need to call load_description first to get distance name
         let hnsw_description = hnswio::load_description(&mut graph_in).unwrap();
         if hnsw_description.format_version <= 2 {
-            let msg = String::from(
-                "from_hnsw::from_hnsw : data mapping is only possible for dumps with the version > 0.1.19 of this crate",
-            );
+            let msg = String::from("from_hnsw::from_hnsw : data mapping is only possible for dumps with the version > 0.1.19 of this crate");
             error!(
                 "Data mapping is only possible for dumps with the version > 0.1.19 of this crate"
             );
@@ -141,10 +139,7 @@ impl DataMap {
         current_mmap_addr += std::mem::size_of::<usize>();
         let dimension = usize::from_ne_bytes(usize_slice);
         if dimension != descr_dimension {
-            error!(
-                "Description and data do not agree on dimension, data got : {:?}, description got : {:?}",
-                dimension, descr_dimension
-            );
+            error!("Description and data do not agree on dimension, data got : {:?}, description got : {:?}",dimension, descr_dimension);
             return Err(String::from(
                 "description and data do not agree on dimension",
             ));
@@ -217,7 +212,7 @@ impl DataMap {
                 v_serialized.as_ptr() as *const T
             );
         } // end of for on record
-        //
+          //
         debug!("End of DataMap::from_hnsw.");
         //
         let datamap = DataMap {
