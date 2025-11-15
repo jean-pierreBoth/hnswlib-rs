@@ -1,3 +1,6 @@
+- version 0.3.3
+  small fix on filter (thanks to VillSnow). include ndarray 0.17 as possible dep. fixed compiler warning on elided lifetimes
+
 - version 0.3.2
   update dependencies to ndarray 0.16 , rand 0.9  indexmap 2.9, hdf5. edition=2024
 

@@ -22,6 +22,7 @@ lazy_static! {
 }
 
 // install a logger facility
+#[allow(unused)]
 fn init_log() -> u64 {
     Builder::from_default_env().init();
     println!("\n ************** initializing logger *****************\n");

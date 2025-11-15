@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
@@ -61,7 +61,7 @@ cfg-if = { version = "1.0" }
 
 # for //
 parking_lot = "0.12"
-rayon = { version = "1.10" }
+rayon = { version = "1.11" }
 num_cpus = { version = "1.16" }
 
 cpu-time = { version = "1.0" }
@@ -70,7 +70,7 @@ num-traits = { version = "0.2" }
 
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
 hashbrown = { version = "0.15" }
-indexmap = { version = "2.9" }
+indexmap = { version = ">= 2.11, < 2.13" }
 
 rand = { version = "0.9" }
 lazy_static = { version = "1.4" }
@@ -96,7 +96,7 @@ anndists = { version = "0.1" }
 # metno is needed as hdf5 is blocked to hdfsys 1.12
 hdf5 = {package = "hdf5-metno", version = "0.10.0" }
 
-ndarray = { version = "0.16" }
+ndarray = { version = ">=0.16.0, <0.18" }
 skiplist = { version = "0.6" }
 tempfile = { version = "3" }
 
