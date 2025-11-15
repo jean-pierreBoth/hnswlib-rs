@@ -3,8 +3,13 @@
 
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
-use rand::{distr::Uniform, Rng};
+use rand::{Rng, distr::Uniform};
 use std::iter;
+
+#[allow(unused)]
+fn log_init_test() {
+    let _ = env_logger::builder().is_test(true).try_init();
+}
 
 // Shows two ways to do filtering, by a sorted vector or with a closure
 // We define a hnsw-index with 500 entries
@@ -207,3 +212,55 @@ fn filter_l2() {
         res.last().unwrap().distance / filter_vec_res.last().unwrap().distance
     );
 } // end of filter_l2
+
+//
+
+use std::collections::HashMap;
+#[test]
+fn filter_villsnow() {
+    println!("\n\n in test villsnow");
+    log_init_test();
+    //
+    let grid_size = 100;
+    let mut hnsw = Hnsw::<f64, DistL2>::new(4, grid_size * grid_size, 16, 100, DistL2::default());
+    let mut points = HashMap::new();
+
+    {
+        for (id, (i, j)) in itertools::iproduct!(0..grid_size, 0..grid_size,).enumerate() {
+            let data = [
+                (i as f64 + 0.5) / grid_size as f64,
+                (j as f64 + 0.5) / grid_size as f64,
+            ];
+            hnsw.insert((&data, id));
+            points.insert(id, data);
+        }
+
+        hnsw.set_searching_mode(true);
+    }
+    {
+        println!("first case");
+        // first case
+        let filter = |id: &usize| DistL2::default().eval(&points[id], &[1.0, 1.0]) < 1e-2;
+        dbg!(points.keys().filter(|x| filter(x)).count()); // -> 1
+
+        let hit = hnsw.search_filter(&[0.0, 0.0], 10, 4, Some(&filter));
+        if !hit.is_empty() {
+            log::info!("got point : {:?}", points.get(&hit[0].d_id));
+            log::info!("got {:?}, must be true", filter(&hit[0].d_id)); // -> sometimes false
+        } else {
+            log::info!("found no point");
+        }
+        assert!(hit.len() <= 1);
+    }
+    {
+        println!("second case");
+        // second case
+        let filter = |_id: &usize| false;
+        dbg!(points.keys().filter(|x| filter(x)).count()); // -> 0, obviously
+
+        let hit = hnsw.search_filter(&[0.0, 0.0], 10, 64, Some(&filter));
+        println!("villsnow , {:?}", hit.len());
+        log::info!("got {:?}, must be 0", hit.len()); // -> 1
+        assert_eq!(hit.len(), 0);
+    }
+}

@@ -980,8 +980,15 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     -(c.dist_to_ref),
                     f.dist_to_ref
                 );
-                if filter.is_none() || (filter.is_some() && return_points.len() >= ef) {
+                if filter.is_none() {
                     return return_points;
+                } else if return_points.len() >= ef {
+                    return_points.retain(|p| {
+                        filter
+                            .as_ref()
+                            .unwrap()
+                            .hnsw_filter(&p.point_ref.get_origin_id())
+                    });
                 }
             }
             // now we scan neighborhood of c in layer and increment visited_point, candidate_points
@@ -1526,18 +1533,40 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         // get the min of K and ef points into a vector.
         //
         let last = knbn.min(ef).min(neighbours.len());
-        let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
-            .iter()
-            .map(|p| {
-                Neighbour::new(
-                    p.as_ref().point_ref.origin_id,
-                    p.as_ref().dist_to_ref,
-                    p.as_ref().point_ref.p_id,
-                )
-            })
-            .collect();
+        //
+        if let Some(filter_t) = filter {
+            let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
+                .iter()
+                .map(|p| {
+                    if filter_t.hnsw_filter(&p.as_ref().point_ref.origin_id) {
+                        Some(Neighbour::new(
+                            p.as_ref().point_ref.origin_id,
+                            p.as_ref().dist_to_ref,
+                            p.as_ref().point_ref.p_id,
+                        ))
+                    } else {
+                        None
+                    }
+                })
+                .filter(|x| x.is_some())
+                .map(|x| x.unwrap())
+                .collect();
+            //
+            knn_neighbours
+        } else {
+            let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
+                .iter()
+                .map(|p| {
+                    Neighbour::new(
+                        p.as_ref().point_ref.origin_id,
+                        p.as_ref().dist_to_ref,
+                        p.as_ref().point_ref.p_id,
+                    )
+                })
+                .collect();
 
-        knn_neighbours
+            knn_neighbours
+        }
     } // end of search_filter
 
     #[inline]

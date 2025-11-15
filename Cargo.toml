@@ -99,13 +99,13 @@ hdf5 = {package = "hdf5-metno", version = "0.10.0" }
 ndarray = { version = ">=0.16.0, <0.18" }
 skiplist = { version = "0.6" }
 tempfile = { version = "3" }
-
+itertools = {version = "0.14"}
 
 [features]
 
 default = []
 
+# feature for std simd on nightly
 stdsimd = ["anndists/stdsimd"]
 # feature for simd on stable for x86*
 simdeez_f = ["anndists/simdeez_f"]
-# feature for std simd on nightly
