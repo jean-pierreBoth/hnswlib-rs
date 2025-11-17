@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use indexmap::map::IndexMap;
 use log::{debug, error, info, trace};
-use mmap_rs::{Mmap, MmapOptions};
+use memmap2::{Mmap, MmapOptions};
 
 use crate::hnsw::DataId;
 use crate::hnswio;
@@ -98,19 +98,13 @@ impl DataMap {
             error!("Could not open file : {:?}", &datapath);
             std::process::exit(1);
         }
-        let fsize = meta.unwrap().len().try_into().unwrap();
-        //
         let file_res = File::open(&datapath);
         if file_res.is_err() {
             error!("Could not open file : {:?}", &datapath);
             std::process::exit(1);
         }
         let file = file_res.unwrap();
-        let offset = 0;
-        //
-        let mmap_opt = MmapOptions::new(fsize).unwrap();
-        let mmap_opt = unsafe { mmap_opt.with_file(&file, offset) };
-        let mapping_res = mmap_opt.map();
+        let mapping_res = unsafe { MmapOptions::new().map(&file) };
         if mapping_res.is_err() {
             error!("Could not memory map : {:?}", &datapath);
             std::process::exit(1);
@@ -121,7 +115,7 @@ impl DataMap {
         //
         // where are we in decoding mmap slice? at beginning
         //
-        let mapped_slice = mmap.as_slice();
+        let mapped_slice = &mmap[..];
         //
         // where are we in decoding mmap slice?
         let mut current_mmap_addr = 0usize;
@@ -158,10 +152,10 @@ impl DataMap {
         let record_size = std::mem::size_of::<u32>()
             + 2 * std::mem::size_of::<u64>()
             + dimension * std::mem::size_of::<T>();
-        let residual = mmap.size() - current_mmap_addr;
+        let residual = mmap.len() - current_mmap_addr;
         info!(
             "Mmap size {}, current_mmap_addr {}, residual : {}",
-            mmap.size(),
+            mmap.len(),
             current_mmap_addr,
             residual
         );
@@ -280,7 +274,7 @@ impl DataMap {
         let address = self.hmap.get(dataid)?;
         debug!("Address for id : {}, address : {:?}", dataid, address);
         let mut current_mmap_addr = *address;
-        let mapped_slice = self.mmap.as_slice();
+        let mapped_slice = &self.mmap[..];
         let mut u64_slice = [0u8; std::mem::size_of::<u64>()];
         u64_slice.copy_from_slice(
             &mapped_slice[current_mmap_addr..current_mmap_addr + std::mem::size_of::<u64>()],
@@ -290,7 +284,7 @@ impl DataMap {
         trace!("Serialized bytes len to reload {:?}", serialized_len);
         let slice_t = unsafe {
             std::slice::from_raw_parts(
-                mapped_slice[current_mmap_addr..].as_ptr() as *const T,
+                self.mmap[current_mmap_addr..].as_ptr() as *const T,
                 self.dimension,
             )
         };
@@ -332,6 +326,7 @@ mod tests {
 
     pub use crate::api::AnnT;
     use crate::prelude::*;
+    use crate::tests::test_utils::check_graph_equality;
 
     use rand::distr::{Distribution, Uniform};
 
@@ -373,11 +368,10 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let _res = hnsw.file_dump(directory.path(), fname);
 
-        let check_reload = false;
+        let check_reload = true;
         if check_reload {
             // We check we can reload
             debug!("HNSW reload.");
-            let directory = tempfile::tempdir().unwrap();
             let mut reloader = HnswIo::new(directory.path(), fname);
             let hnsw_loaded: Hnsw<f32, DistL1> = reloader.load_hnsw::<f32, DistL1>().unwrap();
             check_graph_equality(&hnsw_loaded, &hnsw);
@@ -450,8 +444,13 @@ mod tests {
             assert_eq!(v, &data[*dataid], "dataid = {}, ukey = {}", dataid, i);
         }
         // rm files generated!
-        let _ = std::fs::remove_file("mmap_order_test.hnsw.data");
-        let _ = std::fs::remove_file("mmap_order_test.hnsw.graph");
+        let mut data_path = directory.path().to_path_buf();
+        data_path.push("mmap_order_test.hnsw.data");
+        let _ = std::fs::remove_file(data_path);
+
+        let mut graph_path = directory.path().to_path_buf();
+        graph_path.push("mmap_order_test.hnsw.graph");
+        let _ = std::fs::remove_file(graph_path);
     }
     //
 } // end of mod tests
