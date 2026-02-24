@@ -1,8 +1,8 @@
-//! This module provides io dump/ reload of computed graph via the structure Hnswio.  
-//! This structure stores references to data points if memory map is used.  
+//! This module provides io dump/ reload of computed graph via the structure Hnswio.
+//! This structure stores references to data points if memory map is used.
 //!
 //! A dump is constituted of 2 files.
-//! One file stores just the graph (or topology) with id of points.  
+//! One file stores just the graph (or topology) with id of points.
 //! The other file stores the ids and vector in point and can be reloaded via a mmap scheme.
 //! The graph file is suffixed by "hnsw.graph" the other is suffixed by "hnsw.data"
 //!
@@ -79,10 +79,10 @@ pub(crate) trait HnswIoT {
 
 /// Describe options accessible for reload
 ///
-///  - datamap : a bool for mmap usage.  
-///    The data point can be reloaded via mmap of data file dump.  
+///  - datamap : a bool for mmap usage.
+///    The data point can be reloaded via mmap of data file dump.
 ///    This can be useful when data points consist in large vectors (as in genomic sketching)
-///    as in this case data needs more space than the graph.  
+///    as in this case data needs more space than the graph.
 ///
 ///  - mmap_threshold : the number of itmes above which we use mmap. Default is 0, meaning always use mmap data
 ///    Can be useful for search speed in hnsw if we have part of data resident in memory.
@@ -117,7 +117,7 @@ impl ReloadOptions {
         *self
     }
 
-    /// set mmap threshold i.e : The maximum number of data that will be reloaded in memory by reading file dump, the other points will be mmapped.  
+    /// set mmap threshold i.e : The maximum number of data that will be reloaded in memory by reading file dump, the other points will be mmapped.
     /// As the upper layers are the most frequently used, these points will be loaded in memory during reading, the others will be mmaped.
     /// See test *reload_with_mmap()*
     pub fn set_mmap_threshold(&mut self, threshold: usize) -> Self {
@@ -257,11 +257,11 @@ struct LoadInit {
     datafile: BufReader<File>,
 } // end of LoadInit
 
-/// a structure to provide simplified methods for reloading a previous dump.  
-///  
-/// The data point can be reloaded via mmap of data file dump.  
+/// a structure to provide simplified methods for reloading a previous dump.
+///
+/// The data point can be reloaded via mmap of data file dump.
 /// This can be useful when data points consist in large vectors (as in genomic sketching)
-/// as in this case data needs more space than the graph.  
+/// as in this case data needs more space than the graph.
 /// Note : **As this structure potentially contains the mmap data used in hnsw after reload it must not be dropped
 /// before the reloaded hnsw.**
 /// Example:
@@ -273,14 +273,14 @@ struct LoadInit {
 ///     let options = ReloadOptions::default().set_mmap(true);
 ///     reloader.set_options(options);
 ///     let hnsw_loaded : Hnsw<f32,DistL1>= reloader.load_hnsw::<f32, DistL1>().unwrap();
-/// ```  
-///   
-/// In some cases we need a hnsw variable that can come from a reload **OR** a direct initialization.  
-///   
+/// ```
+///
+/// In some cases we need a hnsw variable that can come from a reload **OR** a direct initialization.
+///
 /// Hnswio must be defined before Hnsw as drop is done in reverse order of definition, and the function [load_hnsw](Self::load_hnsw())
 /// borrows Hnswio. (Hnswio stores the mmap address Hnsw can refer to if mmap is used)
 /// It is also possible to preinitialize a Hnswio with the default() function which leaves all the fields with blank values and use
-/// the function [set_values](Self::set_values()) after.  
+/// the function [set_values](Self::set_values()) after.
 /// We get something like:
 ///
 /// ```text
@@ -437,6 +437,7 @@ impl HnswIo {
         //
         debug!("HnswIo::load_hnsw ");
         let start_t = SystemTime::now();
+
         //
         let init = self.init();
         if init.is_err() {
@@ -493,6 +494,7 @@ impl HnswIo {
         // Do we use mmap at reload
         if self.options.use_mmap().0 {
             let datamap_res = DataMap::from_hnswdump::<T>(self.dir.as_path(), &self.basename);
+
             if datamap_res.is_err() {
                 error!("load_hnsw could not initialize mmap")
             } else {
@@ -520,12 +522,13 @@ impl HnswIo {
         debug!("load_hnsw completed");
         let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
         info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+
         Ok(hnsw)
     } // end of load_hnsw
 
     /// reload a previously dumped hnsw structure
-    /// This function makes reload of a Hnsw dump with a given Dist.  
-    /// It is dedicated to distance of type DistPtr (see crate [anndist](https://crates.io/crates/anndists)) that cannot implement Default.  
+    /// This function makes reload of a Hnsw dump with a given Dist.
+    /// It is dedicated to distance of type DistPtr (see crate [anndist](https://crates.io/crates/anndists)) that cannot implement Default.
     /// **It is the user responsability to reload with the same function as used in the dump**
     ///
     pub fn load_hnsw_with_dist<'b, 'a, T, D>(&'a self, f: D) -> anyhow::Result<Hnsw<'b, T, D>>
@@ -931,7 +934,7 @@ impl Description {
 
 //
 
-/// This method is internally used by Hnswio.  
+/// This method is internally used by Hnswio.
 /// It is make *pub* as it can be used to retrieve the description of a dump.
 /// It takes as input the graph part of the dump.
 pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
@@ -1047,7 +1050,7 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
 //
 
 ///  Graph part of point dump
-/// dump of a point consist in  
+/// dump of a point consist in
 ///  1. The value MAGICPOINT
 ///  2. its identity ( a usize  rank in original data , hash value or else , and PointId)
 ///  3. for each layer dump of the number of neighbours followed by :
@@ -1349,7 +1352,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
 impl<T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync, D: Distance<T> + Send + Sync>
     HnswIoT for Hnsw<'_, T, D>
 {
-    /// The dump method for hnsw.  
+    /// The dump method for hnsw.
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
     /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
     fn dump(&self, mode: DumpMode, dumpinit: &mut DumpInit) -> anyhow::Result<i32> {
