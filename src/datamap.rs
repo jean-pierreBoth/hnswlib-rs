@@ -1,8 +1,8 @@
 //! This module provides a memory mapping of Data vectors filling the Hnsw structure.
 //! It is used by the module [hnswio] and also gives access to an iterator over data without loading the graph.
 //!
-//! We mmap the file and provide   
-//!   - a Hashmap from DataId to address  
+//! We mmap the file and provide
+//!   - a Hashmap from DataId to address
 //!   - an interface for retrieving just data vectors loaded in the hnsw structure.
 
 use std::io::BufReader;
@@ -38,7 +38,7 @@ pub struct DataMap {
 
 impl DataMap {
     // TODO: specifiy mmap option
-    /// The fname argument corresponds to the basename of the dump.  
+    /// The fname argument corresponds to the basename of the dump.
     /// To reload from file fname.hnsw.data just pass fname as argument.
     /// The dir argument is the directory where the fname.hnsw.data and fname.hnsw.graph reside.
     pub fn from_hnswdump<T: std::fmt::Debug>(
@@ -47,7 +47,6 @@ impl DataMap {
     ) -> Result<DataMap, String> {
         // reload description to have data type, and check for dump version
         let mut graphpath = PathBuf::from(dir);
-        graphpath.push(dir);
         let mut filename = file_name.to_string();
         filename.push_str(".hnsw.graph");
         graphpath.push(filename);
@@ -270,9 +269,9 @@ impl DataMap {
 
     //
 
-    /// return the data corresponding to dataid. Access is done using mmap.  
+    /// return the data corresponding to dataid. Access is done using mmap.
     /// Function returns None if address is invalid
-    /// This function requires you know the type T.  
+    /// This function requires you know the type T.
     /// **As mmap loading calls an unsafe function it is recommended to check the type name with  [Self::check_data_type()]**
     pub fn get_data<'a, T: Clone + std::fmt::Debug>(&'a self, dataid: &DataId) -> Option<&'a [T]> {
         //
@@ -297,7 +296,7 @@ impl DataMap {
         Some(slice_t)
     }
 
-    /// returns Keys in order they are in the file, thus optimizing file/memory access.  
+    /// returns Keys in order they are in the file, thus optimizing file/memory access.
     /// Note that in case of parallel insertion this can be different from insertion odrer.
     pub fn get_dataid_iter(&self) -> indexmap::map::Keys<'_, DataId, usize> {
         self.hmap.keys()
