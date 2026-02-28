@@ -1,7 +1,7 @@
 # Changes
 
 - version 0.3.4
-  small fix in reloading with DataMap when case dump directory given by a relative path (thanks to dsgallups)
+  small fix in reloading with DataMap in case dump directory given by a relative path (thanks to dsgallups)
 
 - version 0.3.3
   small fix on filter (thanks to VillSnow). include ndarray 0.17 as possible dep. fixed compiler warning on elided lifetimes
