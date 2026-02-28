@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use cpu_time::ProcessTime;
+use std::time::Instant;
 use std::time::SystemTime;
 
 use std::cmp::Ordering;
@@ -407,7 +407,7 @@ pub struct PointIndexation<'b, T: Clone + Send + Sync> {
 
 impl<T: Clone + Send + Sync> Drop for PointIndexation<'_, T> {
     fn drop(&mut self) {
-        let cpu_start = ProcessTime::now();
+        let cpu_start = Instant::now();
         let sys_now = SystemTime::now();
         info!("entering PointIndexation drop");
         // clear_neighborhood. There are no point in neighborhoods that are not referenced directly in layers.
@@ -1025,19 +1025,19 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         );
                         candidate_points
                             .push(Arc::new(PointWithOrder::new(&e.point_ref, -e_dist_to_p)));
-                        if filter.is_none() {
-                            return_points.push(Arc::clone(&e_prime));
-                        } else {
+                        if let Some(f) = &filter {
                             let id: &usize = &e_prime.point_ref.get_origin_id();
-                            if filter.as_ref().unwrap().hnsw_filter(id) {
+                            if f.hnsw_filter(id) {
                                 if return_points.len() == 1 {
                                     let only_id = return_points.peek().unwrap().point_ref.origin_id;
-                                    if !filter.as_ref().unwrap().hnsw_filter(&only_id) {
+                                    if !f.hnsw_filter(&only_id) {
                                         return_points.clear()
                                     }
                                 }
                                 return_points.push(Arc::clone(&e_prime))
                             }
+                        } else {
+                            return_points.push(Arc::clone(&e_prime));
                         }
                         if return_points.len() > ef {
                             return_points.pop();
@@ -1537,19 +1537,14 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         if let Some(filter_t) = filter {
             let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
                 .iter()
+                .filter(|p| filter_t.hnsw_filter(&p.as_ref().point_ref.origin_id))
                 .map(|p| {
-                    if filter_t.hnsw_filter(&p.as_ref().point_ref.origin_id) {
-                        Some(Neighbour::new(
-                            p.as_ref().point_ref.origin_id,
-                            p.as_ref().dist_to_ref,
-                            p.as_ref().point_ref.p_id,
-                        ))
-                    } else {
-                        None
-                    }
+                    Neighbour::new(
+                        p.as_ref().point_ref.origin_id,
+                        p.as_ref().dist_to_ref,
+                        p.as_ref().point_ref.p_id,
+                    )
                 })
-                .filter(|x| x.is_some())
-                .map(|x| x.unwrap())
                 .collect();
             //
             knn_neighbours
@@ -1750,7 +1745,7 @@ mod tests {
     use anndists::dist;
 
     fn log_init_test() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        // logger init removed — log macros are no-ops without a subscriber
     }
 
     #[test]
@@ -1775,7 +1770,7 @@ mod tests {
         // check insertion
         let ef_construct = 25;
         let nb_connection = 10;
-        let start = ProcessTime::now();
+        let start = Instant::now();
         let hns = Hnsw::<f32, dist::DistL1>::new(
             nb_connection,
             nbcolumn,
@@ -1823,7 +1818,7 @@ mod tests {
         // check insertion
         let ef_construct = 25;
         let nb_connection = 10;
-        let start = ProcessTime::now();
+        let start = Instant::now();
         let hns = Hnsw::<f32, dist::DistL1>::new(
             nb_connection,
             nbcolumn,

@@ -1236,5 +1236,5 @@ pub unsafe extern "C" fn load_hnsw_description(
 /// to initialize rust logging from Julia
 #[unsafe(no_mangle)]
 pub extern "C" fn init_rust_log() {
-    let _res = env_logger::Builder::from_default_env().try_init();
+    // logger init removed — embedding applications provide their own logger
 }

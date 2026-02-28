@@ -63,7 +63,6 @@ parking_lot = "0.12"
 rayon = { version = "1.11" }
 num_cpus = { version = "1.16" }
 
-cpu-time = { version = "1.0" }
 num-traits = { version = "0.2" }
 
 
@@ -72,7 +71,6 @@ hashbrown = { version = "0.15" }
 indexmap = { version = ">= 2.11" }
 
 rand = { version = "0.9" }
-lazy_static = { version = "1.4" }
 
 #
 mmap-rs = { version = "0.7" }
@@ -81,7 +79,6 @@ mmap-rs = { version = "0.7" }
 # decreasing order of log for release build (release_max_level_)  .. idem
 #log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 log = { version = "0.4" }
-env_logger = { version = "0.11" }
 
 anyhow = { version = "1.0" }
 
@@ -99,6 +96,8 @@ ndarray = { version = ">=0.16.0, <0.18" }
 skiplist = { version = "0.6" }
 tempfile = { version = "3" }
 itertools = {version = "0.14"}
+env_logger = { version = "0.11" }
+cpu-time = { version = "1.0" }
 
 [features]
 

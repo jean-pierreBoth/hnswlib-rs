@@ -162,7 +162,7 @@ impl DumpInit {
                 datapath.push(dataname);
                 let exist_res = std::fs::metadata(datapath.as_os_str());
                 if exist_res.is_ok() {
-                    let unique_basename = loop {
+                    loop {
                         let mut unique_basename;
                         let mut dataname: String;
                         let id: usize = rand::rng().random_range(0..10000);
@@ -178,8 +178,7 @@ impl DumpInit {
                         if exist_res.is_err() {
                             break unique_basename;
                         }
-                    };
-                    unique_basename
+                    }
                 } else {
                     basename_default.to_string()
                 }
@@ -495,11 +494,11 @@ impl HnswIo {
         // Do we use mmap at reload
         if self.options.use_mmap().0 {
             let datamap_res = DataMap::from_hnswdump::<T>(self.dir.as_path(), &self.basename);
-            if datamap_res.is_err() {
-                error!("load_hnsw could not initialize mmap")
-            } else {
+            if let std::result::Result::Ok(datamap) = datamap_res {
                 info!("reload using mmap");
-                self.datamap = Some(datamap_res.unwrap());
+                self.datamap = Some(datamap);
+            } else {
+                error!("load_hnsw could not initialize mmap");
             }
         }
         // reloader can use datamap
@@ -1405,7 +1404,7 @@ mod tests {
     use rand::distr::{Distribution, Uniform};
 
     fn log_init_test() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        // logger init removed — log macros are no-ops without a subscriber
     }
 
     fn my_fn(v1: &[f32], v2: &[f32]) -> f32 {
