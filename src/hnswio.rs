@@ -74,7 +74,12 @@ pub enum DumpMode {
 
 /// The main interface for dumping struct Hnsw.
 pub(crate) trait HnswIoT {
-    fn dump(&self, mode: DumpMode, dumpinit: &mut DumpInit) -> anyhow::Result<i32>;
+    fn dump<W: Write>(
+        &self,
+        mode: DumpMode,
+        graph_out: &mut BufWriter<W>,
+        data_out: &mut BufWriter<W>,
+    ) -> anyhow::Result<i32>;
 }
 
 /// Describe options accessible for reload
@@ -1302,9 +1307,12 @@ fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<Poin
 // dump entry point
 //
 impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointIndexation<'_, T> {
-    fn dump(&self, mode: DumpMode, dumpinit: &mut DumpInit) -> Result<i32> {
-        let graphout = &mut dumpinit.graph_out;
-        let dataout = &mut dumpinit.data_out;
+    fn dump<W: Write>(
+        &self,
+        mode: DumpMode,
+        graphout: &mut BufWriter<W>,
+        dataout: &mut BufWriter<W>,
+    ) -> Result<i32> {
         // dump max_layer
         let layers = self.points_by_layer.read();
         let nb_layer = layers.len() as u8;
@@ -1354,10 +1362,13 @@ impl<T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync, D: Distance<
     /// The dump method for hnsw.  
     /// - graphout is a BufWriter dedicated to the dump of the graph part of Hnsw
     /// - dataout is a bufWriter dedicated to the dump of the data stored in the Hnsw structure.
-    fn dump(&self, mode: DumpMode, dumpinit: &mut DumpInit) -> anyhow::Result<i32> {
+    fn dump<W: Write>(
+        &self,
+        mode: DumpMode,
+        graphout: &mut BufWriter<W>,
+        dataout: &mut BufWriter<W>,
+    ) -> anyhow::Result<i32> {
         //
-        let graphout = &mut dumpinit.graph_out;
-        let dataout = &mut dumpinit.data_out;
         // dump description , then PointIndexation
         let dumpmode: u8 = match mode {
             DumpMode::Full => 1,
@@ -1384,7 +1395,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync, D: Distance<
         dataout.write_all(&MAGICDATAP.to_ne_bytes())?;
         dataout.write_all(&datadim.to_ne_bytes())?;
         //
-        self.layer_indexed_points.dump(mode, dumpinit)?;
+        self.layer_indexed_points.dump(mode, graphout, dataout)?;
         Ok(1)
     }
 } // end impl block for Hnsw
