@@ -1,6 +1,6 @@
 [package]
 name = "hnsw_rs"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["jeanpierre.both@gmail.com"]
 description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
 license = "MIT/Apache-2.0"
@@ -70,13 +70,13 @@ num-traits = { version = "0.2" }
 
 #  for hashing . hashbrown still needed beccause of get_key_value(&key)
 hashbrown = { version = "0.15" }
-indexmap = { version = ">= 2.11, < 2.13" }
+indexmap = { version = ">= 2.11" }
 
 rand = { version = "0.9" }
 lazy_static = { version = "1.4" }
 
 #
-mmap-rs = { version = "0.6" }
+mmap-rs = { version = "0.7" }
 #
 # decreasing order of log for debug build : (max_level_)trace debug info warn error off
 # decreasing order of log for release build (release_max_level_)  .. idem

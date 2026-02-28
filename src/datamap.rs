@@ -47,7 +47,6 @@ impl DataMap {
     ) -> Result<DataMap, String> {
         // reload description to have data type, and check for dump version
         let mut graphpath = PathBuf::from(dir);
-        graphpath.push(dir);
         let mut filename = file_name.to_string();
         filename.push_str(".hnsw.graph");
         graphpath.push(filename);

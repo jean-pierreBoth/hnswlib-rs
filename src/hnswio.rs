@@ -138,7 +138,6 @@ impl ReloadOptions {
 
 // initialize datafile and graphfile for io ops
 // This structure will check existence of dumps of same name and generate a unique filename if necessary according to overwrite flag
-#[allow(unused)]
 pub struct DumpInit {
     // basename dump
     basename: String,
@@ -187,7 +186,10 @@ impl DumpInit {
             }
         };
         //
-        info!("Dumping with (unique) basename : {}", basename);
+        debug!(
+            "DumpInit : dumping in dir {:#?} with (unique) basename : {}",
+            dir, basename
+        );
         //
         let mut graphname = basename.clone();
         graphname.push_str(".hnsw.graph");
@@ -200,7 +202,7 @@ impl DumpInit {
             .open(&graphpath);
         if graphfileres.is_err() {
             println!(
-                "HnswIo::reload_hnsw : could not open file {:?}",
+                "DumpInit::new : could not open file {:?}",
                 graphpath.as_os_str()
             );
             std::panic::panic_any("HnswIo::init : could not open file".to_string());
@@ -218,7 +220,7 @@ impl DumpInit {
             .open(&datapath);
         if datafileres.is_err() {
             println!(
-                "HnswIo::init : could not open file {:?}",
+                "DumpInit::init : could not open file {:?}",
                 datapath.as_os_str()
             );
             std::panic::panic_any("HnswIo::init : could not open file".to_string());
@@ -375,15 +377,15 @@ impl HnswIo {
         let graphfileres = OpenOptions::new().read(true).open(&graphpath);
         if graphfileres.is_err() {
             println!(
-                "HnswIo::reload_hnsw : could not open file {:?}",
+                "HnswIo::init : could not open file {:?}",
                 graphpath.as_os_str()
             );
             error!(
-                "HnswIo::reload_hnsw : could not open file {:?}",
+                "HnswIo::init : could not open file {:?}",
                 graphpath.as_os_str()
             );
             return Err(anyhow!(
-                "HnswIo::reload_hnsw : could not open file {:?}",
+                "HnswIo::init : could not open file {:?}",
                 graphpath.as_os_str()
             ));
         }
@@ -404,7 +406,7 @@ impl HnswIo {
                 datapath.as_os_str()
             );
             return Err(anyhow!(
-                "HnswIo::reload_hnsw : could not open file {:?}",
+                "HnswIo::init : could not open file {:?}",
                 datapath.as_os_str()
             ));
         }
@@ -731,7 +733,7 @@ impl HnswIo {
                 point.neighbours.write()[l].sort_unstable();
             } // end of for l
             nbp += 1;
-            if nbp % 500_000 == 0 {
+            if nbp.is_multiple_of(500_000) {
                 debug!("reloading nb_points neighbourhood completed : {}", nbp);
             }
         } // end loop in neighbourhood_map
