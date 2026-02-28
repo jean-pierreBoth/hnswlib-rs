@@ -1,12 +1,12 @@
 [package]
 name = "hnsw_rs"
-version = "0.3.4"
-authors = ["jeanpierre.both@gmail.com"]
-description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
+version = "0.4.0"
+authors = ["jeanpierre.both@gmail.com", "ekoDB <sean@ekodb.io>"]
+description = "HNSW approximate nearest neighbor search — ekoDB-maintained fork of hnswlib-rs"
 license = "MIT/Apache-2.0"
 readme = "README.md"
-keywords = ["algorithms", "ann", "hnsw"]
-repository = "https://github.com/jean-pierreBoth/hnswlib-rs"
+keywords = ["algorithms", "ann", "hnsw", "vector-search"]
+repository = "https://github.com/ekoDB/hnswlib-rs"
 documentation = "https://docs.rs/hnsw_rs"
 edition = "2024"
 
