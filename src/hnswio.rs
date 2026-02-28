@@ -53,7 +53,7 @@ const MAGICDESCR_2: u32 = 0x002a677f;
 // magic at beginning of description format v3 of dump
 // format where we can use mmap to provide acces to data (not graph) via a memory mapping of file data ,
 // useful when data vector are large and data uses more space than graph.
-// differ from v2 as we do not use bincode encoding for point. We dump pure binary
+// differ from v2 as we do not use bincode encoding for point (bincode removed). We dump pure binary
 // This help use mmap as we can return directly a slice.
 const MAGICDESCR_3: u32 = 0x002a6771;
 
@@ -1157,7 +1157,9 @@ where
 
     let v: Vec<T> = if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
         match descr.format_version {
-            2 => bincode::deserialize(&v_serialized).unwrap(),
+            2 => {
+                panic!("v2 dump format is no longer supported — re-export your data with v3+");
+            }
             3 | 4 => {
                 let slice_t = unsafe {
                     std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, descr.dimension)
@@ -1666,26 +1668,6 @@ mod tests {
             std::panic!("hnsw.file_dump failed");
         }
     } // end of reload_with_mmap
-
-    #[test]
-    fn test_bincode() {
-        let mut rng = rand::rng();
-        let unif = Uniform::<f32>::new(0., 1.).unwrap();
-        let size = 10;
-        let mut xsi;
-        let mut data = Vec::with_capacity(size);
-        for _ in 0..size {
-            xsi = unif.sample(&mut rng);
-            println!("xsi = {:?}", xsi);
-            data.push(xsi);
-        }
-        println!("to serialized {:?}", data);
-
-        let v_serialized: Vec<u8> = bincode::serialize(&data).unwrap();
-        debug!("serializing len {:?}", v_serialized.len());
-        let v_deserialized: Vec<f32> = bincode::deserialize(&v_serialized).unwrap();
-        println!("deserialized {:?}", v_deserialized);
-    }
 
     #[test]
     fn read_write_empty_db() -> Result<()> {
