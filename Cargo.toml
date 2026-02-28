@@ -94,7 +94,7 @@ anndists = { version = "0.1" }
 [dev-dependencies]
 # hdf5 = { version = "0.8" }
 # metno is needed as hdf5 is blocked to hdfsys 1.12
-hdf5 = {package = "hdf5-metno", version = "0.10.0" }
+hdf5 = {package = "hdf5-metno", version = "0.12" }
 
 ndarray = { version = ">=0.16.0, <0.18" }
 skiplist = { version = "0.6" }

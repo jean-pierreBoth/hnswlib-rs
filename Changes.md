@@ -1,7 +1,8 @@
 # Changes
 
 - version 0.3.4
-  small fix in reloading with DataMap in case dump directory given by a relative path (thanks to dsgallups)
+  small fix in reloading with DataMap in case dump directory given by a relative path (thanks to dsgallups)  
+  update deps.
 
 - version 0.3.3
   small fix on filter (thanks to VillSnow). include ndarray 0.17 as possible dep. fixed compiler warning on elided lifetimes
@@ -21,10 +22,10 @@
   with the help of bwsw [github](https://github.com/bwsw)
 
 - **version 0.3.0**:
- 
-   The distances implementation is now in a separate crate [anndsits](https://crates.io/crates/anndists). Using hnsw_rs::prelude:::*   should make the change transparent. 
 
-   The mmap implementation makes it possible to use the [coreset](https://github.com/jean-pierreBoth/coreset) crate to compute coreset and clusters of data stored in hnsw dumps.
+  The distances implementation is now in a separate crate [anndsits](https://crates.io/crates/anndists). Using hnsw_rs::prelude:::*   should make the change transparent. 
+
+  The mmap implementation makes it possible to use the [coreset](https://github.com/jean-pierreBoth/coreset) crate to compute coreset and clusters of data stored in hnsw dumps.
 
 - version 0.2.1:
   
