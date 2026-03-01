@@ -335,7 +335,7 @@ mod tests {
     use rand::distr::{Distribution, Uniform};
 
     fn log_init_test() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        // logger init removed — log macros are no-ops without a subscriber
     }
 
     #[test]

@@ -1,12 +1,12 @@
 [package]
 name = "hnsw_rs"
-version = "0.3.4"
-authors = ["jeanpierre.both@gmail.com"]
-description = "Ann based on Hierarchical Navigable Small World Graphs from Yu.A. Malkov and D.A Yashunin"
+version = "0.4.0"
+authors = ["jeanpierre.both@gmail.com", "ekoDB <sean@ekodb.io>"]
+description = "HNSW approximate nearest neighbor search — ekoDB-maintained fork of hnswlib-rs"
 license = "MIT/Apache-2.0"
 readme = "README.md"
-keywords = ["algorithms", "ann", "hnsw"]
-repository = "https://github.com/jean-pierreBoth/hnswlib-rs"
+keywords = ["algorithms", "ann", "hnsw", "vector-search"]
+repository = "https://github.com/ekoDB/hnswlib-rs"
 documentation = "https://docs.rs/hnsw_rs"
 edition = "2024"
 
@@ -55,7 +55,6 @@ path = "examples/levensthein.rs"
 #
 
 serde = { version = "1.0", features = ["derive"] }
-bincode = { version = "1.3" }
 
 cfg-if = { version = "1.0" }
 
@@ -64,7 +63,6 @@ parking_lot = "0.12"
 rayon = { version = "1.11" }
 num_cpus = { version = "1.16" }
 
-cpu-time = { version = "1.0" }
 num-traits = { version = "0.2" }
 
 
@@ -73,7 +71,6 @@ hashbrown = { version = "0.15" }
 indexmap = { version = ">= 2.11" }
 
 rand = { version = "0.9" }
-lazy_static = { version = "1.4" }
 
 #
 mmap-rs = { version = "0.7" }
@@ -82,13 +79,10 @@ mmap-rs = { version = "0.7" }
 # decreasing order of log for release build (release_max_level_)  .. idem
 #log = { version = "0.4", features = ["max_level_debug", "release_max_level_info"] }
 log = { version = "0.4" }
-env_logger = { version = "0.11" }
 
 anyhow = { version = "1.0" }
 
-# anndists = { path = "../anndists" }
-anndists = { version = "0.1" }
-# anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
+anndists = { git = "https://github.com/ekoDB/anndists", branch = "master" }
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
@@ -100,10 +94,12 @@ ndarray = { version = ">=0.16.0, <0.18" }
 skiplist = { version = "0.6" }
 tempfile = { version = "3" }
 itertools = {version = "0.14"}
+env_logger = { version = "0.11" }
+cpu-time = { version = "1.0" }
 
 [features]
 
-default = []
+default = ["simdeez_f"]
 
 # feature for std simd on nightly
 stdsimd = ["anndists/stdsimd"]
