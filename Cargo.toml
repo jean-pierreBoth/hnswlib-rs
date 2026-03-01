@@ -82,9 +82,7 @@ log = { version = "0.4" }
 
 anyhow = { version = "1.0" }
 
-# anndists = { path = "../anndists" }
-anndists = { version = "0.1" }
-# anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
+anndists = { git = "https://github.com/ekoDB/anndists", branch = "master" }
 
 # for benchmark reading, so the lbrary do not depend on hdf5 nor ndarray
 [dev-dependencies]
@@ -101,7 +99,7 @@ cpu-time = { version = "1.0" }
 
 [features]
 
-default = []
+default = ["simdeez_f"]
 
 # feature for std simd on nightly
 stdsimd = ["anndists/stdsimd"]
