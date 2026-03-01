@@ -1715,13 +1715,18 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     /// former neighbors to preserve graph connectivity.
     /// Returns true if the point was found and deleted.
     pub fn mark_deleted(&self, origin_id: usize) -> bool {
-        // Find the point by scanning layer 0 (all points exist in layer 0)
+        // Find the point by scanning all layers (points are stored only in
+        // their assigned layer's points_by_layer slot, not duplicated in layer 0)
         let target_point = {
             let layers = self.layer_indexed_points.points_by_layer.read();
-            if layers.is_empty() || layers[0].is_empty() {
-                return false;
+            let mut found = None;
+            for layer in layers.iter() {
+                if let Some(p) = layer.iter().find(|p| p.origin_id == origin_id) {
+                    found = Some(p.clone());
+                    break;
+                }
             }
-            layers[0].iter().find(|p| p.origin_id == origin_id).cloned()
+            found
         };
 
         let point = match target_point {
@@ -1818,11 +1823,9 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     /// Returns the number of points that have been soft-deleted
     pub fn get_deleted_count(&self) -> usize {
         let layers = self.layer_indexed_points.points_by_layer.read();
-        if layers.is_empty() {
-            return 0;
-        }
-        layers[0]
+        layers
             .iter()
+            .flat_map(|layer| layer.iter())
             .filter(|p| p.deleted.load(AtomicOrdering::Relaxed))
             .count()
     }
