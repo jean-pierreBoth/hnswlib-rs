@@ -12,7 +12,7 @@ use skiplist::OrderedSkipList;
 
 use anndists::dist;
 use hnsw_rs::prelude::*;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 pub fn gen_random_vector_f32(nbrow: usize) -> Vec<f32> {
     let mut rng = rand::rng();
@@ -169,9 +169,9 @@ mod tests {
             recalls.push(recall);
             nb_returned.push(knn_neighbours.len());
         } // end on nbtest
-          //
-          // compute recall
-          //
+        //
+        // compute recall
+        //
 
         let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
         let mean_search_time = (search_times.iter().sum::<f32>()) / (search_times.len() as f32);
@@ -307,9 +307,9 @@ mod tests {
             }
             recalls_id.push(recall_id);
         } // end on nbtest
-          //
-          // compute recall
-          //
+        //
+        // compute recall
+        //
 
         let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
         let mean_search_time = (search_times.iter().sum::<f32>()) / (search_times.len() as f32);

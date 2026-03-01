@@ -777,6 +777,7 @@ impl HnswIo {
                 NB_LAYER_MAX as usize,
             ),
             nb_point: Arc::new(RwLock::new(nb_points_loaded)), // CAVEAT , we should increase , the whole thing is to be able to increment graph ?
+            max_level_observed: std::sync::atomic::AtomicU8::new(entry_point.get_point_id().0),
             entry_point: Arc::new(RwLock::new(Some(entry_point))),
         };
         //

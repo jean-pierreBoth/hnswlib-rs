@@ -13,6 +13,7 @@ use std::cmp::Ordering;
 use parking_lot::{Mutex, RwLock, RwLockReadGuard};
 use rayon::prelude::*;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering as AtomicOrdering};
 use std::sync::mpsc::channel;
 
 use std::any::type_name;
@@ -36,6 +37,47 @@ use anndists::dist::distances::Distance;
 /// It must be associated to the unit structure dist::NoDist for the distance type to provide.
 #[derive(Default, Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct NoData;
+
+/// Generation-based visited set for O(1) amortized visit tracking.
+/// Avoids per-search HashMap allocation — just bumps the generation counter.
+struct VisitedSet {
+    generation: u64,
+    marks: Vec<u64>,
+}
+
+impl VisitedSet {
+    fn new(capacity: usize) -> Self {
+        VisitedSet {
+            generation: 1,
+            marks: vec![0; capacity],
+        }
+    }
+
+    /// Reset for a new search. O(1) — just bumps the generation.
+    #[allow(dead_code)]
+    fn clear(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        if self.generation == 0 {
+            // Wrapped around — reset all marks (extremely rare, ~every 2^64 searches)
+            self.marks.fill(0);
+            self.generation = 1;
+        }
+    }
+
+    /// Mark an ID as visited. Returns `true` if it was newly visited (not seen this generation).
+    fn visit(&mut self, id: usize) -> bool {
+        let i = id;
+        if i >= self.marks.len() {
+            // Grow if needed (shouldn't happen in normal use)
+            self.marks.resize(i + 1, 0);
+        }
+        if self.marks[i] == self.generation {
+            return false;
+        }
+        self.marks[i] = self.generation;
+        true
+    }
+}
 
 /// maximum number of layers
 pub(crate) const NB_LAYER_MAX: u8 = 16; // so max layer is 15!!
@@ -158,7 +200,7 @@ impl<'b, T: Clone + Send + Sync + 'b> PointData<'b, T> {
 ///
 // neighbours table : one vector by layer so neighbours is allocated to NB_LAYER_MAX
 //
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[allow(clippy::type_complexity)]
 pub struct Point<'b, T: Clone + Send + Sync> {
     /// The data of this point, coming from hnsw client and associated to origin_id,
@@ -169,6 +211,20 @@ pub struct Point<'b, T: Clone + Send + Sync> {
     p_id: PointId,
     /// neighbours info
     pub(crate) neighbours: Arc<RwLock<Vec<Vec<Arc<PointWithOrder<'b, T>>>>>>,
+    /// Soft-delete flag: point is skipped in search results but still aids graph traversal
+    pub(crate) deleted: AtomicBool,
+}
+
+impl<'b, T: Clone + Send + Sync> Clone for Point<'b, T> {
+    fn clone(&self) -> Self {
+        Point {
+            data: self.data.clone(),
+            origin_id: self.origin_id,
+            p_id: self.p_id,
+            neighbours: self.neighbours.clone(),
+            deleted: AtomicBool::new(self.deleted.load(AtomicOrdering::Relaxed)),
+        }
+    }
 }
 
 impl<'b, T: Clone + Send + Sync> Point<'b, T> {
@@ -183,6 +239,7 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
             origin_id,
             p_id,
             neighbours: Arc::new(RwLock::new(neighbours)),
+            deleted: AtomicBool::new(false),
         }
     }
 
@@ -197,7 +254,13 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
             origin_id,
             p_id,
             neighbours: Arc::new(RwLock::new(neighbours)),
+            deleted: AtomicBool::new(false),
         }
+    }
+
+    /// Check if this point has been soft-deleted
+    pub fn is_deleted(&self) -> bool {
+        self.deleted.load(AtomicOrdering::Relaxed)
     }
 
     /// get a reference to vector data
@@ -400,6 +463,9 @@ pub struct PointIndexation<'b, T: Clone + Send + Sync> {
     pub(crate) nb_point: Arc<RwLock<usize>>,
     /// curent enter_point: an Arc RwLock on a possible Arc Point
     pub(crate) entry_point: Arc<RwLock<Option<Arc<Point<'b, T>>>>>,
+    /// Optimistic fast-path: tracks the highest layer seen (255 = uninitialized).
+    /// 99%+ of inserts are layer 0, so this avoids the entry_point write lock.
+    pub(crate) max_level_observed: AtomicU8,
 }
 
 // A point indexation may contain circular references. To deallocate these after a point indexation goes out of scope,
@@ -462,16 +528,14 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
             layer_g,
             nb_point: Arc::new(RwLock::new(0)),
             entry_point: Arc::new(RwLock::new(None)),
+            max_level_observed: AtomicU8::new(255), // 255 = uninitialized
         }
     } // end of new
 
     /// returns the maximum level of layer observed
     pub fn get_max_level_observed(&self) -> u8 {
-        let opt = self.entry_point.read();
-        match opt.as_ref() {
-            Some(arc_point) => arc_point.p_id.0,
-            None => 0,
-        }
+        let v = self.max_level_observed.load(AtomicOrdering::Acquire);
+        if v == 255 { 0 } else { v }
     }
 
     pub fn get_level_scale(&self) -> f64 {
@@ -525,11 +589,15 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
         (Arc::clone(&new_point), nb_point)
     } // end of insert
 
-    /// check if entry_point is modified
+    /// check if entry_point is modified.
+    /// Uses an atomic fast-path: 99%+ of inserts are layer 0, so they skip the write lock entirely.
     fn check_entry_point(&self, new_point: &Arc<Point<'b, T>>) {
-        //
-        // take directly a write lock so that we are sure nobody can change anything between read and write
-        // of entry_point_id
+        let current_max = self.max_level_observed.load(AtomicOrdering::Acquire);
+        // Fast path: new point's layer is not higher than current max → can't be new entry point
+        if current_max != 255 && new_point.p_id.0 <= current_max {
+            return;
+        }
+        // Slow path: might be new entry point, acquire write lock and double-check
         trace!("trying to get a lock on entry point");
         let mut entry_point_ref = self.entry_point.write();
         match entry_point_ref.as_ref() {
@@ -541,12 +609,16 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
                         arc_point.p_id.0, new_point.p_id.0
                     );
                     *entry_point_ref = Some(Arc::clone(new_point));
+                    self.max_level_observed
+                        .store(new_point.p_id.0, AtomicOrdering::Release);
                 }
             }
             None => {
                 trace!("initializing entry point");
                 debug!("Hnsw  , inserting  entry point {:?} ", new_point.p_id);
                 *entry_point_ref = Some(Arc::clone(new_point));
+                self.max_level_observed
+                    .store(new_point.p_id.0, AtomicOrdering::Release);
             }
         }
     } // end of check_entry_point
@@ -942,54 +1014,64 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         // initialize visited points
         let dist_to_entry_point = self.dist_f.eval(point, entry_point.data.get_v());
         trace!("       distance to entry point: {:?} ", dist_to_entry_point);
-        // keep a list of id visited
-        let mut visited_point_id = HashMap::<PointId, Arc<Point<T>>>::new();
-        visited_point_id.insert(entry_point.p_id, Arc::clone(&entry_point));
+        // O(1) visited tracking via generation-based bitset (replaces HashMap + Arc::clone)
+        let nb_points = self.layer_indexed_points.get_nb_point();
+        let mut visited = VisitedSet::new(nb_points);
+        visited.visit(entry_point.origin_id);
         //
         let mut candidate_points =
             BinaryHeap::<Arc<PointWithOrder<T>>>::with_capacity(skiplist_size);
+        // Always add entry point to candidates for traversal
         candidate_points.push(Arc::new(PointWithOrder::new(
             &entry_point,
             -dist_to_entry_point,
         )));
-        return_points.push(Arc::new(PointWithOrder::new(
-            &entry_point,
-            dist_to_entry_point,
-        )));
+        // Only add entry point to results if not deleted
+        let entry_deleted = entry_point.deleted.load(AtomicOrdering::Relaxed);
+        if !entry_deleted {
+            return_points.push(Arc::new(PointWithOrder::new(
+                &entry_point,
+                dist_to_entry_point,
+            )));
+        }
+        // Track the farthest distance seen for use when return_points is empty
+        let mut farthest_dist = dist_to_entry_point;
         // at the beginning candidate_points contains point passed as arg in layer entry_point_id.0
         while !candidate_points.is_empty() {
             // get nearest point in candidate_points
             let c = candidate_points.pop().unwrap();
-            // f farthest point to
-            let f = return_points.peek().unwrap();
-            assert!(f.dist_to_ref >= 0.);
             assert!(c.dist_to_ref <= 0.);
-            trace!(
-                "Comparaing c : {:?} f : {:?}",
-                -(c.dist_to_ref),
-                f.dist_to_ref
-            );
-            if -(c.dist_to_ref) > f.dist_to_ref {
-                // this comparison requires that we are sure that distances compared are distances to the same point :
-                // This is the case we compare distance to point passed as arg.
+            // Check early termination: if nearest candidate is farther than farthest result
+            if let Some(f) = return_points.peek() {
+                assert!(f.dist_to_ref >= 0.);
                 trace!(
-                    "Fast return from search_layer, nb points : {:?} \n \t c {:?} \n \t f {:?} dists: {:?}  {:?}",
-                    return_points.len(),
-                    c.point_ref.p_id,
-                    f.point_ref.p_id,
+                    "Comparaing c : {:?} f : {:?}",
                     -(c.dist_to_ref),
                     f.dist_to_ref
                 );
-                if filter.is_none() {
-                    return return_points;
-                } else if return_points.len() >= ef {
-                    return_points.retain(|p| {
-                        filter
-                            .as_ref()
-                            .unwrap()
-                            .hnsw_filter(&p.point_ref.get_origin_id())
-                    });
+                if -(c.dist_to_ref) > f.dist_to_ref {
+                    trace!(
+                        "Fast return from search_layer, nb points : {:?} \n \t c {:?} \n \t f {:?} dists: {:?}  {:?}",
+                        return_points.len(),
+                        c.point_ref.p_id,
+                        f.point_ref.p_id,
+                        -(c.dist_to_ref),
+                        f.dist_to_ref
+                    );
+                    if filter.is_none() {
+                        return return_points;
+                    } else if return_points.len() >= ef {
+                        return_points.retain(|p| {
+                            filter
+                                .as_ref()
+                                .unwrap()
+                                .hnsw_filter(&p.point_ref.get_origin_id())
+                        });
+                    }
                 }
+            } else if -(c.dist_to_ref) > farthest_dist {
+                // return_points is empty (all seen points were deleted), use tracked farthest
+                return return_points;
             }
             // now we scan neighborhood of c in layer and increment visited_point, candidate_points
             // and optimize candidate_points so that it contains points with lowest distances to point arg
@@ -1002,47 +1084,50 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                 neighbours_c_l.len()
             );
             for e in neighbours_c_l {
-                // HERE WE sEE THAT neighbours should be stored as PointIdWithOrder !!
-                // CAVEAT what if several point_id with same distance to ref point?
-                if !visited_point_id.contains_key(&e.point_ref.p_id) {
-                    visited_point_id.insert(e.point_ref.p_id, Arc::clone(&e.point_ref));
+                if visited.visit(e.point_ref.origin_id) {
                     trace!("             visited insertion {:?}", e.point_ref.p_id);
-                    let f_opt = return_points.peek();
-                    if f_opt.is_none() {
-                        // do some debug info, dumped distance is from e to c! as e is in c neighbours
-                        debug!("return points empty when inserting {:?}", e.point_ref.p_id);
-                        return return_points;
-                    }
-                    let f = f_opt.unwrap();
                     let e_dist_to_p = self.dist_f.eval(point, e.point_ref.data.get_v());
-                    let f_dist_to_p = f.dist_to_ref;
-                    if e_dist_to_p < f_dist_to_p || return_points.len() < ef {
+                    // Update farthest distance seen
+                    if e_dist_to_p > farthest_dist {
+                        farthest_dist = e_dist_to_p;
+                    }
+                    let should_consider = if let Some(f) = return_points.peek() {
+                        e_dist_to_p < f.dist_to_ref || return_points.len() < ef
+                    } else {
+                        true // return_points empty, always consider
+                    };
+                    if should_consider {
                         let e_prime = Arc::new(PointWithOrder::new(&e.point_ref, e_dist_to_p));
-                        // a neighbour of neighbour is better, we insert it into candidate with the distance to point
+                        // Always add to candidates for traversal (even if deleted)
                         trace!(
                             "                inserting new candidate {:?}",
                             e_prime.point_ref.p_id
                         );
                         candidate_points
                             .push(Arc::new(PointWithOrder::new(&e.point_ref, -e_dist_to_p)));
-                        if let Some(f) = &filter {
-                            let id: &usize = &e_prime.point_ref.get_origin_id();
-                            if f.hnsw_filter(id) {
-                                if return_points.len() == 1 {
-                                    let only_id = return_points.peek().unwrap().point_ref.origin_id;
-                                    if !f.hnsw_filter(&only_id) {
-                                        return_points.clear()
+                        // Only add to return_points if not deleted
+                        let e_deleted = e.point_ref.deleted.load(AtomicOrdering::Relaxed);
+                        if !e_deleted {
+                            if let Some(f) = &filter {
+                                let id: &usize = &e_prime.point_ref.get_origin_id();
+                                if f.hnsw_filter(id) {
+                                    if return_points.len() == 1 {
+                                        let only_id =
+                                            return_points.peek().unwrap().point_ref.origin_id;
+                                        if !f.hnsw_filter(&only_id) {
+                                            return_points.clear()
+                                        }
                                     }
+                                    return_points.push(Arc::clone(&e_prime))
                                 }
-                                return_points.push(Arc::clone(&e_prime))
+                            } else {
+                                return_points.push(Arc::clone(&e_prime));
                             }
-                        } else {
-                            return_points.push(Arc::clone(&e_prime));
                         }
                         if return_points.len() > ef {
                             return_points.pop();
                         }
-                    } // end if e.dist_to_ref < f.dist_to_ref
+                    } // end if should_consider
                 }
             } // end of for on neighbours_c
         } // end of while in candidates
@@ -1457,6 +1542,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         let last = knbn.min(ef).min(neighbours.len());
         let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
             .iter()
+            .filter(|p| !p.as_ref().point_ref.is_deleted())
             .map(|p| {
                 Neighbour::new(
                     p.as_ref().point_ref.origin_id,
@@ -1537,7 +1623,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         if let Some(filter_t) = filter {
             let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
                 .iter()
-                .filter(|p| filter_t.hnsw_filter(&p.as_ref().point_ref.origin_id))
+                .filter(|p| {
+                    !p.as_ref().point_ref.is_deleted()
+                        && filter_t.hnsw_filter(&p.as_ref().point_ref.origin_id)
+                })
                 .map(|p| {
                     Neighbour::new(
                         p.as_ref().point_ref.origin_id,
@@ -1551,6 +1640,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         } else {
             let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
                 .iter()
+                .filter(|p| !p.as_ref().point_ref.is_deleted())
                 .map(|p| {
                     Neighbour::new(
                         p.as_ref().point_ref.origin_id,
@@ -1618,6 +1708,124 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         }
         answers
     } // end of insert_parallel
+
+    /// Soft-delete a point by its external origin_id.
+    /// Sets the deleted flag so the point is skipped in search results.
+    /// Removes the point from its neighbors' neighbor lists and reconnects
+    /// former neighbors to preserve graph connectivity.
+    /// Returns true if the point was found and deleted.
+    pub fn mark_deleted(&self, origin_id: usize) -> bool {
+        // Find the point by scanning layer 0 (all points exist in layer 0)
+        let target_point = {
+            let layers = self.layer_indexed_points.points_by_layer.read();
+            if layers.is_empty() || layers[0].is_empty() {
+                return false;
+            }
+            layers[0].iter().find(|p| p.origin_id == origin_id).cloned()
+        };
+
+        let point = match target_point {
+            Some(p) => p,
+            None => return false,
+        };
+
+        // Already deleted?
+        if point.deleted.swap(true, AtomicOrdering::AcqRel) {
+            return true; // was already deleted
+        }
+
+        let max_level = point.p_id.0 as usize;
+
+        // For each layer the deleted point participates in, repair neighbor edges
+        for layer in 0..=max_level {
+            let deleted_neighbours: Vec<Arc<PointWithOrder<'b, T>>>;
+            {
+                let neighbours_guard = point.neighbours.read();
+                if layer >= neighbours_guard.len() {
+                    continue;
+                }
+                deleted_neighbours = neighbours_guard[layer].clone();
+            }
+
+            // Remove the deleted point from each neighbor's neighbor list
+            for neighbour in &deleted_neighbours {
+                let mut n_neighbours = neighbour.point_ref.neighbours.write();
+                if layer < n_neighbours.len() {
+                    n_neighbours[layer].retain(|n| n.point_ref.p_id != point.p_id);
+                }
+            }
+
+            // Reconnect: for each pair of former neighbors, if they aren't already
+            // connected and have room, add an edge between them
+            let max_conn = if layer == 0 {
+                2 * self.max_nb_connection
+            } else {
+                self.max_nb_connection
+            };
+
+            for i in 0..deleted_neighbours.len() {
+                for j in (i + 1)..deleted_neighbours.len() {
+                    let a = &deleted_neighbours[i];
+                    let b = &deleted_neighbours[j];
+
+                    // Check if a and b are already neighbors
+                    let a_has_b = {
+                        let a_n = a.point_ref.neighbours.read();
+                        layer < a_n.len()
+                            && a_n[layer]
+                                .iter()
+                                .any(|n| n.point_ref.p_id == b.point_ref.p_id)
+                    };
+
+                    if a_has_b {
+                        continue;
+                    }
+
+                    let dist_ab = self
+                        .dist_f
+                        .eval(a.point_ref.data.get_v(), b.point_ref.data.get_v());
+
+                    // Add b to a's neighbors if a has room
+                    {
+                        let mut a_n = a.point_ref.neighbours.write();
+                        if layer < a_n.len() && a_n[layer].len() < max_conn {
+                            a_n[layer].push(Arc::new(PointWithOrder::new(&b.point_ref, dist_ab)));
+                        }
+                    }
+
+                    // Add a to b's neighbors if b has room
+                    {
+                        let mut b_n = b.point_ref.neighbours.write();
+                        if layer < b_n.len() && b_n[layer].len() < max_conn {
+                            b_n[layer].push(Arc::new(PointWithOrder::new(&a.point_ref, dist_ab)));
+                        }
+                    }
+                }
+            }
+
+            // NOTE: We intentionally keep the deleted point's own outgoing edges.
+            // If this point is (or was) the entry point, its edges are needed for
+            // traversal to reach the rest of the graph.
+        }
+
+        debug!(
+            "mark_deleted: origin_id={} point_id={:?}",
+            origin_id, point.p_id
+        );
+        true
+    } // end of mark_deleted
+
+    /// Returns the number of points that have been soft-deleted
+    pub fn get_deleted_count(&self) -> usize {
+        let layers = self.layer_indexed_points.points_by_layer.read();
+        if layers.is_empty() {
+            return 0;
+        }
+        layers[0]
+            .iter()
+            .filter(|p| p.deleted.load(AtomicOrdering::Relaxed))
+            .count()
+    }
 } // end of Hnsw
 
 // This function takes a binary heap with points declared with a negative distance
