@@ -1290,9 +1290,9 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         trace!("Hnsw exiting insert new point {:?} ", new_point.p_id);
     } // end of insert
 
-    /// Insert in parallel a slice of Vec\<T\> each associated to its id.    
-    /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
-    /// Typically 1000 * the number of threads.  
+    /// Insert in parallel a slice of Vec\<T\> each associated to its id.
+    /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.
+    /// Typically 1000 * the number of threads.
     /// Many consecutive parallel_insert can be done, so the size of vector inserted in one insertion can be optimized.
     pub fn parallel_insert(&self, datas: &[(&Vec<T>, usize)]) {
         debug!("entering parallel_insert");
@@ -1302,13 +1302,48 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         debug!("exiting parallel_insert");
     } // end of parallel_insert
 
-    /// Insert in parallel slices of \[T\] each associated to its id.    
-    /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
-    /// Typically 1000 * the number of threads.  
+    /// Insert in parallel slices of \[T\] each associated to its id.
+    /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.
+    /// Typically 1000 * the number of threads.
     /// Facilitates the use with the ndarray crate as we can extract slices (for data in contiguous order) from Array.
     pub fn parallel_insert_slice(&self, datas: &Vec<(&[T], usize)>) {
         datas.par_iter().for_each(|&item| self.insert_slice(item));
     } // end of parallel_insert
+
+    /// Smart bulk insert that automatically chooses sequential or parallel insertion
+    /// based on dataset size. For small datasets (fewer than `PARALLEL_THRESHOLD` vectors),
+    /// sequential insertion produces better-connected HNSW graphs because the graph
+    /// structure is fully consistent between each insertion. For large datasets, parallel
+    /// insertion via Rayon is used for performance.
+    ///
+    /// This is the recommended method for rebuilding graphs from scratch.
+    pub fn bulk_insert(&self, datas: &[(&Vec<T>, usize)]) {
+        const PARALLEL_THRESHOLD: usize = 128;
+        if datas.len() < PARALLEL_THRESHOLD {
+            debug!("bulk_insert: sequential mode for {} vectors", datas.len());
+            for &(item, v) in datas {
+                self.insert((item.as_slice(), v));
+            }
+        } else {
+            debug!("bulk_insert: parallel mode for {} vectors", datas.len());
+            self.parallel_insert(datas);
+        }
+    } // end of bulk_insert
+
+    /// Smart bulk insert for slices, analogous to [`bulk_insert`] but accepts `&[T]` slices.
+    /// Automatically chooses sequential or parallel insertion based on dataset size.
+    pub fn bulk_insert_slice(&self, datas: &[(&[T], usize)]) {
+        const PARALLEL_THRESHOLD: usize = 128;
+        if datas.len() < PARALLEL_THRESHOLD {
+            debug!("bulk_insert_slice: sequential mode for {} vectors", datas.len());
+            for &item in datas {
+                self.insert_slice(item);
+            }
+        } else {
+            debug!("bulk_insert_slice: parallel mode for {} vectors", datas.len());
+            datas.par_iter().for_each(|&item| self.insert_slice(item));
+        }
+    } // end of bulk_insert_slice
 
     /// insert new_point in neighbourhood info of point
     fn reverse_update_neighborhood_simple(&self, new_point: Arc<Point<T>>) {
