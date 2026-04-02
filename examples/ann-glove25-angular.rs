@@ -58,6 +58,10 @@ use std::time::{Duration, SystemTime};
 //  24            800        128            0.5            1          0          0.974        16521     1.002
 //  48            800        128            0.5            1          0          0.985        11484     1.001
 
+// AMD ryzen 9 7950X 16-Core   knbn = 100 simdeez 3.0 (avx512) with level scale modification factor 0.5
+// ==================================================
+//  24            800        128            0.5            1          0          0.974        20113     1.002
+
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
 use log::info;
