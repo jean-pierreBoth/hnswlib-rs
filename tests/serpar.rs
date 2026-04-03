@@ -8,11 +8,18 @@
 use rand::distr::Uniform;
 use rand::prelude::*;
 
-use skiplist::OrderedSkipList;
+use skiplist::{Comparator, OrderedSkipList};
 
 use anndists::dist;
 use hnsw_rs::prelude::*;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
+
+struct CompareByDist;
+impl Comparator<PointIdWithOrder> for CompareByDist {
+    fn compare(&self, p1: &PointIdWithOrder, p2: &PointIdWithOrder) -> std::cmp::Ordering {
+        p1.dist_to_ref.total_cmp(&p2.dist_to_ref)
+    }
+}
 
 pub fn gen_random_vector_f32(nbrow: usize) -> Vec<f32> {
     let mut rng = rand::rng();
@@ -37,9 +44,11 @@ fn brute_force_neighbours<T: Serialize + DeserializeOwned + Copy + Send + Sync>(
     refdata: &PointIndexation<T>,
     distance: PointDistance<T>,
     data: &[T],
-) -> OrderedSkipList<PointIdWithOrder> {
-    let mut neighbours = OrderedSkipList::<PointIdWithOrder>::with_capacity(refdata.get_nb_point());
-
+) -> OrderedSkipList<PointIdWithOrder, 16, CompareByDist> {
+    //
+    let mut neighbours: OrderedSkipList<PointIdWithOrder, 16, CompareByDist> =
+        OrderedSkipList::<PointIdWithOrder, 16, CompareByDist>::with_comparator(CompareByDist {});
+    //
     let mut ptiter = refdata.into_iter();
     let mut more = true;
     while more {
@@ -51,7 +60,7 @@ fn brute_force_neighbours<T: Serialize + DeserializeOwned + Copy + Send + Sync>(
                 neighbours.insert(ordered_point);
             } else {
                 neighbours.insert(ordered_point);
-                neighbours.pop_back();
+                neighbours.pop_last();
             }
         } else {
             more = false;
@@ -169,9 +178,9 @@ mod tests {
             recalls.push(recall);
             nb_returned.push(knn_neighbours.len());
         } // end on nbtest
-          //
-          // compute recall
-          //
+        //
+        // compute recall
+        //
 
         let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
         let mean_search_time = (search_times.iter().sum::<f32>()) / (search_times.len() as f32);
@@ -307,9 +316,9 @@ mod tests {
             }
             recalls_id.push(recall_id);
         } // end on nbtest
-          //
-          // compute recall
-          //
+        //
+        // compute recall
+        //
 
         let mean_recall = (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
         let mean_search_time = (search_times.iter().sum::<f32>()) / (search_times.len() as f32);
