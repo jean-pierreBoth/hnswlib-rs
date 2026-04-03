@@ -1537,7 +1537,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         if let Some(filter_t) = filter {
             let knn_neighbours: Vec<Neighbour> = neighbours[0..last]
                 .iter()
-                .map(|p| {
+                .filter_map(|p| {
                     if filter_t.hnsw_filter(&p.as_ref().point_ref.origin_id) {
                         Some(Neighbour::new(
                             p.as_ref().point_ref.origin_id,
@@ -1548,8 +1548,6 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         None
                     }
                 })
-                .filter(|x| x.is_some())
-                .map(|x| x.unwrap())
                 .collect();
             //
             knn_neighbours
