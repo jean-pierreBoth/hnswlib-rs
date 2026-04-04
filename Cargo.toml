@@ -97,7 +97,7 @@ anndists = { version = "0.1" }
 hdf5 = {package = "hdf5-metno", version = "0.12" }
 
 ndarray = { version = ">=0.16.0, <0.18" }
-skiplist = { version = "0.6" }
+skiplist = { version = "1.1" }
 tempfile = { version = "3" }
 itertools = {version = "0.14"}
 
