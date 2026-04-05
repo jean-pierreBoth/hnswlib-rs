@@ -517,7 +517,7 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
             *lock_nb_point += 1;
             nb_point = *lock_nb_point;
             if nb_point % 50000 == 0 {
-                println!(" setting number of points {:?} ", nb_point);
+                trace!(" setting number of points {:?} ", nb_point);
             }
         }
         trace!(" setting number of points {:?} ", *self.nb_point);
