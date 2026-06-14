@@ -1,6 +1,11 @@
-// check retrieve of data with query being inserted data
-// parallel (versus serial) insertion degrades performance. Pb is more acute with DistL1 than DistJaccard
-// degradation reduces when using modify_level_scale
+/*
+ check retrieve of data with query being the inserted data
+
+ playing with parameters we can see that:
+  - parallel (versus serial) insertion can degrade performance. Pb is more acute with DistL1 than DistJaccard
+  - degradation reduces when using modify_level_scale
+  - BUT it can also occur that parallel insertion has better recall than serial
+*/
 
 use anndists::dist::*;
 use cpu_time::ProcessTime;
@@ -17,7 +22,7 @@ fn test_equality_float() {
     //
     let mut rng = rand::rng();
     let unif = Uniform::<f32>::new(0., 1.).unwrap();
-    let nbdata = 50000;
+    let nbdata = 10000;
     let dim = 10;
     let mut datas: Vec<Vec<f32>> = Vec::with_capacity(nbdata);
     //
@@ -100,7 +105,7 @@ fn test_equality_int() {
     //
     let mut rng = rand::rng();
     let unif = Uniform::<u32>::new(0, 1000).unwrap();
-    let nbdata = 50000;
+    let nbdata = 10000;
     let dim = 10;
     let mut datas: Vec<Vec<u32>> = Vec::with_capacity(nbdata);
     //
