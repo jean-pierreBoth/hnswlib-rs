@@ -3,7 +3,7 @@
 
 use anndists::dist::*;
 use hnsw_rs::prelude::*;
-use rand::{Rng, distr::Uniform};
+use rand::distr::{Distribution, Uniform};
 use std::iter;
 
 #[allow(unused)]
@@ -19,7 +19,8 @@ fn log_init_test() {
 fn generate_random_string(len: usize) -> String {
     const CHARSET: &[u8] = b"abcdefghij";
     let mut rng = rand::rng();
-    let one_char = || CHARSET[rng.random_range(0..CHARSET.len())] as char;
+    let unif = Uniform::try_from(0..CHARSET.len()).unwrap();
+    let one_char = || CHARSET[unif.sample(&mut rng)] as char;
     iter::repeat_with(one_char).take(len).collect()
 }
 
@@ -159,7 +160,9 @@ fn filter_l2() {
     let unif = Uniform::<f32>::new(0., 1.).unwrap();
     let mut data = Vec::with_capacity(nb_elem);
     for _ in 0..nb_elem {
-        let column = (0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
+        let column = (0..dim)
+            .map(|_| unif.sample(&mut rng))
+            .collect::<Vec<f32>>();
         data.push(column);
     }
     // give an id to each data
@@ -174,7 +177,9 @@ fn filter_l2() {
     //
     let ef_search = 30;
     let knbn = 10;
-    let vec_tosearch = (0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>();
+    let vec_tosearch = (0..dim)
+        .map(|_| unif.sample(&mut rng))
+        .collect::<Vec<f32>>();
     //
     // Create a sorted vector of ids
     // the ids in the vector will be used as a filter

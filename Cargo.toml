@@ -61,8 +61,8 @@ cfg-if = { version = "1.0" }
 
 # for //
 parking_lot = "0.12"
-rayon = { version = "1.11" }
-num_cpus = { version = "1.16" }
+rayon = { version = "1.12" }
+num_cpus = { version = "1.17" }
 
 cpu-time = { version = "1.0" }
 num-traits = { version = "0.2" }
@@ -72,7 +72,7 @@ num-traits = { version = "0.2" }
 hashbrown = { version = "0.15" }
 indexmap = { version = ">= 2.11" }
 
-rand = { version = "0.9" }
+rand = { version = "0.10" }
 lazy_static = { version = "1.4" }
 
 #

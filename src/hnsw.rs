@@ -3,6 +3,7 @@
 //! small World graphs.
 //! Yu. A. Malkov, D.A Yashunin 2016, 2018
 
+use rand::rngs::Xoshiro256PlusPlus;
 use serde::{Deserialize, Serialize};
 
 use cpu_time::ProcessTime;
@@ -325,7 +326,9 @@ impl LayerGenerator {
     pub fn new(max_nb_connection: usize, maxlevel: usize) -> Self {
         let scale = 1. / (max_nb_connection as f64).ln();
         LayerGenerator {
-            rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
+            rng: Arc::new(Mutex::new(StdRng::from_rng(
+                &mut Xoshiro256PlusPlus::seed_from_u64(397),
+            ))),
             unif: Uniform::<f64>::new(0., 1.).unwrap(),
             scale,
             maxlevel,
@@ -340,7 +343,9 @@ impl LayerGenerator {
     ) -> Self {
         let scale_default = 1. / (max_nb_connection as f64).ln();
         LayerGenerator {
-            rng: Arc::new(Mutex::new(StdRng::from_os_rng())),
+            rng: Arc::new(Mutex::new(StdRng::from_rng(
+                &mut Xoshiro256PlusPlus::seed_from_u64(397),
+            ))),
             unif: Uniform::<f64>::new(0., 1.).unwrap(),
             scale: scale_default * scale_factor,
             maxlevel,
@@ -862,7 +867,11 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     /// By default the levels are sampled using an exponential law of parameter **ln(max_nb_conn)**
     /// so the probability of having more than l levels decrease as **exp(-l * ln(max_nb_conn))**.  
     /// Reducing the scale change the parameter of the exponential to **ln(max_nb_conn)/scale**.
-    /// This reduce the number of levels generated and can provide better precision, reduce memory with marginally more cpu used.  
+    /// This reduce the number of levels generated and can provide better precision, reduce memory with marginally more cpu used.
+    ///
+    /// NOTE: This is useful when using [parallel_insert](Self::parallel_insert).
+    /// Reducing the number of layers reduce deviation from serial insertion results due to thread contention.
+    ///
     /// The factor must between 0.2 and 1.
     pub fn modify_level_scale(&mut self, scale_modification: f64) {
         //
@@ -1208,7 +1217,8 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     /// Insert in parallel a slice of Vec\<T\> each associated to its id.    
     /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
     /// Typically 1000 * the number of threads.  
-    /// Many consecutive parallel_insert can be done, so the size of vector inserted in one insertion can be optimized.
+    /// Many consecutive parallel_insert can be done, so the size of vector inserted in one insertion can be optimized.  
+    /// NOTE: See [modify_level_scale](Self::modify_level_scale) to reduce number of layers.
     pub fn parallel_insert(&self, datas: &[(&Vec<T>, usize)]) {
         debug!("entering parallel_insert");
         datas

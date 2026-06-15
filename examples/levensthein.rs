@@ -1,13 +1,14 @@
 use anndists::dist::*;
 
 use hnsw_rs::prelude::*;
-use rand::Rng;
+use rand::distr::{Distribution, Uniform};
 use std::iter;
 
 fn generate(len: usize) -> String {
     const CHARSET: &[u8] = b"abcdefghij";
+    let unif = Uniform::try_from(0..CHARSET.len()).unwrap();
     let mut rng = rand::rng();
-    let one_char = || CHARSET[rng.random_range(0..CHARSET.len())] as char;
+    let one_char = || CHARSET[unif.sample(&mut rng)] as char;
     iter::repeat_with(one_char).take(len).collect()
 }
 

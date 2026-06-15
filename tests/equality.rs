@@ -11,7 +11,7 @@ use anndists::dist::*;
 use cpu_time::ProcessTime;
 
 use hnsw_rs::prelude::*;
-use rand::{Rng, distr::Uniform};
+use rand::distr::{Distribution, Uniform};
 
 #[test]
 fn test_equality_float() {
@@ -27,7 +27,11 @@ fn test_equality_float() {
     let mut datas: Vec<Vec<f32>> = Vec::with_capacity(nbdata);
     //
     for _ in 0..nbdata {
-        datas.push((0..dim).map(|_| rng.sample(unif)).collect::<Vec<f32>>());
+        datas.push(
+            (0..dim)
+                .map(|_| unif.sample(&mut rng))
+                .collect::<Vec<f32>>(),
+        );
         // data_refs.push((&datas[j], j));
     }
     let data_refs: Vec<(&Vec<f32>, usize)> = (0..nbdata).map(|j| (&datas[j], j)).collect();
@@ -110,7 +114,11 @@ fn test_equality_int() {
     let mut datas: Vec<Vec<u32>> = Vec::with_capacity(nbdata);
     //
     for _ in 0..nbdata {
-        datas.push((0..dim).map(|_| rng.sample(unif)).collect::<Vec<u32>>());
+        datas.push(
+            (0..dim)
+                .map(|_| unif.sample(&mut rng))
+                .collect::<Vec<u32>>(),
+        );
         // data_refs.push((&datas[j], j));
     }
     let data_refs: Vec<(&Vec<u32>, usize)> = (0..nbdata).map(|j| (&datas[j], j)).collect();
