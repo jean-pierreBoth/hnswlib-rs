@@ -1,5 +1,9 @@
 # Changes
 
+- version 0.3.5
+   dependancies update.
+   Doc update in parallel_insertion and modify_scale_level methods. See test file equality.rs
+
 - version 0.3.4
   small fix in reloading with DataMap in case dump directory given by a relative path (thanks to dsgallups)  
   update deps.
@@ -23,13 +27,13 @@
 
 - **version 0.3.0**:
 
-  The distances implementation is now in a separate crate [anndsits](https://crates.io/crates/anndists). Using hnsw_rs::prelude:::*   should make the change transparent. 
+  The distances implementation is now in a separate crate [anndsits](https://crates.io/crates/anndists). Using hnsw_rs::prelude:::*   should make the change transparent.
 
   The mmap implementation makes it possible to use the [coreset](https://github.com/jean-pierreBoth/coreset) crate to compute coreset and clusters of data stored in hnsw dumps.
 
 - version 0.2.1:
   
-  when using mmap, the points less frequently used (points in lower layers) are preferentially mmap-ed while upper layers are preferentially 
+  when using mmap, the points less frequently used (points in lower layers) are preferentially mmap-ed while upper layers are preferentially
   explcitly read from file.
 
   Hnswio is now Sync.

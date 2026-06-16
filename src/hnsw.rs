@@ -764,7 +764,7 @@ pub struct Hnsw<'b, T: Clone + Send + Sync + 'b, D: Distance<T>> {
 
 impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     /// allocation function  
-    /// . max_nb_connection : number of neighbours stored, by layer, in tables. Must be less than 256.
+    /// . max_nb_connection : number of neighbours stored, by layer, in tables. Must be less than 256.  
     /// . ef_construction : controls numbers of neighbours explored during construction. See README or paper.  
     /// . max_elements : hint to speed up allocation tables. number of elements expected.  
     /// . f : the distance function
@@ -870,7 +870,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     /// This reduce the number of levels generated and can provide better precision, reduce memory with marginally more cpu used.
     ///
     /// NOTE: This is useful when using [parallel_insert](Self::parallel_insert).
-    /// Reducing the number of layers reduce deviation from serial insertion results due to thread contention.
+    /// Reducing the number of layers reduce random deviation from serial insertion results due to thread contention.
     ///
     /// The factor must between 0.2 and 1.
     pub fn modify_level_scale(&mut self, scale_modification: f64) {
@@ -1218,7 +1218,9 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     /// It uses Rayon for threading so the number of insertions asked for must be large enough to be efficient.  
     /// Typically 1000 * the number of threads.  
     /// Many consecutive parallel_insert can be done, so the size of vector inserted in one insertion can be optimized.  
-    /// NOTE: See [modify_level_scale](Self::modify_level_scale) to reduce number of layers.
+    ///
+    /// NOTE: Small random deviation from serial insertion can occur due to thread race.
+    ///       To control this,if necessary, it can be useful to reduce number of layers (see [modify_level_scale](Self::modify_level_scale)) or to increase max_nb_connection.
     pub fn parallel_insert(&self, datas: &[(&Vec<T>, usize)]) {
         debug!("entering parallel_insert");
         datas

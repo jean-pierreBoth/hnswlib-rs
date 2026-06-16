@@ -18,6 +18,7 @@ use rand::distr::{Distribution, Uniform};
 #[derive(Debug, Clone)]
 struct SearchStats {
     nb_found: usize,
+    #[allow(unused)]
     nb_dist_equal: usize,
     missing_ids: Vec<usize>,
 }
