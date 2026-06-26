@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  check:
+    name: cargo check (mmap on and off)
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check with default features (mmap on)
+        run: cargo check
+      - name: Check without default features (mmap off)
+        run: cargo check --no-default-features
+
+  clippy:
+    name: clippy -D warnings
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install HDF5 (dev-dependency build)
+        run: sudo apt-get update && sudo apt-get install -y libhdf5-dev pkg-config
+      - name: Clippy all targets (default features)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy lib without default features (mmap off)
+        run: cargo clippy --lib --no-default-features -- -D warnings
+
+  test:
+    name: cargo test
+    needs: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install HDF5 (dev-dependency build)
+        run: sudo apt-get update && sudo apt-get install -y libhdf5-dev pkg-config
+      - run: cargo test
+
+  wasm:
+    name: wasm32 build (default-features = false)
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+      - name: Build for wasm32-wasip1 without default features
+        run: cargo build --lib --no-default-features --target wasm32-wasip1
+
+  audit:
+    name: cargo audit
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo generate-lockfile
+      - run: cargo audit
+
+  deny:
+    name: cargo deny
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - run: cargo deny check

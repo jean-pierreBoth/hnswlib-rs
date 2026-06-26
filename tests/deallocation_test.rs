@@ -26,7 +26,7 @@ fn main() {
         let s6 = [1.0, -1.0, 1.0];
         hnsw.insert_slice((&s6, 5));
 
-        if counter % 1_000_000 == 0 {
+        if counter.is_multiple_of(1_000_000) {
             println!("counter : {}", counter)
         }
         counter += 1;

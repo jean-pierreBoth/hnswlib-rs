@@ -94,14 +94,14 @@ impl DataMap {
         //
         let meta = std::fs::metadata(&datapath);
         if meta.is_err() {
-            error!("Could not open file : {:?}", &datapath);
+            error!("Could not open file : {:?}", datapath);
             std::process::exit(1);
         }
         let fsize = meta.unwrap().len().try_into().unwrap();
         //
         let file_res = File::open(&datapath);
         if file_res.is_err() {
-            error!("Could not open file : {:?}", &datapath);
+            error!("Could not open file : {:?}", datapath);
             std::process::exit(1);
         }
         let file = file_res.unwrap();
@@ -111,12 +111,12 @@ impl DataMap {
         let mmap_opt = unsafe { mmap_opt.with_file(&file, offset) };
         let mapping_res = mmap_opt.map();
         if mapping_res.is_err() {
-            error!("Could not memory map : {:?}", &datapath);
+            error!("Could not memory map : {:?}", datapath);
             std::process::exit(1);
         }
         let mmap = mapping_res.unwrap();
         //
-        info!("Mmap done on file : {:?}", &datapath);
+        info!("Mmap done on file : {:?}", datapath);
         //
         // where are we in decoding mmap slice? at beginning
         //
@@ -321,7 +321,6 @@ impl DataMap {
 //=====================================================================================
 
 #[cfg(test)]
-
 mod tests {
 
     use super::*;
@@ -356,7 +355,7 @@ mod tests {
                 xsi = unif.sample(&mut rng);
                 data[j].push(xsi);
             }
-            debug!("j : {:?}, data : {:?} ", j, &data[j]);
+            debug!("j : {:?}, data : {:?} ", j, data[j]);
         }
         // define hnsw
         let ef_construct = 25;
@@ -393,9 +392,9 @@ mod tests {
             let id = unif.sample(&mut rng);
             let d = datamap.get_data::<f32>(&id);
             assert!(d.is_some());
-            if d.is_some() {
-                debug!("id = {}, v = {:?}", id, d.as_ref().unwrap());
-                assert_eq!(d.as_ref().unwrap(), &data[id]);
+            if let Some(v) = &d {
+                debug!("id = {}, v = {:?}", id, v);
+                assert_eq!(v, &data[id]);
             }
         }
         // test iterator from datamap
@@ -422,7 +421,7 @@ mod tests {
                 xsi = unif.sample(&mut rng);
                 data[j].push(xsi);
             }
-            debug!("j : {:?}, data : {:?} ", j, &data[j]);
+            debug!("j : {:?}, data : {:?} ", j, data[j]);
         }
         // define hnsw
         let ef_construct = 25;
