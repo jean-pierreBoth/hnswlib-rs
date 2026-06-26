@@ -76,7 +76,7 @@ rand = { version = "0.10" }
 lazy_static = { version = "1.4" }
 
 #
-mmap-rs = { version = "0.7" }
+mmap-rs = { version = "0.7", optional = true }
 #
 # decreasing order of log for debug build : (max_level_)trace debug info warn error off
 # decreasing order of log for release build (release_max_level_)  .. idem
@@ -103,7 +103,10 @@ itertools = {version = "0.14"}
 
 [features]
 
-default = []
+default = ["mmap"]
+
+# reload a dumped index by memory mapping its data file (native only, pulls in mmap-rs)
+mmap = ["dep:mmap-rs"]
 
 # feature for std simd on nightly
 stdsimd = ["anndists/stdsimd"]

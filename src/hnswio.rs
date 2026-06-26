@@ -19,6 +19,8 @@
 use serde::{Serialize, de::DeserializeOwned};
 use std::sync::atomic::{AtomicUsize, Ordering};
 //
+// std time panics on wasm32-unknown-unknown, gate the diagnostic timing
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::SystemTime;
 
 // io
@@ -38,6 +40,7 @@ use std::any::type_name;
 use anndists::dist::distances::*;
 
 use self::hnsw::*;
+#[cfg(feature = "mmap")]
 use crate::datamap::*;
 use crate::hnsw;
 use log::{debug, error, info, trace};
@@ -160,7 +163,7 @@ impl DumpInit {
                 datapath.push(dataname);
                 let exist_res = std::fs::metadata(datapath.as_os_str());
                 if exist_res.is_ok() {
-                    let unique_basename = loop {
+                    loop {
                         let mut unique_basename;
                         let mut dataname: String;
                         let id: usize = rand::random_range(0..10000);
@@ -176,8 +179,7 @@ impl DumpInit {
                         if exist_res.is_err() {
                             break unique_basename;
                         }
-                    };
-                    unique_basename
+                    }
                 } else {
                     basename_default.to_string()
                 }
@@ -303,6 +305,7 @@ pub struct HnswIo {
     basename: String,
     /// options
     options: ReloadOptions,
+    #[cfg(feature = "mmap")]
     datamap: Option<DataMap>,
     /// for Hnswio to be async
     nb_point_loaded: Arc<AtomicUsize>,
@@ -319,6 +322,7 @@ impl HnswIo {
             dir: directory.to_path_buf(),
             basename: basename.to_string(),
             options: ReloadOptions::default(),
+            #[cfg(feature = "mmap")]
             datamap: None,
             nb_point_loaded: Arc::new(AtomicUsize::new(0)),
             initialized: true,
@@ -331,6 +335,7 @@ impl HnswIo {
             dir: directory.to_path_buf(),
             basename: basename.to_string(),
             options,
+            #[cfg(feature = "mmap")]
             datamap: None,
             nb_point_loaded: Arc::new(AtomicUsize::new(0)),
             initialized: true,
@@ -356,7 +361,10 @@ impl HnswIo {
         self.dir = directory.to_path_buf();
         self.basename = basename;
         self.options = options;
-        self.datamap = None;
+        #[cfg(feature = "mmap")]
+        {
+            self.datamap = None;
+        }
         //
         self.initialized = true;
         //
@@ -366,7 +374,7 @@ impl HnswIo {
     //
     fn init(&self) -> Result<LoadInit> {
         //
-        info!("reloading from basename : {}", &self.basename);
+        info!("reloading from basename : {}", self.basename);
         //
         let mut graphname = self.basename.clone();
         graphname.push_str(".hnsw.graph");
@@ -436,6 +444,7 @@ impl HnswIo {
     {
         //
         debug!("HnswIo::load_hnsw ");
+        #[cfg(not(target_arch = "wasm32"))]
         let start_t = SystemTime::now();
         //
         let init = self.init();
@@ -492,12 +501,21 @@ impl HnswIo {
         debug!("T type name in dump = {:?}", t_type);
         // Do we use mmap at reload
         if self.options.use_mmap().0 {
-            let datamap_res = DataMap::from_hnswdump::<T>(self.dir.as_path(), &self.basename);
-            if datamap_res.is_err() {
-                error!("load_hnsw could not initialize mmap")
-            } else {
-                info!("reload using mmap");
-                self.datamap = Some(datamap_res.unwrap());
+            #[cfg(feature = "mmap")]
+            {
+                match DataMap::from_hnswdump::<T>(self.dir.as_path(), &self.basename) {
+                    Result::Ok(datamap) => {
+                        info!("reload using mmap");
+                        self.datamap = Some(datamap);
+                    }
+                    Result::Err(_) => error!("load_hnsw could not initialize mmap"),
+                }
+            }
+            #[cfg(not(feature = "mmap"))]
+            {
+                return Err(anyhow!(
+                    "reload with mmap requested but hnsw_rs was built without the \"mmap\" feature"
+                ));
             }
         }
         // reloader can use datamap
@@ -518,8 +536,11 @@ impl HnswIo {
         };
         //
         debug!("load_hnsw completed");
-        let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
-        info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
+            info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+        }
         Ok(hnsw)
     } // end of load_hnsw
 
@@ -820,11 +841,18 @@ impl HnswIo {
                 }
                 Point::<T>::new(v.unwrap(), origin_id, p_id)
             }
+            #[cfg(feature = "mmap")]
             true => {
                 skip_point_data(origin_id, data_in, descr)?; // keep cohrence between data file and graph file!
                 debug!("constructing point from datamap, dataid : {:?}", origin_id);
                 let s: Option<&'b [T]> = self.datamap.as_ref().unwrap().get_data::<T>(&origin_id);
                 Point::<T>::new_from_mmap(s.unwrap(), origin_id, p_id)
+            }
+            #[cfg(not(feature = "mmap"))]
+            true => {
+                return Err(anyhow!(
+                    "point reload with mmap requested but hnsw_rs was built without the \"mmap\" feature"
+                ));
             }
         };
         self.nb_point_loaded.fetch_add(1, Ordering::Relaxed);
@@ -1178,6 +1206,7 @@ where
 } // end of load_point_data
 
 // We need to maintain coherence in data and graph stream, so we read to keep in phase
+#[cfg(feature = "mmap")]
 fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, _descr: &Description) -> Result<()> {
     //
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
@@ -1390,7 +1419,6 @@ impl<T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync, D: Distance<
 //===============================================================================================================
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
 

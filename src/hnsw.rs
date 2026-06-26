@@ -6,7 +6,10 @@
 use rand::rngs::Xoshiro256PlusPlus;
 use serde::{Deserialize, Serialize};
 
+// cpu_time::ProcessTime is unavailable on wasm32-unknown-unknown and std time panics there at runtime
+#[cfg(not(target_arch = "wasm32"))]
 use cpu_time::ProcessTime;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::SystemTime;
 
 use std::cmp::Ordering;
@@ -412,7 +415,9 @@ pub struct PointIndexation<'b, T: Clone + Send + Sync> {
 
 impl<T: Clone + Send + Sync> Drop for PointIndexation<'_, T> {
     fn drop(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
         let cpu_start = ProcessTime::now();
+        #[cfg(not(target_arch = "wasm32"))]
         let sys_now = SystemTime::now();
         info!("entering PointIndexation drop");
         // clear_neighborhood. There are no point in neighborhoods that are not referenced directly in layers.
@@ -440,6 +445,7 @@ impl<T: Clone + Send + Sync> Drop for PointIndexation<'_, T> {
         debug!("clearing self.points_by_layer...");
         drop(self.points_by_layer.write());
         debug!("exiting PointIndexation drop");
+        #[cfg(not(target_arch = "wasm32"))]
         info!(
             " drop sys time(s) {:?} cpu time {:?}",
             sys_now.elapsed().unwrap().as_secs(),
@@ -1034,19 +1040,19 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         );
                         candidate_points
                             .push(Arc::new(PointWithOrder::new(&e.point_ref, -e_dist_to_p)));
-                        if filter.is_none() {
-                            return_points.push(Arc::clone(&e_prime));
-                        } else {
+                        if let Some(f) = &filter {
                             let id: &usize = &e_prime.point_ref.get_origin_id();
-                            if filter.as_ref().unwrap().hnsw_filter(id) {
+                            if f.hnsw_filter(id) {
                                 if return_points.len() == 1 {
                                     let only_id = return_points.peek().unwrap().point_ref.origin_id;
-                                    if !filter.as_ref().unwrap().hnsw_filter(&only_id) {
+                                    if !f.hnsw_filter(&only_id) {
                                         return_points.clear()
                                     }
                                 }
                                 return_points.push(Arc::clone(&e_prime))
                             }
+                        } else {
+                            return_points.push(Arc::clone(&e_prime));
                         }
                         if return_points.len() > ef {
                             return_points.pop();
@@ -1753,7 +1759,6 @@ where
 } // end of check_reload
 
 #[cfg(test)]
-
 mod tests {
 
     use super::*;

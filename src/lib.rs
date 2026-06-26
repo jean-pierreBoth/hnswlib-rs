@@ -6,6 +6,7 @@ use env_logger::Builder;
 use lazy_static::lazy_static;
 
 pub mod api;
+#[cfg(feature = "mmap")]
 pub mod datamap;
 pub mod filter;
 pub mod flatten;

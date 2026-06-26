@@ -1,0 +1,26 @@
+[advisories]
+version = 2
+# Unmaintained transitive crates with no available fix. Vulnerability and yanked
+# detection stays fully active, only these reviewed advisories are waived.
+ignore = [
+    { id = "RUSTSEC-2025-0141", reason = "bincode 1.x is unmaintained but feature complete, transitive via the dump format, no safe upgrade exists" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
