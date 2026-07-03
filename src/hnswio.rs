@@ -160,7 +160,7 @@ impl DumpInit {
                 datapath.push(dataname);
                 let exist_res = std::fs::metadata(datapath.as_os_str());
                 if exist_res.is_ok() {
-                    let unique_basename = loop {
+                    loop {
                         let mut unique_basename;
                         let mut dataname: String;
                         let id: usize = rand::random_range(0..10000);
@@ -176,8 +176,7 @@ impl DumpInit {
                         if exist_res.is_err() {
                             break unique_basename;
                         }
-                    };
-                    unique_basename
+                    }
                 } else {
                     basename_default.to_string()
                 }
@@ -493,11 +492,11 @@ impl HnswIo {
         // Do we use mmap at reload
         if self.options.use_mmap().0 {
             let datamap_res = DataMap::from_hnswdump::<T>(self.dir.as_path(), &self.basename);
-            if datamap_res.is_err() {
-                error!("load_hnsw could not initialize mmap")
-            } else {
+            if let Result::Ok(datamap) = datamap_res {
                 info!("reload using mmap");
-                self.datamap = Some(datamap_res.unwrap());
+                self.datamap = Some(datamap);
+            } else {
+                error!("load_hnsw could not initialize mmap")
             }
         }
         // reloader can use datamap
@@ -1155,7 +1154,10 @@ where
 
     let v: Vec<T> = if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
         match descr.format_version {
-            2 => bincode::deserialize(&v_serialized).unwrap(),
+            2 => {
+                error!("format bincode of dump no more used");
+                std::process::exit(1);
+            }
             3 | 4 => {
                 let slice_t = unsafe {
                     std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, descr.dimension)
@@ -1390,7 +1392,6 @@ impl<T: Serialize + DeserializeOwned + Clone + Sized + Send + Sync, D: Distance<
 //===============================================================================================================
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
 
@@ -1664,26 +1665,6 @@ mod tests {
             std::panic!("hnsw.file_dump failed");
         }
     } // end of reload_with_mmap
-
-    #[test]
-    fn test_bincode() {
-        let mut rng = rand::rng();
-        let unif = Uniform::<f32>::new(0., 1.).unwrap();
-        let size = 10;
-        let mut xsi;
-        let mut data = Vec::with_capacity(size);
-        for _ in 0..size {
-            xsi = unif.sample(&mut rng);
-            println!("xsi = {:?}", xsi);
-            data.push(xsi);
-        }
-        println!("to serialized {:?}", data);
-
-        let v_serialized: Vec<u8> = bincode::serialize(&data).unwrap();
-        debug!("serializing len {:?}", v_serialized.len());
-        let v_deserialized: Vec<f32> = bincode::deserialize(&v_serialized).unwrap();
-        println!("deserialized {:?}", v_deserialized);
-    }
 
     #[test]
     fn read_write_empty_db() -> Result<()> {

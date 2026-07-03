@@ -126,7 +126,6 @@ impl<T: Clone + Send + Sync, D: Distance<T> + Send + Sync> From<&Hnsw<'_, T, D>>
 } // e,d of Fom implementation
 
 #[cfg(test)]
-
 mod tests {
 
     use super::*;

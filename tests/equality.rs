@@ -23,7 +23,7 @@ struct SearchStats {
     missing_ids: Vec<usize>,
 }
 
-fn report_search_results<T: std::fmt::Debug>(
+fn report_search_results(
     label: &str,
     data_neighbours: &[Vec<Neighbour>],
     epsil: f32,
@@ -128,7 +128,7 @@ fn test_equality_float() {
     assert_eq!(data_neighbours.len(), nbdata);
 
     let parallel_stats =
-        report_search_results::<f32>("DistL1 parallel insertion", &data_neighbours, epsil);
+        report_search_results("DistL1 parallel insertion", &data_neighbours, epsil);
 
     //
     // serial insertion
@@ -147,8 +147,7 @@ fn test_equality_float() {
     let data_neighbours = hns.parallel_search(&datas, search_k, search_ef);
     assert_eq!(data_neighbours.len(), nbdata);
 
-    let serial_stats =
-        report_search_results::<f32>("DistL1 serial insertion", &data_neighbours, epsil);
+    let serial_stats = report_search_results("DistL1 serial insertion", &data_neighbours, epsil);
 
     log::info!(
         "DistL1 comparison : parallel_found = {}, serial_found = {}, parallel_missing = {}, serial_missing = {}",
@@ -213,7 +212,7 @@ fn test_equality_cosine() {
     assert_eq!(data_neighbours.len(), nbdata);
 
     let parallel_stats =
-        report_search_results::<f32>("DistCosine parallel insertion", &data_neighbours, epsil);
+        report_search_results("DistCosine parallel insertion", &data_neighbours, epsil);
 
     //
     // serial insertion
@@ -238,7 +237,7 @@ fn test_equality_cosine() {
     assert_eq!(data_neighbours.len(), nbdata);
 
     let serial_stats =
-        report_search_results::<f32>("DistCosine serial insertion", &data_neighbours, epsil);
+        report_search_results("DistCosine serial insertion", &data_neighbours, epsil);
 
     log::info!(
         "DistCosine comparison : parallel_found = {}, serial_found = {}, parallel_missing = {}, serial_missing = {}",
@@ -302,7 +301,7 @@ fn test_equality_int() {
     assert_eq!(data_neighbours.len(), nbdata);
 
     let parallel_stats =
-        report_search_results::<u32>("DistJaccard parallel insertion", &data_neighbours, epsil);
+        report_search_results("DistJaccard parallel insertion", &data_neighbours, epsil);
 
     //
     // serial insertion
@@ -325,7 +324,7 @@ fn test_equality_int() {
     assert_eq!(data_neighbours.len(), nbdata);
 
     let serial_stats =
-        report_search_results::<u32>("DistJaccard serial insertion", &data_neighbours, epsil);
+        report_search_results("DistJaccard serial insertion", &data_neighbours, epsil);
 
     log::info!(
         "DistJaccard comparison : parallel_found = {}, serial_found = {}, parallel_missing = {}, serial_missing = {}",

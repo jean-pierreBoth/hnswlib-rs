@@ -321,7 +321,6 @@ impl DataMap {
 //=====================================================================================
 
 #[cfg(test)]
-
 mod tests {
 
     use super::*;
@@ -393,10 +392,8 @@ mod tests {
             let id = unif.sample(&mut rng);
             let d = datamap.get_data::<f32>(&id);
             assert!(d.is_some());
-            if d.is_some() {
-                debug!("id = {}, v = {:?}", id, d.as_ref().unwrap());
-                assert_eq!(d.as_ref().unwrap(), &data[id]);
-            }
+            debug!("id = {}, v = {:?}", id, d.as_ref().unwrap());
+            assert_eq!(d.as_ref().unwrap(), &data[id]);
         }
         // test iterator from datamap
         let keys = datamap.get_dataid_iter();
