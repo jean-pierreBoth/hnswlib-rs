@@ -939,9 +939,17 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         // we will store positive distances in this one
         let mut return_points = BinaryHeap::<Arc<PointWithOrder<T>>>::with_capacity(skiplist_size);
         //
-        if self.layer_indexed_points.points_by_layer.read()[layer as usize].is_empty() {
-            // at the beginning we can have nothing in layer
-            trace!("search layer {:?}, empty layer", layer);
+        // `points_by_layer[l]` stores points whose *top sampled level* is
+        // exactly `l`; it is not the set of points participating in logical
+        // layer `l`. A higher-level entry point participates in every lower
+        // layer even when the exact-level bucket is empty. Treating that bucket
+        // as an emptiness oracle disconnects graphs for sampled level orders
+        // such as [high, high, 0].
+        if entry_point.p_id.0 < layer {
+            trace!(
+                "search layer {:?}, entry point {:?} does not participate",
+                layer, entry_point.p_id
+            );
             return return_points;
         }
         if entry_point.p_id.1 < 0 {
@@ -1138,12 +1146,6 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             // sorted_points = from_positive_binaryheap_to_negative_binary_heap(&mut sorted_points);
             //
             if let Some(ep) = sorted_points.pop() {
-                // useful for projecting lower layer to upper layer. keep track of points encountered.
-                if new_point.neighbours.read()[l as usize].len()
-                    < self.get_max_nb_connection() as usize
-                {
-                    new_point.neighbours.write()[l as usize].push(Arc::clone(&ep));
-                }
                 // get the lowest distance point
                 let tmp_dist = self.dist_f.eval(data, ep.point_ref.data.get_v());
                 if tmp_dist < dist_to_entry {
@@ -1156,8 +1158,11 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             }
         }
         // now enter_point_id_copy contains id of nearest
-        // now loop down to 0
-        for l in (0..level + 1).rev() {
+        // Connect only in layers shared by the new point and the existing
+        // graph. A point above the previous maximum is the sole member of its
+        // extra layers until a future insertion reaches them.
+        let highest_shared_layer = level.min(max_level_observed);
+        for l in (0..highest_shared_layer + 1).rev() {
             let ef = self.ef_construction;
             // when l == level, we cannot get new_point in sorted_points as it is seen only from declared neighbours
             let mut sorted_points = self.search_layer(
@@ -1254,9 +1259,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     let q_point = &q.point_ref;
                     let mut q_point_neighbours = q_point.neighbours.write();
                     let n_to_add = PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
-                    // must be sure that we add a point at the correct level. See the comment to search_layer!
-                    // this ensures that reverse updating do not add problems.
-                    let l_n = n_to_add.point_ref.p_id.0 as usize;
+                    // Mirror the forward edge in the same layer. Using the new
+                    // point's top layer here misfiles every lower-layer reverse
+                    // edge whenever the new point spans multiple layers.
+                    let l_n = l as usize;
                     let already = q_point_neighbours[l_n]
                         .iter()
                         .position(|old| old.point_ref.p_id == new_point.p_id);
@@ -1292,6 +1298,19 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
 
     pub fn get_point_indexation(&self) -> &PointIndexation<'b, T> {
         &self.layer_indexed_points
+    }
+
+    /// Returns the internal identity of the graph's current search entry point.
+    ///
+    /// This read-only accessor lets persistence and conformance layers attest
+    /// that every indexed point is reachable from the same entry point used by
+    /// [`Hnsw::search`]. An empty graph has no entry point.
+    pub fn get_entry_point_id(&self) -> Option<(DataId, PointId)> {
+        self.layer_indexed_points
+            .entry_point
+            .read()
+            .as_ref()
+            .map(|point| (point.get_origin_id(), point.get_point_id()))
     }
 
     // This is best explained in : Navarro. Searching in metric spaces by spatial approximation.
@@ -1758,10 +1777,256 @@ where
 mod tests {
 
     use super::*;
+    use crate::api::AnnT;
+    use crate::hnswio::HnswIo;
     use anndists::dist;
+
+    fn seeded_unit_vector(seed: usize, dimension: usize) -> Vec<f32> {
+        let mut state = u64::try_from(seed).unwrap_or(0).wrapping_add(1);
+        let mut vector = Vec::with_capacity(dimension);
+        for _ in 0..dimension {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1);
+            let random = u32::try_from((state >> 32) & u64::from(u32::MAX)).unwrap_or(u32::MAX);
+            let upper = u16::try_from((random >> 16) & u32::from(u16::MAX)).unwrap_or(u16::MAX);
+            let raw = f32::from(upper) / f32::from(u16::MAX);
+            vector.push(raw.mul_add(2.0, -1.0));
+        }
+        let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for value in &mut vector {
+                // Leave a deterministic roundoff margin below unit radius;
+                // anndists::DistDot asserts when an accumulated self-dot
+                // rounds above one.
+                *value = (*value / norm) * 0.999;
+            }
+        }
+        vector
+    }
 
     fn log_init_test() {
         let _ = env_logger::builder().is_test(true).try_init();
+    }
+
+    #[test]
+    fn entry_point_identity_is_empty_then_matches_search_root() {
+        let hnsw = Hnsw::<f32, dist::DistL1>::new(16, 2, 16, 200, dist::DistL1 {});
+        assert_eq!(hnsw.get_entry_point_id(), None);
+
+        hnsw.insert((&[1.0_f32, 0.0], 0));
+        let first_entry = hnsw
+            .get_entry_point_id()
+            .expect("one-point graph must expose its entry point");
+        let first_point = hnsw
+            .get_point_indexation()
+            .into_iter()
+            .next()
+            .expect("one-point graph");
+        assert_eq!(
+            first_entry,
+            (first_point.get_origin_id(), first_point.get_point_id())
+        );
+
+        hnsw.insert((&[0.0_f32, 1.0], 1));
+        let current_entry = hnsw
+            .get_entry_point_id()
+            .expect("non-empty graph must retain an entry point");
+        let point_ids = hnsw
+            .get_point_indexation()
+            .into_iter()
+            .map(|point| point.get_point_id())
+            .collect::<Vec<_>>();
+        assert!(point_ids.contains(&current_entry.1));
+        let current_point_id = current_entry.1;
+        assert_eq!(
+            current_point_id.0,
+            point_ids
+                .iter()
+                .map(|point_id| point_id.0)
+                .max()
+                .expect("two-point graph"),
+            "the exposed entry point must be on the highest populated layer"
+        );
+    }
+
+    #[test]
+    fn entry_point_identity_survives_dump_and_load() {
+        let hnsw = Hnsw::<f32, dist::DistL1>::new(16, 4, 16, 200, dist::DistL1 {});
+        for (origin, vector) in [
+            [1.0_f32, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+        .iter()
+        .enumerate()
+        {
+            hnsw.insert((vector, origin));
+        }
+        let expected = hnsw
+            .get_entry_point_id()
+            .expect("populated graph must expose its entry point");
+
+        let directory = tempfile::tempdir().expect("temporary dump directory");
+        let basename = "entry-point-roundtrip";
+        hnsw.file_dump(directory.path(), basename)
+            .expect("entry-point graph dump");
+
+        let mut reloader = HnswIo::new(directory.path(), basename);
+        let loaded = reloader
+            .load_hnsw::<f32, dist::DistL1>()
+            .expect("entry-point graph reload");
+        assert_eq!(loaded.get_entry_point_id(), Some(expected));
+    }
+
+    #[test]
+    fn reverse_edges_stay_within_each_points_layers() {
+        let mut exercised_new_point_above_entry = false;
+        let mut exercised_new_point_below_entry = false;
+
+        for vector_seed in 0..32 {
+            let vectors = [
+                seeded_unit_vector(vector_seed * 100, 16),
+                seeded_unit_vector(vector_seed * 100 + 1, 16),
+            ];
+            for level_seed in 0..512_u64 {
+                let mut hnsw = Hnsw::<f32, dist::DistDot>::new(16, 2, 16, 200, dist::DistDot {});
+                hnsw.layer_indexed_points.layer_g.rng = Arc::new(Mutex::new(
+                    <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(level_seed),
+                ));
+                hnsw.insert((&vectors[0], 0));
+                hnsw.parallel_insert(&[(&vectors[1], 1)]);
+
+                let points: Vec<_> = hnsw.get_point_indexation().into_iter().collect();
+                let first_level = points
+                    .iter()
+                    .find(|point| point.get_origin_id() == 0)
+                    .expect("first inserted point")
+                    .p_id
+                    .0;
+                let second_level = points
+                    .iter()
+                    .find(|point| point.get_origin_id() == 1)
+                    .expect("second inserted point")
+                    .p_id
+                    .0;
+                match second_level.cmp(&first_level) {
+                    std::cmp::Ordering::Greater => exercised_new_point_above_entry = true,
+                    std::cmp::Ordering::Less => exercised_new_point_below_entry = true,
+                    std::cmp::Ordering::Equal => {}
+                }
+
+                for point in &points {
+                    let max_layer = usize::from(point.p_id.0);
+                    let neighbourhoods = point.get_neighborhood_id();
+                    assert!(
+                        neighbourhoods.iter().skip(max_layer + 1).all(Vec::is_empty),
+                        "vector_seed={vector_seed}, level_seed={level_seed}: point {:?} has \
+                         neighbours above its sampled layer: {:?}",
+                        point.p_id,
+                        neighbourhoods
+                    );
+                }
+
+                for (expected_id, query) in vectors.iter().enumerate() {
+                    let neighbours = hnsw.search(query, 2, 64);
+                    assert_eq!(
+                        neighbours.len(),
+                        2,
+                        "vector_seed={vector_seed}, level_seed={level_seed}, query={expected_id}"
+                    );
+                    assert_eq!(
+                        neighbours[0].d_id, expected_id,
+                        "vector_seed={vector_seed}, level_seed={level_seed}, query={expected_id}"
+                    );
+                }
+            }
+        }
+
+        assert!(
+            exercised_new_point_above_entry && exercised_new_point_below_entry,
+            "seed sweep must exercise both relative sampled-level orders"
+        );
+    }
+
+    #[test]
+    fn small_parallel_insertions_keep_every_point_search_reachable() {
+        for count in [3_usize, 16, 17] {
+            for vector_seed in 0..8 {
+                let vectors = (0..count)
+                    .map(|index| seeded_unit_vector(vector_seed * 100 + index, 16))
+                    .collect::<Vec<_>>();
+                for level_seed in 0..256_u64 {
+                    let mut hnsw =
+                        Hnsw::<f32, dist::DistDot>::new(16, count, 16, 200, dist::DistDot {});
+                    hnsw.layer_indexed_points.layer_g.rng = Arc::new(Mutex::new(
+                        <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(level_seed),
+                    ));
+                    hnsw.insert((&vectors[0], 0));
+                    let remaining = vectors
+                        .iter()
+                        .enumerate()
+                        .skip(1)
+                        .map(|(origin, vector)| (vector, origin))
+                        .collect::<Vec<_>>();
+                    hnsw.parallel_insert(&remaining);
+
+                    for (query_id, query) in vectors.iter().enumerate() {
+                        let neighbours = hnsw.search(query, count, count.max(64));
+                        assert_eq!(
+                            neighbours.len(),
+                            count,
+                            "count={count}, vector_seed={vector_seed}, \
+                             level_seed={level_seed}, query={query_id}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn empty_exact_level_bucket_does_not_hide_higher_level_points() {
+        let vectors = [
+            seeded_unit_vector(10, 16),
+            seeded_unit_vector(11, 16),
+            seeded_unit_vector(12, 16),
+        ];
+        let mut exercised_gap_order = false;
+
+        for level_seed in 0..65_536_u64 {
+            let mut hnsw = Hnsw::<f32, dist::DistDot>::new(16, 3, 16, 200, dist::DistDot {});
+            hnsw.layer_indexed_points.layer_g.rng = Arc::new(Mutex::new(
+                <rand::rngs::StdRng as rand::SeedableRng>::seed_from_u64(level_seed),
+            ));
+            for (origin, vector) in vectors.iter().enumerate() {
+                hnsw.insert((vector, origin));
+            }
+            let mut levels = hnsw
+                .get_point_indexation()
+                .into_iter()
+                .map(|point| (point.get_origin_id(), point.get_point_id().0))
+                .collect::<Vec<_>>();
+            levels.sort_unstable_by_key(|(origin, _)| *origin);
+            if levels[0].1 > 0 && levels[1].1 > 0 && levels[2].1 == 0 {
+                exercised_gap_order = true;
+                for (query_id, query) in vectors.iter().enumerate() {
+                    let neighbours = hnsw.search(query, 3, 64);
+                    assert_eq!(
+                        neighbours.len(),
+                        3,
+                        "level_seed={level_seed}, levels={levels:?}, query={query_id}"
+                    );
+                }
+                break;
+            }
+        }
+
+        assert!(
+            exercised_gap_order,
+            "seed sweep must exercise sampled levels [high, high, 0]"
+        );
     }
 
     #[test]
