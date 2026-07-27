@@ -1351,7 +1351,7 @@ where
 } // end of load_point_data
 
 // We need to maintain coherence in data and graph stream, so we read to keep in phase
-fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, descr: &Description) -> Result<()> {
+fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, _descr: &Description) -> Result<()> {
     //
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
     data_in.read_exact(&mut it_slice)?;
@@ -1395,7 +1395,6 @@ fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, descr: &Description
             MAX_SERIALIZED_POINT_BYTES
         ));
     }
-    let _ = descr;
     let mut remaining = serialized_len;
     let mut scratch = [0u8; 8192];
     while remaining > 0 {
