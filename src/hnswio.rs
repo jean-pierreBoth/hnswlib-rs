@@ -411,8 +411,12 @@ impl HnswIo {
         //
         let mut graph_in = BufReader::new(graphfile);
         let data_in = BufReader::new(datafile);
-        // we need to call load_description first to get distance name
-        let hnsw_description = load_description(&mut graph_in).unwrap();
+        // we need to call load_description first to get distance name.
+        // A rejected description is a normal outcome for an untrusted or
+        // damaged dump, so it must stay an error here: unwrapping would turn
+        // every header validation below into a panic at this line.
+        let hnsw_description = load_description(&mut graph_in)
+            .map_err(|e| anyhow!("HnswIo::init : could not load description: {}", e))?;
         //
         Ok(LoadInit {
             descr: hnsw_description,
@@ -437,11 +441,9 @@ impl HnswIo {
         debug!("HnswIo::load_hnsw ");
         let start_t = SystemTime::now();
         //
-        let init = self.init();
-        if init.is_err() {
-            return Err(anyhow!("could not reload HNSW structure"));
-        }
-        let mut init = init.unwrap();
+        let mut init = self
+            .init()
+            .map_err(|e| anyhow!("could not reload HNSW structure: {}", e))?;
         let data_in = &mut init.datafile;
         let graph_in = &mut init.graphfile;
         let description = init.descr;
@@ -450,19 +452,7 @@ impl HnswIo {
         let mut it_slice = [0u8; std::mem::size_of::<u32>()];
         data_in.read_exact(&mut it_slice)?;
         let magic = u32::from_ne_bytes(it_slice);
-        assert_eq!(
-            magic, MAGICDATAP,
-            "magic not equal to MAGICDATAP in load_point"
-        );
-        //
-        let mut it_slice = [0u8; std::mem::size_of::<usize>()];
-        data_in.read_exact(&mut it_slice)?;
-        let dimension = usize::from_ne_bytes(it_slice);
-        assert_eq!(
-            dimension, description.dimension,
-            "data dimension incoherent {:?} {:?} ",
-            dimension, description.dimension
-        );
+        check_data_header(magic, data_in, &description)?;
         //
         let _mode = description.dumpmode;
         let distname = description.distname.clone();
@@ -536,11 +526,9 @@ impl HnswIo {
         //
         debug!("HnswIo::load_hnsw_with_dist");
         //
-        let init = self.init();
-        if init.is_err() {
-            return Err(anyhow!("Could not reload hnsw structure"));
-        }
-        let mut init = init.unwrap();
+        let mut init = self
+            .init()
+            .map_err(|e| anyhow!("Could not reload hnsw structure: {}", e))?;
         //
         let data_in = &mut init.datafile;
         let graph_in = &mut init.graphfile;
@@ -549,19 +537,7 @@ impl HnswIo {
         let mut it_slice = [0u8; std::mem::size_of::<u32>()];
         data_in.read_exact(&mut it_slice)?;
         let magic = u32::from_ne_bytes(it_slice);
-        assert_eq!(
-            magic, MAGICDATAP,
-            "magic not equal to MAGICDATAP in load_point"
-        );
-        //
-        let mut it_slice = [0u8; std::mem::size_of::<usize>()];
-        data_in.read_exact(&mut it_slice)?;
-        let dimension = usize::from_ne_bytes(it_slice);
-        assert_eq!(
-            dimension, description.dimension,
-            "data dimension incoherent {:?} {:?} ",
-            dimension, description.dimension
-        );
+        check_data_header(magic, data_in, &description)?;
         //
         let _mode = description.dumpmode;
         let distname = description.distname.clone();
@@ -633,7 +609,11 @@ impl HnswIo {
                 descr.t_name,
                 std::any::type_name::<T>()
             );
-            panic!("incohrent size of T in description");
+            return Err(anyhow!(
+                "dump was written for element type {:?} but is being reloaded as {:?}",
+                descr.t_name,
+                std::any::type_name::<T>()
+            ));
         }
         //
         let mut points_by_layer: Vec<Vec<Arc<Point<T>>>> =
@@ -665,7 +645,19 @@ impl HnswIo {
             graph_in.read_exact(&mut it_slice)?;
             let nbpoints = usize::from_ne_bytes(it_slice);
             debug!(" layer {:?} , nb points {:?}", l, nbpoints);
-            let mut vlayer: Vec<Arc<Point<T>>> = Vec::with_capacity(nbpoints);
+            // No layer can hold more points than the whole index declares;
+            // rejecting here keeps a hostile count from driving allocation
+            // and from silently disagreeing with the description.
+            if nbpoints > descr.nb_point {
+                return Err(anyhow!(
+                    "layer {} declares {} points, above the {} the description declares",
+                    l,
+                    nbpoints,
+                    descr.nb_point
+                ));
+            }
+            let mut vlayer: Vec<Arc<Point<T>>> =
+                Vec::with_capacity(nbpoints.min(RESERVE_POINT_HINT));
             // load graph and data part of point. Points are dumped in the same order.
             for r in 0..nbpoints {
                 // do we use mmap? for this point. We must load into memory up to threshold points, and we also want the  most
@@ -689,38 +681,51 @@ impl HnswIo {
                         }
                     }
                 };
-                let load_point_res = self.load_point(graph_in, descr, data_in, point_use_mmap);
-                if let Err(other) = load_point_res {
-                    error!("in load_point_indexation, loading of point {} failed", r);
-                    return Err(anyhow!(other));
-                }
-
-                let load_point_res = load_point_res.unwrap();
+                let load_point_res = self
+                    .load_point(graph_in, descr, data_in, point_use_mmap)
+                    .map_err(|other| {
+                        error!("in load_point_indexation, loading of point {} failed", r);
+                        anyhow!(other)
+                    })?;
                 let point = load_point_res.0;
                 let p_id = point.get_point_id();
-                // some checks
-                assert_eq!(l, p_id.0 as usize);
-                if r != p_id.1 as usize {
+                // Points are dumped layer by layer in rank order, so a point
+                // whose own identity contradicts its position means the graph
+                // file is inconsistent with itself.
+                if l != p_id.0 as usize || r != p_id.1 as usize {
                     debug!("Origin= {:?},  p_id = {:?}", point.get_origin_id(), p_id);
                     debug!("Storing at l {:?}, r {:?}", l, r);
+                    return Err(anyhow!(
+                        "point stored at layer {} rank {} carries identity {:?}",
+                        l,
+                        r,
+                        p_id
+                    ));
                 }
-                assert_eq!(r, p_id.1 as usize);
                 // store neoghbour info of this point
                 neighbourhood_map.insert(p_id, load_point_res.1);
                 vlayer.push(point);
                 nb_points_loaded += 1;
                 nb_still_to_load -= 1;
-                assert!(nb_still_to_load >= 0);
+                if nb_still_to_load < 0 {
+                    return Err(anyhow!(
+                        "graph file holds more points than the {} the description declares",
+                        descr.nb_point
+                    ));
+                }
             }
             points_by_layer.push(vlayer);
         }
         // at this step all points are loaded , but without their neighbours fileds are not yet initialized
         let mut nbp: usize = 0;
         for (p_id, neighbours) in &neighbourhood_map {
-            let point = &points_by_layer[p_id.0 as usize][p_id.1 as usize];
+            let point = resolve_in_layers(&points_by_layer, *p_id)?;
             for (l, neighbours) in neighbours.iter().enumerate() {
                 for n in neighbours {
-                    let n_point = &points_by_layer[n.p_id.0 as usize][n.p_id.1 as usize];
+                    // A neighbour identity is file-controlled: resolve it
+                    // through a checked lookup so a dangling reference is a
+                    // typed error instead of an indexing panic.
+                    let n_point = resolve_in_layers(&points_by_layer, n.p_id)?;
                     // now n_point is the Arc<Point> corresponding to neighbour n of point,
                     // construct a corresponding PointWithOrder
                     let n_pwo = PointWithOrder::<T>::new(n_point, n.distance);
@@ -803,27 +808,30 @@ impl HnswIo {
         //
         //    debug!(" point load {:?} {:?}  ", p_id, origin_id);
         // Now  for each layer , read neighbours
-        let load_res = load_point_graph(graph_in, descr);
-        if load_res.is_err() {
+        let (origin_id, p_id, neighborhood) = load_point_graph(graph_in, descr).map_err(|e| {
             error!("load_point error reading graph data for point p_id");
-            return Err(anyhow!("error reading graph data for point"));
-        }
-        let (origin_id, p_id, neighborhood) = load_res.unwrap();
+            anyhow!("error reading graph data for point: {}", e)
+        })?;
         //
         let point = match point_use_mmap {
             false => {
-                let v = load_point_data::<T>(origin_id, data_in, descr);
-                if v.is_err() {
-                    error!("loading point {:?}", origin_id);
-                    std::process::exit(1);
-                }
-                Point::<T>::new(v.unwrap(), origin_id, p_id)
+                let v = load_point_data::<T>(origin_id, data_in, descr)
+                    .map_err(|e| anyhow!("loading data for point {}: {}", origin_id, e))?;
+                Point::<T>::new(v, origin_id, p_id)
             }
             true => {
                 skip_point_data(origin_id, data_in, descr)?; // keep cohrence between data file and graph file!
                 debug!("constructing point from datamap, dataid : {:?}", origin_id);
-                let s: Option<&'b [T]> = self.datamap.as_ref().unwrap().get_data::<T>(&origin_id);
-                Point::<T>::new_from_mmap(s.unwrap(), origin_id, p_id)
+                let datamap = self.datamap.as_ref().ok_or_else(|| {
+                    anyhow!(
+                        "mmap reload requested for point {} without a datamap",
+                        origin_id
+                    )
+                })?;
+                let s: &'b [T] = datamap.get_data::<T>(&origin_id).ok_or_else(|| {
+                    anyhow!("data file has no mmap entry for point {}", origin_id)
+                })?;
+                Point::<T>::new_from_mmap(s, origin_id, p_id)
             }
         };
         self.nb_point_loaded.fetch_add(1, Ordering::Relaxed);
@@ -933,6 +941,41 @@ impl Description {
 /// This method is internally used by Hnswio.  
 /// It is make *pub* as it can be used to retrieve the description of a dump.
 /// It takes as input the graph part of the dump.
+/// Validate the data file's own header against the description.
+///
+/// The data file repeats the magic and the dimension; both must agree with
+/// the graph file's description, because every later payload length is
+/// computed from the description while the bytes come from here. A
+/// disagreement means the two files are not a matched pair and the load
+/// must stop before any point is reconstructed.
+fn check_data_header(magic: u32, data_in: &mut dyn Read, descr: &Description) -> Result<()> {
+    if magic != MAGICDATAP {
+        return Err(anyhow!(
+            "bad magic at data file beginning: expected {:x}, got {:x}",
+            MAGICDATAP,
+            magic
+        ));
+    }
+    let mut it_slice = [0u8; std::mem::size_of::<usize>()];
+    data_in.read_exact(&mut it_slice)?;
+    let dimension = usize::from_ne_bytes(it_slice);
+    if dimension != descr.dimension {
+        return Err(anyhow!(
+            "data file declares dimension {} but the description declares {}",
+            dimension,
+            descr.dimension
+        ));
+    }
+    Ok(())
+}
+
+/// Largest vector dimension a dump may declare.
+///
+/// The dimension multiplies into every per-point buffer length, so an
+/// unbounded value turns a few header bytes into an arbitrary allocation
+/// demand. The ceiling is far above any real embedding width.
+const MAX_DIMENSION: usize = 1 << 24;
+
 pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
     //
     let mut descr = Description {
@@ -1018,7 +1061,8 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
     }
     let mut distv = vec![0; len];
     io_in.read_exact(distv.as_mut_slice())?;
-    let distname = String::from_utf8(distv).unwrap();
+    let distname =
+        String::from_utf8(distv).map_err(|e| anyhow!("distance name is not valid UTF-8: {}", e))?;
     debug!("distance name {:?} ", distname);
     descr.distname = distname;
     // reload of type name
@@ -1032,10 +1076,34 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
     }
     let mut tnamev = vec![0; len];
     io_in.read_exact(tnamev.as_mut_slice())?;
-    let t_name = String::from_utf8(tnamev).unwrap();
+    let t_name =
+        String::from_utf8(tnamev).map_err(|e| anyhow!("T type name is not valid UTF-8: {}", e))?;
     debug!("T type name {:?} ", t_name);
     descr.t_name = t_name;
     debug!(" end of description load \n");
+    //
+    // Every later stage sizes buffers and indexes tables from these fields,
+    // so validate them once here rather than at each use.
+    if descr.nb_layer > NB_LAYER_MAX {
+        return Err(anyhow!(
+            "description declares {} layers, above the {} maximum",
+            descr.nb_layer,
+            NB_LAYER_MAX
+        ));
+    }
+    if descr.dimension > MAX_DIMENSION {
+        return Err(anyhow!(
+            "description declares dimension {}, above the {} maximum",
+            descr.dimension,
+            MAX_DIMENSION
+        ));
+    }
+    if !descr.level_scale.is_finite() || descr.level_scale <= 0.0 {
+        return Err(anyhow!(
+            "description declares a non-positive or non-finite level scale {}",
+            descr.level_scale
+        ));
+    }
     //
     Ok(descr)
 }
@@ -1113,6 +1181,101 @@ fn dump_point<T: Serialize + Clone + Sized + Send + Sync, W: Write>(
     Ok(1)
 } // end of dump for Point<T>
 
+/// Upper bound on a single serialized point payload, in bytes.
+///
+/// The `NoData` case and any future format carry no description-derived
+/// length, so they need a standalone ceiling; v3/v4 payload lengths are
+/// additionally pinned to exactly `dimension * size_of::<T>()`. Without a
+/// ceiling, an 8-byte hostile length field would drive an unbounded
+/// allocation before a single data byte is read.
+const MAX_SERIALIZED_POINT_BYTES: u64 = 1 << 30;
+
+/// Validate a declared payload length against the description, returning it
+/// as a `usize` that is safe to allocate.
+///
+/// For the raw-binary formats (v3/v4) the length is fully determined by the
+/// description, so anything else means the pair of files disagree and the
+/// point must be rejected rather than reconstructed from a mismatched
+/// buffer.
+fn check_serialized_len<T: 'static>(
+    serialized_len: u64,
+    descr: &Description,
+    origin_id: usize,
+) -> Result<usize> {
+    if serialized_len > MAX_SERIALIZED_POINT_BYTES {
+        return Err(anyhow!(
+            "point {} declares {} serialized bytes, above the {} byte ceiling",
+            origin_id,
+            serialized_len,
+            MAX_SERIALIZED_POINT_BYTES
+        ));
+    }
+    let serialized_len = usize::try_from(serialized_len)
+        .map_err(|_| anyhow!("point {} declares a length exceeding usize", origin_id))?;
+    let is_no_data = std::any::TypeId::of::<T>() == std::any::TypeId::of::<NoData>();
+    if !is_no_data && matches!(descr.format_version, 3 | 4) {
+        let expected = descr
+            .dimension
+            .checked_mul(std::mem::size_of::<T>())
+            .ok_or_else(|| anyhow!("dimension {} overflows a byte length", descr.dimension))?;
+        if serialized_len != expected {
+            return Err(anyhow!(
+                "point {} declares {} serialized bytes but the description implies {} \
+                 ({} elements of {} bytes)",
+                origin_id,
+                serialized_len,
+                expected,
+                descr.dimension,
+                std::mem::size_of::<T>()
+            ));
+        }
+    }
+    Ok(serialized_len)
+}
+
+/// Decode `dimension` values of `T` from a raw little-endian-by-construction
+/// binary payload.
+///
+/// The v3/v4 dump writes the in-memory bytes of `T` directly, so reload has
+/// to reinterpret them. Two properties matter and are why this is not a
+/// `slice::from_raw_parts` cast:
+///
+/// - **Length.** The caller must have validated `bytes.len()` against
+///   `dimension * size_of::<T>()` (see [`check_serialized_len`]); this
+///   function additionally refuses to read past the buffer, so a mismatch
+///   can never become an out-of-bounds read.
+/// - **Alignment.** `bytes` comes from a `Vec<u8>` (alignment 1) while `T`
+///   may require greater alignment, so each element is read with
+///   `read_unaligned` instead of through a misaligned `*const T`.
+///
+/// The formats remain plain-data-only by construction: the dump side writes
+/// `T`'s raw bytes, so a `T` owning heap memory was never representable in
+/// these versions.
+fn decode_raw_binary_vector<T>(bytes: &[u8], dimension: usize) -> Vec<T> {
+    let width = std::mem::size_of::<T>();
+    let mut values = Vec::with_capacity(dimension);
+    if width == 0 {
+        return values;
+    }
+    for index in 0..dimension {
+        let Some(offset) = index.checked_mul(width) else {
+            break;
+        };
+        let Some(end) = offset.checked_add(width) else {
+            break;
+        };
+        if end > bytes.len() {
+            break;
+        }
+        // SAFETY: `offset + width <= bytes.len()` was just checked, so the
+        // read stays inside the buffer, and `read_unaligned` imposes no
+        // alignment requirement on the source pointer.
+        let value = unsafe { std::ptr::read_unaligned(bytes.as_ptr().add(offset) as *const T) };
+        values.push(value);
+    }
+    values
+}
+
 // just reload data vector for point from file where data were dumped
 // used when we do not used memory map in reload
 fn load_point_data<T>(
@@ -1131,45 +1294,53 @@ where
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
     data_in.read_exact(&mut it_slice)?;
     let magic = u32::from_ne_bytes(it_slice);
-    assert_eq!(
-        magic, MAGICDATAP,
-        "magic not equal to MAGICDATAP in load_point, point_id : {:?} ",
-        origin_id
-    );
+    if magic != MAGICDATAP {
+        return Err(anyhow!(
+            "bad magic in data file for point {}: expected {:x}, got {:x}",
+            origin_id,
+            MAGICDATAP,
+            magic
+        ));
+    }
     // read origin id
     let mut it_slice = [0u8; std::mem::size_of::<u64>()];
     data_in.read_exact(&mut it_slice)?;
     let origin_id_data = u64::from_ne_bytes(it_slice) as usize;
-    assert_eq!(
-        origin_id, origin_id_data,
-        "origin_id incoherent between graph and data"
-    );
+    if origin_id != origin_id_data {
+        return Err(anyhow!(
+            "origin_id incoherent between graph and data: graph {}, data {}",
+            origin_id,
+            origin_id_data
+        ));
+    }
     // now read data. we use size_t that is in description, to take care of the casewhere we reload
     let mut it_slice = [0u8; std::mem::size_of::<u64>()];
     data_in.read_exact(&mut it_slice)?;
     let serialized_len = u64::from_ne_bytes(it_slice);
     trace!("serialized len to reload {:?}", serialized_len);
-    let mut v_serialized = vec![0; serialized_len as usize];
+    let serialized_len = check_serialized_len::<T>(serialized_len, descr, origin_id)?;
+    // Read into a capacity-bounded buffer rather than pre-allocating the
+    // declared length: a truncated file then fails in read_exact instead of
+    // letting a hostile length reserve gigabytes before any I/O happens.
+    let mut v_serialized = vec![0u8; serialized_len];
     data_in.read_exact(&mut v_serialized)?;
 
     let v: Vec<T> = if std::any::TypeId::of::<T>() != std::any::TypeId::of::<NoData>() {
         match descr.format_version {
             2 => {
                 error!("format bincode of dump no more used");
-                std::process::exit(1);
+                return Err(anyhow!(
+                    "dump for point {} uses the retired bincode format (version 2)",
+                    origin_id
+                ));
             }
-            3 | 4 => {
-                let slice_t = unsafe {
-                    std::slice::from_raw_parts(v_serialized.as_ptr() as *const T, descr.dimension)
-                };
-                slice_t.to_vec()
-            }
-            _ => {
-                error!(
-                    "error in load_point, unknow format_version : {:?}",
-                    descr.format_version
-                );
-                std::process::exit(1);
+            3 | 4 => decode_raw_binary_vector::<T>(&v_serialized, descr.dimension),
+            other => {
+                return Err(anyhow!(
+                    "unknown format_version {} while loading point {}",
+                    other,
+                    origin_id
+                ));
             }
         }
     } else {
@@ -1180,24 +1351,30 @@ where
 } // end of load_point_data
 
 // We need to maintain coherence in data and graph stream, so we read to keep in phase
-fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, _descr: &Description) -> Result<()> {
+fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, descr: &Description) -> Result<()> {
     //
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
     data_in.read_exact(&mut it_slice)?;
     let magic = u32::from_ne_bytes(it_slice);
-    assert_eq!(
-        magic, MAGICDATAP,
-        "magic not equal to MAGICDATAP in load_point, point_id : {:?} ",
-        origin_id
-    );
+    if magic != MAGICDATAP {
+        return Err(anyhow!(
+            "bad magic in data file while skipping point {}: expected {:x}, got {:x}",
+            origin_id,
+            MAGICDATAP,
+            magic
+        ));
+    }
     // read origin id
     let mut it_slice = [0u8; std::mem::size_of::<u64>()];
     data_in.read_exact(&mut it_slice)?;
     let origin_id_data = u64::from_ne_bytes(it_slice) as usize;
-    assert_eq!(
-        origin_id, origin_id_data,
-        "origin_id incoherent between graph and data"
-    );
+    if origin_id != origin_id_data {
+        return Err(anyhow!(
+            "origin_id incoherent between graph and data while skipping: graph {}, data {}",
+            origin_id,
+            origin_id_data
+        ));
+    }
     //
     // now read data. we use size_t that is in description, to take care of the casewhere we reload
     let mut it_slice = [0u8; std::mem::size_of::<u64>()];
@@ -1207,8 +1384,25 @@ fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, _descr: &Descriptio
         "skip_point_data : serialized len to reload {:?}",
         serialized_len
     );
-    let mut v_serialized = vec![0; serialized_len as usize];
-    data_in.read_exact(&mut v_serialized)?;
+    // The skipped payload is never interpreted, so bound it by the ceiling
+    // alone; consuming it through a fixed-size scratch buffer keeps a hostile
+    // length from reserving memory it never fills.
+    if serialized_len > MAX_SERIALIZED_POINT_BYTES {
+        return Err(anyhow!(
+            "point {} declares {} serialized bytes, above the {} byte ceiling",
+            origin_id,
+            serialized_len,
+            MAX_SERIALIZED_POINT_BYTES
+        ));
+    }
+    let _ = descr;
+    let mut remaining = serialized_len;
+    let mut scratch = [0u8; 8192];
+    while remaining > 0 {
+        let take = remaining.min(scratch.len() as u64) as usize;
+        data_in.read_exact(&mut scratch[..take])?;
+        remaining -= take as u64;
+    }
     //
     Ok(())
 } // end of skip_point_data
@@ -1218,6 +1412,94 @@ fn skip_point_data(origin_id: usize, data_in: &mut dyn Read, _descr: &Descriptio
 /// This structure gathers info loaded in dumped graph file for a point.
 type PointGraphInfo = (usize, PointId, Vec<Vec<Neighbour>>);
 
+/// Capacity hint used when reading a neighbour list, independent of the
+/// count the file declares (see the call site for why).
+const RESERVE_NEIGHBOUR_HINT: usize = 64;
+
+/// Capacity hint used when reading a layer's point list, bounded for the
+/// same reason as [`RESERVE_NEIGHBOUR_HINT`].
+const RESERVE_POINT_HINT: usize = 4096;
+
+/// Resolve a point identity against the reloaded layer tables.
+///
+/// Both the identity of a point and the identities inside its neighbour
+/// lists come from the file, so every lookup is checked: a layer or rank
+/// that does not name a loaded point yields a typed error rather than an
+/// out-of-bounds panic.
+fn resolve_in_layers<'layers, 'point, T: Clone + Send + Sync>(
+    points_by_layer: &'layers [Vec<Arc<Point<'point, T>>>],
+    p_id: PointId,
+) -> Result<&'layers Arc<Point<'point, T>>> {
+    let layer = points_by_layer.get(p_id.0 as usize).ok_or_else(|| {
+        anyhow!(
+            "point identity names layer {} but only {} layers were loaded",
+            p_id.0,
+            points_by_layer.len()
+        )
+    })?;
+    if p_id.1 < 0 {
+        return Err(anyhow!(
+            "point identity names a negative rank {} in layer {}",
+            p_id.1,
+            p_id.0
+        ));
+    }
+    layer.get(p_id.1 as usize).ok_or_else(|| {
+        anyhow!(
+            "point identity names rank {} in layer {} but that layer loaded {} points",
+            p_id.1,
+            p_id.0,
+            layer.len()
+        )
+    })
+}
+
+/// Largest neighbour count a single layer of a well-formed dump can hold.
+///
+/// Construction caps a neighbourhood at `max_nb_connection` (doubled at
+/// layer 0 by the usual HNSW rule), and no layer can hold more neighbours
+/// than the index holds points. Taking the larger of the two keeps honest
+/// dumps loadable — including ones written by a build with a different
+/// connection policy — while still bounding a hostile count.
+fn max_neighbours_per_layer(descr: &Description) -> usize {
+    let by_connection = (descr.max_nb_connection as usize).saturating_mul(2);
+    by_connection.max(descr.nb_point)
+}
+
+/// Reject a point identity that cannot address a layer table.
+///
+/// Reconstruction indexes `points_by_layer[layer][rank]`, so a layer at or
+/// above `NB_LAYER_MAX`, a negative rank, or a rank beyond the point count
+/// must fail here as a typed error. Left to the indexing site they become a
+/// panic (or, for a negative rank widened to `usize`, an absurd index) on
+/// purely file-controlled values.
+fn check_point_id(layer: u8, rank_in_layer: i32, descr: &Description) -> Result<()> {
+    if layer >= NB_LAYER_MAX {
+        return Err(anyhow!(
+            "point identity names layer {}, at or above the {} layer maximum",
+            layer,
+            NB_LAYER_MAX
+        ));
+    }
+    if rank_in_layer < 0 {
+        return Err(anyhow!(
+            "point identity names a negative rank {} in layer {}",
+            rank_in_layer,
+            layer
+        ));
+    }
+    if descr.nb_point > 0 && rank_in_layer as usize >= descr.nb_point {
+        return Err(anyhow!(
+            "point identity names rank {} in layer {}, beyond the {} points the description \
+             declares",
+            rank_in_layer,
+            layer,
+            descr.nb_point
+        ));
+    }
+    Ok(())
+}
+
 // This function reads neighbourhood info and returns neighbourhood info.
 // It suppose and requires that the file graph_in is just at beginning of info related to origin_id
 fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<PointGraphInfo> {
@@ -1225,24 +1507,28 @@ fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<Poin
     trace!("in load_point_graph");
     // read and check magic
     let mut it_slice = [0u8; std::mem::size_of::<u32>()];
-    graph_in.read_exact(&mut it_slice).unwrap();
+    graph_in.read_exact(&mut it_slice)?;
     let magic = u32::from_ne_bytes(it_slice);
     if magic != MAGICPOINT {
         error!("got instead of MAGICPOINT {:x}", magic);
         return Err(anyhow!("bad magic at point beginning"));
     }
     let mut it_slice = [0u8; std::mem::size_of::<DataId>()];
-    graph_in.read_exact(&mut it_slice).unwrap();
+    graph_in.read_exact(&mut it_slice)?;
     let origin_id = DataId::from_ne_bytes(it_slice);
     //
     // read point_id
     let mut it_slice = [0u8; std::mem::size_of::<u8>()];
-    graph_in.read_exact(&mut it_slice).unwrap();
+    graph_in.read_exact(&mut it_slice)?;
     let layer = u8::from_ne_bytes(it_slice);
     //
     let mut it_slice = [0u8; std::mem::size_of::<i32>()];
-    graph_in.read_exact(&mut it_slice).unwrap();
+    graph_in.read_exact(&mut it_slice)?;
     let rank_in_l = i32::from_ne_bytes(it_slice);
+    // A point identity is used to index the layer tables during
+    // reconstruction, so reject out-of-range identities at the parse
+    // boundary rather than letting them become an indexing panic later.
+    check_point_id(layer, rank_in_l, descr)?;
     let p_id = PointId(layer, rank_in_l);
     debug!(
         "in load_point_graph, got origin_id : {}, p_id : {:?}",
@@ -1251,29 +1537,56 @@ fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<Poin
     //
     // Now  for each layer , read neighbours
     let nb_layer = descr.nb_layer;
+    // The tail loop below pads to exactly NB_LAYER_MAX entries, which only
+    // holds if the description's layer count fits. load_description rejects
+    // an over-large count, so this is a cheap restatement of that invariant
+    // at the point that depends on it.
+    if nb_layer > NB_LAYER_MAX {
+        return Err(anyhow!(
+            "description declares {} layers, above the {} maximum",
+            nb_layer,
+            NB_LAYER_MAX
+        ));
+    }
     let mut neighborhood = Vec::<Vec<Neighbour>>::with_capacity(NB_LAYER_MAX as usize);
     for _l in 0..nb_layer {
         let mut neighbour: Neighbour = Default::default();
         // read nb_neighbour as usize!!! CAUTION, then nb_neighbours times identity(depends on Full or Light) distance : f32
         let mut it_slice = [0u8; std::mem::size_of::<usize>()];
-        graph_in.read_exact(&mut it_slice).unwrap();
+        graph_in.read_exact(&mut it_slice)?;
         let nb_neighbours = usize::from_ne_bytes(it_slice);
-        let mut neighborhood_l: Vec<Neighbour> = Vec::with_capacity(nb_neighbours);
+        if nb_neighbours > max_neighbours_per_layer(descr) {
+            return Err(anyhow!(
+                "point {} declares {} neighbours at one layer, above the {} bound implied by \
+                 max_nb_connection {} and nb_point {}",
+                origin_id,
+                nb_neighbours,
+                max_neighbours_per_layer(descr),
+                descr.max_nb_connection,
+                descr.nb_point
+            ));
+        }
+        // Capacity is a hint bounded independently of the declared count: a
+        // truncated file must fail in read_exact, not after reserving for
+        // neighbours that are not in the file.
+        let mut neighborhood_l: Vec<Neighbour> =
+            Vec::with_capacity(nb_neighbours.min(RESERVE_NEIGHBOUR_HINT));
         for _j in 0..nb_neighbours {
             let mut it_slice = [0u8; std::mem::size_of::<DataId>()];
-            graph_in.read_exact(&mut it_slice).unwrap();
+            graph_in.read_exact(&mut it_slice)?;
             neighbour.d_id = DataId::from_ne_bytes(it_slice);
             if descr.dumpmode == 1 {
                 let mut it_slice = [0u8; std::mem::size_of::<u8>()];
-                graph_in.read_exact(&mut it_slice).unwrap();
+                graph_in.read_exact(&mut it_slice)?;
                 neighbour.p_id.0 = u8::from_ne_bytes(it_slice);
                 //
                 let mut it_slice = [0u8; std::mem::size_of::<i32>()];
-                graph_in.read_exact(&mut it_slice).unwrap();
+                graph_in.read_exact(&mut it_slice)?;
                 neighbour.p_id.1 = i32::from_ne_bytes(it_slice);
+                check_point_id(neighbour.p_id.0, neighbour.p_id.1, descr)?;
             }
             let mut it_slice = [0u8; std::mem::size_of::<f32>()];
-            graph_in.read_exact(&mut it_slice).unwrap();
+            graph_in.read_exact(&mut it_slice)?;
             neighbour.distance = f32::from_ne_bytes(it_slice);
             //  debug!("        voisins  load {:?} {:?} {:?} ", neighbour.p_id, neighbour.d_id , neighbour.distance);
             // now we have a new neighbour, we must really fill neighbourhood info, so it means going from Neighbour to PointWithOrder
@@ -1403,6 +1716,98 @@ mod tests {
 
     fn log_init_test() {
         let _ = env_logger::builder().is_test(true).try_init();
+    }
+
+    fn description_for(format_version: usize, dimension: usize, nb_point: usize) -> Description {
+        Description {
+            format_version,
+            dumpmode: 1,
+            max_nb_connection: 8,
+            level_scale: 1.0,
+            nb_layer: 4,
+            ef: 24,
+            nb_point,
+            dimension,
+            distname: String::from("DistL1"),
+            t_name: String::from("f32"),
+        }
+    }
+
+    /// The raw-binary decoder must never read past the buffer, whatever the
+    /// declared dimension says, and must tolerate a source buffer with no
+    /// alignment guarantee (a `Vec<u8>` reinterpreted as `f32`).
+    #[test]
+    fn raw_binary_decode_is_bounded_and_alignment_free() {
+        let values: [f32; 4] = [1.5, -2.25, 0.0, 1e30];
+        let mut bytes = Vec::new();
+        for value in &values {
+            bytes.extend_from_slice(&value.to_ne_bytes());
+        }
+
+        let decoded = decode_raw_binary_vector::<f32>(&bytes, 4);
+        assert_eq!(decoded, values.to_vec(), "exact-length decode round-trips");
+
+        // A dimension larger than the buffer must stop at the buffer end
+        // rather than reading out of bounds.
+        let truncated = decode_raw_binary_vector::<f32>(&bytes, 64);
+        assert_eq!(truncated.len(), 4);
+
+        // A partial trailing element is not a value: it must be dropped, not
+        // completed with whatever follows in memory.
+        let ragged = decode_raw_binary_vector::<f32>(&bytes[..bytes.len() - 1], 4);
+        assert_eq!(ragged.len(), 3);
+
+        // Decode from a deliberately misaligned offset: `f32` wants 4-byte
+        // alignment and this slice starts one byte in.
+        let mut offset_bytes = vec![0u8];
+        offset_bytes.extend_from_slice(&bytes);
+        let unaligned = decode_raw_binary_vector::<f32>(&offset_bytes[1..], 4);
+        assert_eq!(unaligned, values.to_vec());
+    }
+
+    /// A payload length that disagrees with the description must be rejected
+    /// before it can be used to reconstruct a point.
+    #[test]
+    fn serialized_length_must_match_the_description() {
+        let descr = description_for(3, 8, 100);
+        let exact = (8 * std::mem::size_of::<f32>()) as u64;
+        assert_eq!(
+            check_serialized_len::<f32>(exact, &descr, 0).expect("exact length is accepted"),
+            exact as usize
+        );
+        assert!(
+            check_serialized_len::<f32>(exact - 4, &descr, 0).is_err(),
+            "a short payload must be rejected, not silently under-read"
+        );
+        assert!(
+            check_serialized_len::<f32>(exact + 4, &descr, 0).is_err(),
+            "an over-long payload means the files disagree"
+        );
+        assert!(
+            check_serialized_len::<f32>(u64::MAX, &descr, 0).is_err(),
+            "a hostile length must never reach an allocation"
+        );
+    }
+
+    /// Point identities index the layer tables, so out-of-range values must
+    /// be refused at the parse boundary.
+    #[test]
+    fn point_identities_are_range_checked() {
+        let descr = description_for(4, 8, 10);
+        check_point_id(0, 0, &descr).expect("a valid identity is accepted");
+        check_point_id(3, 9, &descr).expect("the last valid rank is accepted");
+        assert!(
+            check_point_id(NB_LAYER_MAX, 0, &descr).is_err(),
+            "a layer at the maximum is out of range"
+        );
+        assert!(
+            check_point_id(0, -1, &descr).is_err(),
+            "a negative rank must not widen into a huge index"
+        );
+        assert!(
+            check_point_id(0, 10, &descr).is_err(),
+            "a rank beyond the declared point count is out of range"
+        );
     }
 
     fn my_fn(v1: &[f32], v2: &[f32]) -> f32 {
