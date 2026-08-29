@@ -52,6 +52,7 @@ fn main() {
     let seed: u64 = a[8].parse().unwrap();
     let k: usize = a.get(9).map(|v| v.parse().unwrap()).unwrap_or(200);
     let ef: usize = a.get(10).map(|v| v.parse().unwrap()).unwrap_or(1024);
+    let efc: usize = a.get(11).map(|v| v.parse().unwrap()).unwrap_or(100);
 
     let pts: Vec<Vec<f32>> = (0..n)
         .map(|i| {
@@ -63,7 +64,7 @@ fn main() {
         })
         .collect();
 
-    let mut hnsw = Hnsw::<f32, DistCosine>::new(m, n, 16, 100, DistCosine {});
+    let mut hnsw = Hnsw::<f32, DistCosine>::new(m, n, 16, efc, DistCosine {});
     if (scale - 1.0).abs() > f64::EPSILON {
         hnsw.modify_level_scale(scale);
     }
@@ -86,6 +87,6 @@ fn main() {
         .count();
 
     println!(
-        "n={n} M={m} dim={dim} scale={scale} mode={mode} clusters={nclusters} sigma={sigma} seed={seed} maxlevel={maxlev} above0={above0} k={k} ef={ef} orphans={orphans}"
+        "n={n} M={m} dim={dim} scale={scale} mode={mode} clusters={nclusters} sigma={sigma} seed={seed} maxlevel={maxlev} above0={above0} k={k} ef={ef} efc={efc} orphans={orphans}"
     );
 }
