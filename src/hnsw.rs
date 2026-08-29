@@ -939,11 +939,18 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         // we will store positive distances in this one
         let mut return_points = BinaryHeap::<Arc<PointWithOrder<T>>>::with_capacity(skiplist_size);
         //
-        if self.layer_indexed_points.points_by_layer.read()[layer as usize].is_empty() {
-            // at the beginning we can have nothing in layer
-            trace!("search layer {:?}, empty layer", layer);
-            return return_points;
-        }
+        // NOTE: do *not* short-circuit on `points_by_layer[layer].is_empty()`.
+        // `generate_new_point` buckets each point under its *top* level only, while a
+        // point of level L participates in the graph at every layer 0..=L.  An empty
+        // bucket therefore does not mean an empty layer: once every point in a small
+        // index has been drawn at level >= 1, layer 0's bucket is empty while layer 0
+        // still carries edges.  Returning early here handed `insert_slice` an empty
+        // heap, whose `if !sorted_points.is_empty()` guard then skipped the layer, and
+        // the point being inserted ended up with no layer-0 neighbours at all.
+        //
+        // The traversal below is seeded from `entry_point` and bounded by the
+        // neighbour lists, so it is well defined whatever the bucket holds: an entry
+        // point with no neighbours at this layer simply yields itself.
         if entry_point.p_id.1 < 0 {
             trace!("search layer negative point id : {:?}", entry_point.p_id);
             return return_points;
@@ -1254,9 +1261,18 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     let q_point = &q.point_ref;
                     let mut q_point_neighbours = q_point.neighbours.write();
                     let n_to_add = PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
-                    // must be sure that we add a point at the correct level. See the comment to search_layer!
-                    // this ensures that reverse updating do not add problems.
-                    let l_n = n_to_add.point_ref.p_id.0 as usize;
+                    // The symmetric edge must be stored on the layer the forward edge
+                    // was built on (`l`), not on `new_point`'s top level.  Writing every
+                    // backlink at `new_point.p_id.0` leaves layers 0..level-1 of `q` with
+                    // no in-edge to `new_point`, so a point of level >= 1 receives no
+                    // layer-0 in-edge at all and a layer-0 traversal can only reach it
+                    // when it happens to be the entry point.
+                    //
+                    // `search_layer` seeds its heap with the entry point unconditionally,
+                    // so `q` may be a point whose own level is below `l`.  Clamp to a
+                    // layer both endpoints actually occupy, so the edge is never written
+                    // above `q`'s own level either.
+                    let l_n = (l as usize).min(q_point.p_id.0 as usize);
                     let already = q_point_neighbours[l_n]
                         .iter()
                         .position(|old| old.point_ref.p_id == new_point.p_id);
