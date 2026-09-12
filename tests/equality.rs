@@ -17,10 +17,17 @@ use rand::distr::{Distribution, Uniform};
 
 #[derive(Debug, Clone)]
 struct SearchStats {
+    nb_points: usize,
     nb_found: usize,
     #[allow(unused)]
     nb_dist_equal: usize,
     missing_ids: Vec<usize>,
+}
+
+impl SearchStats {
+    fn get_missing_fraction(&self) -> f32 {
+        self.missing_ids.len() as f32 / self.nb_points as f32
+    }
 }
 
 fn report_search_results(
@@ -32,6 +39,7 @@ fn report_search_results(
     let mut nb_dist_equal = 0usize;
     let mut missing_ids = Vec::new();
 
+    let nb_points = data_neighbours.len();
     for (id, neighbours) in data_neighbours.iter().enumerate() {
         let mut found_id = false;
 
@@ -52,11 +60,12 @@ fn report_search_results(
     }
 
     log::info!(
-        "{} : nb_found = {}, nb_dist_equal = {:.5e}, missing_count = {}",
+        "{} : nb_found = {}, nb_dist_equal = {:.5e}, missing_count = {}, fraction not found = {:.5e}",
         label,
         nb_found,
         nb_dist_equal,
-        missing_ids.len()
+        missing_ids.len(),
+        missing_ids.len() as f32 / nb_points as f32
     );
 
     if !missing_ids.is_empty() {
@@ -73,6 +82,7 @@ fn report_search_results(
     }
 
     SearchStats {
+        nb_points,
         nb_found,
         nb_dist_equal,
         missing_ids,
@@ -120,7 +130,7 @@ fn test_equality_float() {
     let mut hns =
         Hnsw::<f32, DistL1>::new(nb_connection, nbdata, max_layer, ef_construct, DistL1 {});
 
-    hns.modify_level_scale(0.5);
+    hns.modify_level_scale(1.);
     hns.parallel_insert(&data_refs);
     hns.dump_layer_info();
 
@@ -138,7 +148,7 @@ fn test_equality_float() {
     let mut hns =
         Hnsw::<f32, DistL1>::new(nb_connection, nbdata, max_layer, ef_construct, DistL1 {});
 
-    hns.modify_level_scale(0.5);
+    hns.modify_level_scale(1.0);
 
     for data in data_refs {
         hns.insert((data.0, data.1));
@@ -156,6 +166,15 @@ fn test_equality_float() {
         parallel_stats.missing_ids.len(),
         serial_stats.missing_ids.len()
     );
+    //
+    if parallel_stats.get_missing_fraction() > 1.0e-3 {
+        log::info!("test_equality_float failed in parallel mode");
+        panic!()
+    }
+    if serial_stats.get_missing_fraction() > 1.0e-3 {
+        log::info!("test_equality_float failed in serial mode");
+        panic!()
+    }
 }
 
 #[test]
@@ -204,7 +223,7 @@ fn test_equality_cosine() {
         DistCosine {},
     );
 
-    hns.modify_level_scale(0.5);
+    hns.modify_level_scale(1.);
     hns.parallel_insert(&data_refs);
     hns.dump_layer_info();
 
@@ -227,7 +246,7 @@ fn test_equality_cosine() {
         DistCosine {},
     );
 
-    hns.modify_level_scale(0.5);
+    hns.modify_level_scale(1.);
 
     for data in data_refs {
         hns.insert((data.0, data.1));
@@ -246,6 +265,15 @@ fn test_equality_cosine() {
         parallel_stats.missing_ids.len(),
         serial_stats.missing_ids.len()
     );
+    //
+    if parallel_stats.get_missing_fraction() > 1.0e-3 {
+        log::info!("test_equality_float failed in parallel mode");
+        panic!()
+    }
+    if serial_stats.get_missing_fraction() > 1.0e-3 {
+        log::info!("test_equality_float failed in serial mode");
+        panic!()
+    }
 }
 
 #[test]
@@ -333,4 +361,13 @@ fn test_equality_int() {
         parallel_stats.missing_ids.len(),
         serial_stats.missing_ids.len()
     );
+    //
+    if parallel_stats.get_missing_fraction() > 1.0e-3 {
+        log::info!("test_equality_float failed in parallel mode");
+        panic!()
+    }
+    if serial_stats.get_missing_fraction() > 1.0e-3 {
+        log::info!("test_equality_float failed in serial mode");
+        panic!()
+    }
 }

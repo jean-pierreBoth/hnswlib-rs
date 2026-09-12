@@ -85,9 +85,10 @@ The main parameters occuring in constructing the graph or in searching are:
 
 * max_nb_connection (in hnsw initialization)
     The maximum number of links from one point to others. Values ranging from 16 to 64 are standard initialising values, the higher the more time consuming.
+    Note that layer 0 can store 2 * max_nb_connection neighbours
 
 * ef_construction (in hnsw initialization)  
-  This parameter controls the width of the search for neighbours during insertion. Values from 200 to 800 are standard initialising values, the higher the more time consuming.
+  This parameter controls the width of the search for neighbours during insertion. Values from 200 to 800 are standard initialising values, the higher the more time consuming. It should be greater than 2 * max_nb_connection neighbours.
 
 * max_layer (in hnsw initialization)  
     The maximum number of layers in graph. Must be less or equal than 16.

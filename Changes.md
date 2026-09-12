@@ -1,8 +1,10 @@
 # Changes
 
-- version 0.3.5
-   dependancies update.
-   Doc update in parallel_insertion and modify_scale_level methods. See test file equality.rs
+- version 0.3.5  
+  - takes into account pull request #39 from [vidaunited](https://github.com/vidaunited). Warning if ef_construction <= 2 * max_nb_conn.  
+  - fix bug in reverse edges management found by [vidaunited](https://github.com/vidaunited). It impacted capacity to retrieve data points stored in Hnsw by method *search*. See pull request #38 (and #37)
+  - Doc update in parallel_insertion and modify_scale_level methods. See test file equality.rs
+  - dependancies update and clippy cleaning
 
 - version 0.3.4
   small fix in reloading with DataMap in case dump directory given by a relative path (thanks to dsgallups)  

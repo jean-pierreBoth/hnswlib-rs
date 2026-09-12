@@ -163,7 +163,7 @@ pub fn search<Dist>(
     let search_cpu_time = cpu_time.as_micros() as f32;
     let search_sys_time = now.elapsed().unwrap().as_micros() as f32;
     println!(
-        "total cpu time for search requests {:?} , system time {:?} ",
+        "total cpu time for search requests {:?} (micros), system time {:?} (micros)",
         search_cpu_time,
         now.elapsed()
     );
