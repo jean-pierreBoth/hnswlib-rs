@@ -1249,7 +1249,8 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     let q_point = &q.point_ref;
                     let mut q_point_neighbours = q_point.neighbours.write();
                     let n_to_add = PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
-                    // ensure graph symetry. fix from vidaunited (https://github.com/vidaunited)
+                    // fix from vidaunited (https://github.com/vidaunited), store potential reverse neighbout at correct layer
+                    // This potential reverse add provide a symetric edge only if new_point is sufficiently close to q_point from q_point point of view
                     let l_n = l as usize;
                     let already = q_point_neighbours[l_n]
                         .iter()
