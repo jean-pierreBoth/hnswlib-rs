@@ -786,6 +786,20 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             std::process::exit(1);
         }
         //
+        // At layer 0 `insert` asks `select_neighbours` for 2 * max_nb_connection neighbours,
+        // but the candidate pool it chooses from is bounded by ef_construction. When the pool
+        // is no larger than the target there is no surplus for the diversity heuristic to
+        // select against, so on clustered data only intra-cluster candidates are kept and the
+        // links bridging clusters are never created, leaving whole components unreachable.
+        // This is a quality warning, not an error: the same setting is harmless on uniform data.
+        if ef_construction <= 2 * max_nb_connection {
+            println!(
+                "warning: ef_construction ({}) <= 2 * max_nb_connection ({}), layer 0 neighbour selection will be starved. This can disconnect clustered data. See README for recommended ranges.",
+                ef_construction,
+                2 * max_nb_connection
+            );
+        }
+        //
         info!("Hnsw max_nb_connection {:?}", max_nb_connection);
         info!("Hnsw nb elements {:?}", max_elements);
         info!("Hnsw ef_construction {:?}", ef_construction);
