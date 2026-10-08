@@ -455,7 +455,7 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
             // recall that range are right extremeity excluded
             // compute fraction of points going into layer i and do expected memory reservation
             let s = 1. / (max_nb_connection as f64).ln();
-            let frac = (-(i as f64) / s).exp() - (-((i + 1) as f64) / s);
+            let frac = (-(i as f64) / s).exp() - (-((i + 1) as f64) / s).exp();
             let expected_size = ((frac * max_elements as f64).round()) as usize;
             points_by_layer.push(Vec::with_capacity(expected_size));
         }
@@ -1754,6 +1754,25 @@ mod tests {
 
     use super::*;
     use anndists::dist;
+    #[test]
+    fn test_point_indexation_reserved_capacity() {
+        let max_elements = 10_000;
+        let index = PointIndexation::<f32>::new(16, 16, max_elements);
+
+        let total_capacity: usize = index
+            .points_by_layer
+            .read()
+            .iter()
+            .map(|layer| layer.capacity())
+            .sum();
+
+        assert!(
+            total_capacity <= max_elements + 16,
+            "reserved {} slots for {} expected elements",
+            total_capacity,
+            max_elements
+        );
+    }
 
     fn log_init_test() {
         let _ = env_logger::builder().is_test(true).try_init();
