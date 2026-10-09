@@ -1754,6 +1754,25 @@ mod tests {
 
     use super::*;
     use anndists::dist;
+    #[test]
+    fn test_point_indexation_reserved_capacity() {
+        let max_elements = 10_000;
+        let index = PointIndexation::<f32>::new(16, 16, max_elements);
+
+        let total_capacity: usize = index
+            .points_by_layer
+            .read()
+            .iter()
+            .map(|layer| layer.capacity())
+            .sum();
+
+        assert!(
+            total_capacity <= max_elements + 16,
+            "reserved {} slots for {} expected elements",
+            total_capacity,
+            max_elements
+        );
+    }
 
     fn log_init_test() {
         let _ = env_logger::builder().is_test(true).try_init();
