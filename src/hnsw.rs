@@ -1236,53 +1236,90 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
 
     /// insert new_point in neighbourhood info of point
     fn reverse_update_neighborhood_simple(&self, new_point: Arc<Point<T>>) {
-        //  println!("reverse update neighbourhood for  new point {:?} ", new_point.p_id);
-        trace!(
+        debug!(
             "reverse update neighbourhood for  new point {:?} ",
             new_point.p_id
         );
+        let mut nb_reversible_edges: u16 = 0;
         let level = new_point.p_id.0;
         for l in (0..level + 1).rev() {
-            for q in &new_point.neighbours.read()[l as usize] {
+            let p_neighbours_at_l = &new_point.neighbours.read()[l as usize];
+            for q in p_neighbours_at_l {
                 if new_point.p_id != q.point_ref.p_id {
                     // as new point is in global table, do not loop and deadlock!!
                     let q_point = &q.point_ref;
-                    let mut q_point_neighbours = q_point.neighbours.write();
-                    let n_to_add = PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
                     // fix from vidaunited (https://github.com/vidaunited), store potential reverse neighbout at correct layer
                     // This potential reverse add provide a symetric edge only if new_point is sufficiently close to q_point from q_point point of view
                     let l_n = l as usize;
-                    let already = q_point_neighbours[l_n]
+                    let already = q_point.neighbours.read()[l_n]
                         .iter()
                         .position(|old| old.point_ref.p_id == new_point.p_id);
                     if already.is_some() {
-                        // debug!(" new_point.p_id {:?} already in neighbourhood of  q_point {:?} at index {:?}", new_point.p_id, q_point.p_id, already.unwrap());
+                        debug!(
+                            " new_point.p_id {:?} already in neighbourhood of  q_point {:?} at index {:?}",
+                            new_point.p_id,
+                            q_point.p_id,
+                            already.unwrap()
+                        );
                         // q_point.debug_dump();  cannot be called as its neighbours are locked write by this method.
                         //   new_point.debug_dump();
                         //   panic!();
                         continue;
                     }
-                    q_point_neighbours[l_n].push(Arc::new(n_to_add));
-                    let nbn_at_l = q_point_neighbours[l_n].len();
                     //
-                    // if l < level, update upward chaining, insert does a sort! t_q has a neighbour not yet in global table of points!
                     let threshold_shrinking = if l_n > 0 {
                         self.max_nb_connection
                     } else {
                         2 * self.max_nb_connection
                     };
-                    let shrink = nbn_at_l > threshold_shrinking;
+                    // to reduce to one read lock
+                    let q_nbn_at_l: usize;
+                    let q_neighborhood_radius: f32;
                     {
-                        // sort and shring if necessary
-                        q_point_neighbours[l_n].sort_unstable();
-                        if shrink {
-                            q_point_neighbours[l_n].pop();
+                        let q_neighbours = &q_point.neighbours.read()[l_n];
+                        q_nbn_at_l = q_neighbours.len();
+                        q_neighborhood_radius = match q_neighbours.last() {
+                            Some(last) => last.dist_to_ref,
+                            None => -1.,
                         }
                     }
+                    // if we have sufficient space or if q is nearer to new_point than its last neighbour we insert
+                    // the distance from to q is q.dist_to_ref
+                    if q_nbn_at_l < threshold_shrinking || q.dist_to_ref <= q_neighborhood_radius {
+                        let n_to_add =
+                            PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
+                        // if q in inside neighborhood we have to insert, we search its insertion position and shift
+                        let rank = q_point.neighbours.read()[l_n]
+                            .partition_point(|point| point.dist_to_ref <= q.dist_to_ref);
+                        {
+                            // to reduce to one write lock
+                            let q_neighbours = &mut q_point.neighbours.write()[l_n];
+                            q_neighbours.insert(rank, Arc::new(n_to_add));
+                            if q_nbn_at_l >= threshold_shrinking {
+                                q_neighbours.truncate(threshold_shrinking);
+                                log::debug!(
+                                    "reverse_update , point id {:?} truncating q",
+                                    new_point.p_id
+                                );
+                            }
+                        }
+                        nb_reversible_edges += 1;
+                        log::debug!(
+                            "reverse update for point id {:?}, old_radius = {:3.5e}, new radius = {:3.5e} nb_reversible_edges : {:?}",
+                            new_point.p_id,
+                            q_neighborhood_radius,
+                            q_point.neighbours.read()[l_n].last().unwrap().dist_to_ref,
+                            nb_reversible_edges
+                        );
+                    }
+                    //
                 } // end protection against point identity
             }
         }
-        //   println!("     exitingreverse update neighbourhood for  new point {:?} ", new_point.p_id);
+        log::debug!(
+            "     exiting reverse update neighbourhood for  new point {:?} ",
+            new_point.p_id
+        );
     } // end of reverse_update_neighborhood_simple
 
     pub fn get_point_indexation(&self) -> &PointIndexation<'b, T> {
@@ -1521,12 +1558,16 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                 } // end of for on neighbours
             }
             if has_changed {
+                log::debug!(
+                    "pivot changed , current pivot {:?} new_pivot : {:?}",
+                    pivot.get_point_id(),
+                    new_pivot.as_ref().unwrap().get_point_id()
+                );
                 pivot = Arc::clone(new_pivot.as_ref().unwrap());
             }
         } // end on for on layers
         // ef must be greater than knbn. Possibly it should be between knbn and self.max_nb_connection
         let ef = ef_arg.max(knbn);
-        log::debug!("pivot changed , current pivot {:?}", pivot.get_point_id());
         // search lowest non empty layer (in case of search with incomplete lower layer at beginning of hnsw filling)
         let mut l = 0u8;
         let layer_to_search = loop {

@@ -130,9 +130,9 @@ pub fn main() {
     let cpu_time: Duration = start.elapsed();
     //
     println!(
-        "\n hnsw data insertion cpu time  {:?}  system time {:?} ",
-        cpu_time,
-        now.elapsed()
+        "\n hnsw data insertion cpu time (millis {:?}  system time (millis) {:?} ",
+        cpu_time.as_millis(),
+        now.elapsed().unwrap().as_millis()
     );
     hnsw.dump_layer_info();
     println!(" hnsw data nb point inserted {:?}", hnsw.get_nb_point());
@@ -186,9 +186,8 @@ pub fn search<Dist>(
     let search_cpu_time = cpu_time.as_micros() as f32;
     let search_sys_time = now.elapsed().unwrap().as_micros() as f32;
     println!(
-        "total cpu time for search requests {:?} , system time {:?} ",
-        search_cpu_time,
-        now.elapsed()
+        "total cpu time (micros) for search requests {:?} , system time (micros) {:?} ",
+        search_cpu_time, search_sys_time
     );
     // now compute recall rate
     for i in 0..anndata.test_data.len() {

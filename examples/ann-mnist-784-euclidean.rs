@@ -31,6 +31,7 @@ mod utils;
 use utils::*;
 
 pub fn main() {
+    env_logger::builder().is_test(true).try_init().unwrap();
     let mut parallel = true;
     //
     let fname = String::from("/home/jpboth/Data/ANN/fashion-mnist-784-euclidean.hdf5");
@@ -50,8 +51,8 @@ pub fn main() {
     let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
     let ef_c = 400;
     println!(
-        " number of elements to insert {:?} , setting max nb layer to {:?} ef_construction {:?}",
-        nb_elem, nb_layer, ef_c
+        " number of elements to insert {:?} , setting max nb layer to {:?} ef_construction {:?} max_nb_conn to {:?}",
+        nb_elem, nb_layer, ef_c, max_nb_connection
     );
     println!(
         " ====================================================================================="

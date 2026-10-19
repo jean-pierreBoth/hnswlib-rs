@@ -2,7 +2,7 @@
 
 use cpu_time::ProcessTime;
 use env_logger::Builder;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant};
 
 use anndists::dist::*;
 use log::info;
@@ -89,7 +89,7 @@ pub fn main() {
     //
     // parallel insertion
     let start = ProcessTime::now();
-    let now = SystemTime::now();
+    let now = Instant::now();
     let data_for_par_insertion = anndata
         .train_data
         .iter()
@@ -107,9 +107,9 @@ pub fn main() {
     let cpu_time: Duration = start.elapsed();
     //
     println!(
-        "\n hnsw data insertion cpu time  {:?}  system time {:?} ",
-        cpu_time,
-        now.elapsed()
+        "\n hnsw data insertion cpu time (millis) {:?}  system time (millis) {:?} ",
+        cpu_time.as_millis(),
+        now.elapsed().as_millis()
     );
     hnsw.dump_layer_info();
     println!(" hnsw data nb point inserted {:?}", hnsw.get_nb_point());
@@ -146,7 +146,7 @@ pub fn search<Dist>(
     hnsw.set_searching_mode(true);
     println!("searching with ef : {:?}", ef_search);
     let start = ProcessTime::now();
-    let now = SystemTime::now();
+    let now = Instant::now();
     // search
     if parallel {
         println!(" \n parallel search");
@@ -161,11 +161,10 @@ pub fn search<Dist>(
     }
     let cpu_time = start.elapsed();
     let search_cpu_time = cpu_time.as_micros() as f32;
-    let search_sys_time = now.elapsed().unwrap().as_micros() as f32;
+    let search_sys_time = now.elapsed().as_micros() as f32;
     println!(
         "total cpu time for search requests {:?} (micros), system time {:?} (micros)",
-        search_cpu_time,
-        now.elapsed()
+        search_cpu_time, search_sys_time
     );
     // now compute recall rate
     for i in 0..anndata.test_data.len() {
