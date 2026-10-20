@@ -42,8 +42,16 @@ pub struct NoData;
 pub(crate) const NB_LAYER_MAX: u8 = 16; // so max layer is 15!!
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-/// The 2-uple represent layer as u8  and rank in layer as a i32 as stored in our structure
-pub struct PointId(pub u8, pub i32);
+/// The 2-uple represent layer as u8  and rank in layer as a u32 as stored in our structure
+/// A value of i32::MIN (=  -2147483648) is used at initialization
+/// A negative value > i32::MIN means point is scheduled to be deleted.
+pub struct PointId(pub u8, pub i32, pub(crate) u8);
+impl PointId {
+    #[allow(unused)]
+    pub(crate) fn to_be_deleted(&self) -> bool {
+        if self.2 > 0 { true } else { false }
+    }
+}
 
 /// this type is for an identificateur of each data vector, given by client.
 /// Can be the rank of data in an array, a hash value or anything that permits
@@ -53,7 +61,8 @@ pub type DataId = usize;
 pub type PointDistance<T> = Box<dyn Distance<T>>;
 
 /// A structure containing internal pointId with distance to this pointId.
-/// The order is given by ordering the distance to the point it refers to.
+/// The order is given by
+/// ordering the distance to the point it refers to.
 /// So points ordering has a meaning only has points refers to the same point
 #[derive(Debug, Clone, Copy)]
 pub struct PointIdWithOrder {
@@ -507,8 +516,9 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
         {
             // open a write lock on points_by_layer
             let mut points_by_layer_ref = self.points_by_layer.write();
-            let mut p_id = PointId(level as u8, -1);
+            let mut p_id = PointId(level as u8, -1, u8::MAX);
             p_id.1 = points_by_layer_ref[p_id.0 as usize].len() as i32;
+            p_id.2 = 0; // alive
             // make a Point and then an Arc<Point>
             let point = Point::new(data.to_vec(), origin_id, p_id);
             new_point = Arc::new(point);
@@ -1913,7 +1923,7 @@ mod tests {
                 Hnsw::new(15, 100_000, 20, 500_000, dist::DistL1 {});
             hnsw.insert((&[1.0, 0.0, 0.0, 0.0], 0));
             let result = hnsw.search(&[1.0, 0.0, 0.0, 0.0], 2, 10);
-            assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0))]);
+            assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0, 0))]);
         }
     }
 } // end of module test

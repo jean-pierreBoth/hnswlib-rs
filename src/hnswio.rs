@@ -1243,7 +1243,7 @@ fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<Poin
     let mut it_slice = [0u8; std::mem::size_of::<i32>()];
     graph_in.read_exact(&mut it_slice).unwrap();
     let rank_in_l = i32::from_ne_bytes(it_slice);
-    let p_id = PointId(layer, rank_in_l);
+    let p_id = PointId(layer, rank_in_l, 0);
     debug!(
         "in load_point_graph, got origin_id : {}, p_id : {:?}",
         origin_id, p_id
@@ -1316,7 +1316,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
             graphout.write_all(&MAGICLAYER.to_ne_bytes())?;
             graphout.write_all(&nb_point.to_ne_bytes())?;
             for j in 0..layers[i].len() {
-                assert_eq!(layers[i][j].get_point_id(), PointId(i as u8, j as i32));
+                assert_eq!(layers[i][j].get_point_id(), PointId(i as u8, j as i32, 0));
                 dump_point(&layers[i][j], mode, graphout, dataout)?;
             }
         }

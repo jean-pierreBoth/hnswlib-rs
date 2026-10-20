@@ -118,7 +118,11 @@ With a i9-13900HX 24 cores laptop we get the following results:
 1. fashion-mnist-784-euclidean : search requests run at 62000 req/s with a recall rate of 0.977
 2. ann-glove-25-angular : search for the first 100 neighbours run with recall 0.979 at 12000 req/s
 3. sift1m benchmark: (1 million points in 128 dimension) search requests for the 10 first neighbours runs at 15000 req/s with a recall rate of 0.9907 or at 8300 req/s with a recall rate of 0.9959, depending on the parameters.
-  
+
+With AMD ryzen 9 7950X 16-Core (32 threads) and feature simdeez enabled we get:
+
+1. sift1m benchmark: simdeez 3.0 with level scale modification factor 0.5 we get a recall@10 of 0.9992 at 11700 req/s
+
 Moreover a tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
 gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/neurips21.html) benchmark. The benchmark is also described at [IRISA](http://corpus-texmex.irisa.fr/). This crate can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.
 
