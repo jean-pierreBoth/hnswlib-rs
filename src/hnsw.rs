@@ -1253,7 +1253,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         let mut nb_reversible_edges: u16 = 0;
         let level = new_point.p_id.0;
         for l in (0..level + 1).rev() {
-            let p_neighbours_at_l = &new_point.neighbours.read()[l as usize];
+            let p_neighbours_at_l = &new_point.neighbours.read()[l as usize].clone();
             for q in p_neighbours_at_l {
                 if new_point.p_id != q.point_ref.p_id {
                     // as new point is in global table, do not loop and deadlock!!
@@ -1285,25 +1285,24 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     // to reduce to one read lock
                     let q_nbn_at_l: usize;
                     let q_neighborhood_radius: f32;
-                    {
-                        let q_neighbours = &q_point.neighbours.read()[l_n];
-                        q_nbn_at_l = q_neighbours.len();
-                        q_neighborhood_radius = match q_neighbours.last() {
-                            Some(last) => last.dist_to_ref,
-                            None => -1.,
-                        }
-                    }
+                    let q_neighbours = &mut q_point.neighbours.write()[l_n];
+
+                    q_nbn_at_l = q_neighbours.len();
+                    q_neighborhood_radius = match q_neighbours.last() {
+                        Some(last) => last.dist_to_ref,
+                        None => -1.,
+                    };
+
                     // if we have sufficient space or if q is nearer to new_point than its last neighbour we insert
                     // the distance from to q is q.dist_to_ref
                     if q_nbn_at_l < threshold_shrinking || q.dist_to_ref <= q_neighborhood_radius {
                         let n_to_add =
                             PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
                         // if q in inside neighborhood we have to insert, we search its insertion position and shift
-                        let rank = q_point.neighbours.read()[l_n]
+                        let rank = q_neighbours
                             .partition_point(|point| point.dist_to_ref <= q.dist_to_ref);
                         {
                             // to reduce to one write lock
-                            let q_neighbours = &mut q_point.neighbours.write()[l_n];
                             q_neighbours.insert(rank, Arc::new(n_to_add));
                             if q_nbn_at_l >= threshold_shrinking {
                                 q_neighbours.truncate(threshold_shrinking);
@@ -1924,6 +1923,38 @@ mod tests {
             hnsw.insert((&[1.0, 0.0, 0.0, 0.0], 0));
             let result = hnsw.search(&[1.0, 0.0, 0.0, 0.0], 2, 10);
             assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0, 0))]);
+        }
+    }
+
+    #[test]
+    fn update_deadlock_test() {
+        log_init_test();
+        //
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f32 / (1u64 << 53) as f32 * 2.0 - 1.0
+        };
+
+        for round in 0..1000 {
+            let hnsw = Hnsw::<f32, dist::DistCosine>::new(2, 4096, 16, 32, dist::DistCosine {});
+
+            log::info!("round = {:?}", round);
+            // 4096 points in tight clusters of 32, so concurrent inserts select each other.
+            let mut data: Vec<Vec<f32>> = Vec::with_capacity(4096);
+            while data.len() < 4096 {
+                let centre: Vec<f32> = (0..8).map(|_| next()).collect();
+                for j in 0..32 {
+                    data.push(centre.iter().map(|c| c + next() * 1e-1).collect());
+                    log::debug!("j {}, data {:?}", j, data.last().unwrap());
+                }
+            }
+            let items: Vec<(&Vec<f32>, usize)> = data.iter().zip(0..).collect();
+            hnsw.parallel_insert(&items);
+            println!("round {round} done, {} points", hnsw.get_nb_point());
+            hnsw.dump_layer_info();
         }
     }
 } // end of module test
