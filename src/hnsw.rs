@@ -162,7 +162,7 @@ impl<'b, T: Clone + Send + Sync + 'b> PointData<'b, T> {
 } // end of impl block for PointData
 
 // we need a type that can be made atomic to modify a point within an Arc
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub(crate) enum Pstatus {
     #[default]
     Init, // allocated not YET used in search etc
@@ -239,11 +239,19 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
     }
 
     pub(crate) fn get_status(&self) -> Pstatus {
-        self.status.read().clone()
+        *self.status.read()
     }
 
     pub(crate) fn set_status(&self, status: Pstatus) {
         *self.status.write() = status;
+    }
+
+    pub(crate) fn is_live(&self) -> bool {
+        if *self.status.read() == Pstatus::Live {
+            true
+        } else {
+            false
+        }
     }
 
     /// returns for each layer, a vector Neighbour of a point, one vector by layer
@@ -791,6 +799,8 @@ pub struct Hnsw<'b, T: Clone + Send + Sync + 'b, D: Distance<T>> {
     pub(crate) searching: bool,
     /// set to true if some data come from a mmap
     pub(crate) datamap_opt: bool,
+    /// set to true if point deletion is enabled.
+    pub(crate) with_deletion: bool,
 } // end of Hnsw
 
 impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
@@ -834,6 +844,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             dist_f: f,
             searching: false,
             datamap_opt: false,
+            with_deletion: false,
         }
     } // end of new
 
@@ -893,6 +904,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     // When dumping we need to know if some file is mmapped
     pub(crate) fn get_datamap_opt(&self) -> bool {
         self.datamap_opt
+    }
+
+    pub(crate) fn with_deletion(&self) -> bool {
+        self.with_deletion
     }
 
     /// By default the levels are sampled using an exponential law of parameter **ln(max_nb_conn)**
@@ -1052,6 +1067,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     let e_dist_to_p = self.dist_f.eval(point, e.point_ref.data.get_v());
                     let f_dist_to_p = f.dist_to_ref;
                     if e_dist_to_p < f_dist_to_p || return_points.len() < ef {
+                        if self.with_deletion() && !e.point_ref.is_live() {
+                            // TODO: clean e
+                            continue;
+                        }
                         let e_prime = Arc::new(PointWithOrder::new(&e.point_ref, e_dist_to_p));
                         // a neighbour of neighbour is better, we insert it into candidate with the distance to point
                         trace!(
@@ -1276,8 +1295,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         let mut nb_reversible_edges: u16 = 0;
         let level = new_point.p_id.0;
         for l in (0..level + 1).rev() {
-            let p_neighbours_at_l = &new_point.neighbours.read()[l as usize].clone();
-            for q in p_neighbours_at_l {
+            for q in &new_point.neighbours.read()[l as usize] {
                 if new_point.p_id != q.point_ref.p_id {
                     // as new point is in global table, do not loop and deadlock!!
                     let q_point = &q.point_ref;
@@ -1950,7 +1968,7 @@ mod tests {
     }
 
     //  TODO: to check reverse_update
-    // #[test]
+    //    #[test]
     #[allow(unused)]
     fn update_deadlock_test() {
         log_init_test();
@@ -1963,7 +1981,7 @@ mod tests {
             (state >> 11) as f32 / (1u64 << 53) as f32 * 2.0 - 1.0
         };
 
-        for round in 0..1000 {
+        for round in 0..5000 {
             let hnsw = Hnsw::<f32, dist::DistCosine>::new(2, 4096, 16, 32, dist::DistCosine {});
 
             log::info!("round = {:?}", round);

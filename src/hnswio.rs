@@ -514,6 +514,7 @@ impl HnswIo {
             dist_f: D::default(),
             searching: false,
             datamap_opt: true, // set datamap_opt to true
+            with_deletion: false,
         };
         //
         debug!("load_hnsw completed");
@@ -603,6 +604,7 @@ impl HnswIo {
             dist_f: f,
             searching: false,
             datamap_opt: false,
+            with_deletion: false,
         };
         //
         debug!("load_hnsw_with_dist completed");
