@@ -31,7 +31,8 @@ use log::info;
 //=============================================================================
 
 //     48           1600        64            0.5              0          0        0.9938       14073       1.0002
-//     48           1600       128            0.5              0          0        0.9992       7906        1.0000
+//     48           1600        96            0.5              0          0        0.9982       10500       1.0000
+//     48           1600       128            0.5              0          0        0.9992       8200        1.0000
 
 // with an AMD ryzen 9 7950X 16-Core simdeez with level scale modification factor 0.5
 //=============================================================================
@@ -121,7 +122,7 @@ pub fn main() {
     search(&mut hnsw, knbn, ef_search, &anndata);
     //
     println!("searching with ef = {}", ef_search);
-    let ef_search = 128;
+    let ef_search = 96;
     search(&mut hnsw, knbn, ef_search, &anndata);
 }
 
