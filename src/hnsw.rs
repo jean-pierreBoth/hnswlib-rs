@@ -165,7 +165,7 @@ impl<'b, T: Clone + Send + Sync + 'b> PointData<'b, T> {
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub(crate) enum Pstatus {
     #[default]
-    Init, // allocated not YET used in search etc
+    Init, // allocated not YET used in search, cannot be inserted in a neighbourhood  etc
     Live,
     #[allow(unused)]
     Dead, // to be delete, not used ANYMORE in search etc
@@ -251,6 +251,25 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
             true
         } else {
             false
+        }
+    }
+
+    /// search if a point_id is found at given layer.
+    /// Returns an option containing the rank at which it is found or None.
+    pub fn has_neighbour_at_layer(&self, layer: usize, p_id: PointId) -> Option<usize> {
+        self.neighbours.read()[layer]
+            .iter()
+            .position(|old| old.point_ref.p_id == p_id)
+    }
+
+    // TODO: implement Drop for (removed) point
+    #[allow(unused)]
+    pub(crate) fn remove_neigbour_at_layer(&self, layer: usize, p_id: PointId) {
+        match self.has_neighbour_at_layer(layer, p_id) {
+            Some(rank) => {
+                self.neighbours.write()[layer].remove(rank);
+            }
+            _ => {}
         }
     }
 
@@ -1067,7 +1086,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     let e_dist_to_p = self.dist_f.eval(point, e.point_ref.data.get_v());
                     let f_dist_to_p = f.dist_to_ref;
                     if e_dist_to_p < f_dist_to_p || return_points.len() < ef {
-                        if self.with_deletion() && !e.point_ref.is_live() {
+                        if !e.point_ref.is_live() {
                             // TODO: clean e
                             continue;
                         }
@@ -1255,7 +1274,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         // so that we can call reverse_update_neighborhoodwe consitently
         // now reverse update of neighbours.
         self.reverse_update_neighborhood_simple(Arc::clone(&new_point));
-        // The point can now be used in search and stored in neighbourhood
+        // The point can now be used in search and stored in neighbourhood !!
         new_point.set_status(Pstatus::Live);
         //
         self.layer_indexed_points.check_entry_point(&new_point);
@@ -1298,25 +1317,11 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             for q in &new_point.neighbours.read()[l as usize] {
                 if new_point.p_id != q.point_ref.p_id {
                     // as new point is in global table, do not loop and deadlock!!
+                    // 20/2026 now new_point is not yet Live so cannot be inserted yet! and the preceding test is useless but no cost
                     let q_point = &q.point_ref;
                     // fix from vidaunited (https://github.com/vidaunited), store potential reverse neighbout at correct layer
                     // This potential reverse add provide a symetric edge only if new_point is sufficiently close to q_point from q_point point of view
                     let l_n = l as usize;
-                    let already = q_point.neighbours.read()[l_n]
-                        .iter()
-                        .position(|old| old.point_ref.p_id == new_point.p_id);
-                    if already.is_some() {
-                        debug!(
-                            " new_point.p_id {:?} already in neighbourhood of  q_point {:?} at index {:?}",
-                            new_point.p_id,
-                            q_point.p_id,
-                            already.unwrap()
-                        );
-                        // q_point.debug_dump();  cannot be called as its neighbours are locked write by this method.
-                        //   new_point.debug_dump();
-                        //   panic!();
-                        continue;
-                    }
                     //
                     let threshold_shrinking = if l_n > 0 {
                         self.max_nb_connection
@@ -1342,17 +1347,16 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         // if q in inside neighborhood we have to insert, we search its insertion position and shift
                         let rank = q_neighbours
                             .partition_point(|point| point.dist_to_ref <= q.dist_to_ref);
-                        {
-                            // to reduce to one write lock
-                            q_neighbours.insert(rank, Arc::new(n_to_add));
-                            if q_nbn_at_l >= threshold_shrinking {
-                                q_neighbours.truncate(threshold_shrinking);
-                                log::debug!(
-                                    "reverse_update , point id {:?} truncating q",
-                                    new_point.p_id
-                                );
-                            }
+                        // check if
+                        q_neighbours.insert(rank, Arc::new(n_to_add));
+                        if q_nbn_at_l >= threshold_shrinking {
+                            q_neighbours.truncate(threshold_shrinking);
+                            log::debug!(
+                                "reverse_update , point id {:?} truncating q",
+                                new_point.p_id
+                            );
                         }
+
                         nb_reversible_edges += 1;
                         log::debug!(
                             "reverse update for point id {:?}, old_radius = {:3.5e}, new radius = {:3.5e} nb_reversible_edges : {:?}",
@@ -1968,7 +1972,7 @@ mod tests {
     }
 
     //  TODO: to check reverse_update
-    //    #[test]
+    #[test]
     #[allow(unused)]
     fn update_deadlock_test() {
         log_init_test();
