@@ -1243,7 +1243,8 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         );
         let level = new_point.p_id.0;
         for l in (0..level + 1).rev() {
-            for q in &new_point.neighbours.read()[l as usize] {
+            let q_neighbours_l = new_point.neighbours.read()[l as usize].clone();
+            for q in &q_neighbours_l {
                 if new_point.p_id != q.point_ref.p_id {
                     // as new point is in global table, do not loop and deadlock!!
                     let q_point = &q.point_ref;
@@ -1873,6 +1874,39 @@ mod tests {
             hnsw.insert((&[1.0, 0.0, 0.0, 0.0], 0));
             let result = hnsw.search(&[1.0, 0.0, 0.0, 0.0], 2, 10);
             assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0))]);
+        }
+    }
+
+    #[test]
+    #[allow(unused)]
+    fn update_deadlock_test() {
+        log_init_test();
+        //
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f32 / (1u64 << 53) as f32 * 2.0 - 1.0
+        };
+
+        for round in 0..5000 {
+            let hnsw = Hnsw::<f32, dist::DistCosine>::new(2, 4096, 16, 32, dist::DistCosine {});
+
+            log::info!("round = {:?}", round);
+            // 4096 points in tight clusters of 32, so concurrent inserts select each other.
+            let mut data: Vec<Vec<f32>> = Vec::with_capacity(4096);
+            while data.len() < 4096 {
+                let centre: Vec<f32> = (0..8).map(|_| next()).collect();
+                for j in 0..32 {
+                    data.push(centre.iter().map(|c| c + next() * 1e-1).collect());
+                    log::debug!("j {}, data {:?}", j, data.last().unwrap());
+                }
+            }
+            let items: Vec<(&Vec<f32>, usize)> = data.iter().zip(0..).collect();
+            hnsw.parallel_insert(&items);
+            println!("round {round} done, {} points", hnsw.get_nb_point());
+            hnsw.dump_layer_info();
         }
     }
 } // end of module test
