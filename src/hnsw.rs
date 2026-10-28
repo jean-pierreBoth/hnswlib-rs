@@ -1273,7 +1273,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         // new_point has been inserted at the beginning in table
         // so that we can call reverse_update_neighborhoodwe consitently
         // now reverse update of neighbours.
-        self.reverse_update_neighborhood_simple(Arc::clone(&new_point));
+        self.reverse_update_neighborhood_simple(&new_point);
         // The point can now be used in search and stored in neighbourhood !!
         new_point.set_status(Pstatus::Live);
         //
@@ -1306,7 +1306,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     } // end of parallel_insert
 
     /// insert new_point in neighbourhood info of point
-    fn reverse_update_neighborhood_simple(&self, new_point: Arc<Point<T>>) {
+    fn reverse_update_neighborhood_simple(&self, new_point: &Arc<Point<T>>) {
         debug!(
             "reverse update neighbourhood for  new point {:?} ",
             new_point.p_id
