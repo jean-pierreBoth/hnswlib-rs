@@ -1,5 +1,8 @@
 # Changes
 
+- version 0.3.6
+  - fix request #43 from [SagarM21](https://github.com/SagarM21). Possible deadlock with low *max_nb_connection*
+  
 - version 0.3.5  
   - takes into account pull request #39 from [vidaunited](https://github.com/vidaunited). Warning if ef_construction <= 2 * max_nb_conn.  
   - fix bug in reverse edges management found by [vidaunited](https://github.com/vidaunited). It impacted capacity to retrieve data points stored in Hnsw by method *search*. See pull request #38 (and #37)

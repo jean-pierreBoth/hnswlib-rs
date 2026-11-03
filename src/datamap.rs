@@ -199,7 +199,9 @@ impl DataMap {
                 &mapped_slice[current_mmap_addr..current_mmap_addr + std::mem::size_of::<u64>()],
             );
             current_mmap_addr += std::mem::size_of::<u64>();
-            let serialized_len = u64::from_ne_bytes(u64_slice) as usize;
+            // we bound serialized_len just in case (cf issue #45) ...
+            let residual = mmap.size() - current_mmap_addr;
+            let serialized_len = residual.min(u64::from_ne_bytes(u64_slice) as usize);
             if i == 0 {
                 debug!("serialized bytes len to reload {:?}", serialized_len);
             }

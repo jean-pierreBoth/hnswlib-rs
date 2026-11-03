@@ -1095,7 +1095,6 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         "Hnsw  stored first point , direct return  {:?} ",
                         new_point.p_id
                     );
-                    return;
                 }
                 max_level_observed = enter_point_copy.as_ref().unwrap().p_id.0;
             }
