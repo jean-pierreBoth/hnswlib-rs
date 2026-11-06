@@ -365,7 +365,7 @@ impl HnswIo {
     //
     fn init(&self) -> Result<LoadInit> {
         //
-        info!("reloading from basename : {}", &self.basename);
+        info!("reloading from basename : {}", self.basename);
         //
         let mut graphname = self.basename.clone();
         graphname.push_str(".hnsw.graph");

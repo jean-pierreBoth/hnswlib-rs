@@ -1101,8 +1101,18 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         }
         if enter_point_copy.is_none() {
             self.layer_indexed_points.check_entry_point(&new_point);
-            return;
-        }
+            // now we are sure there is an entry point most probably new_point except if another thread put another point.
+            // Cf last item in issue #44.
+            let arc_point = Arc::clone(
+                self.layer_indexed_points
+                    .entry_point
+                    .read()
+                    .as_ref()
+                    .unwrap(),
+            );
+            enter_point_copy = Some(arc_point);
+            max_level_observed = enter_point_copy.as_ref().unwrap().p_id.0;
+        };
         let mut dist_to_entry = self
             .dist_f
             .eval(data, enter_point_copy.as_ref().unwrap().data.get_v());
@@ -1168,15 +1178,11 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             );
             sorted_points = from_positive_binaryheap_to_negative_binary_heap(&mut sorted_points);
             if !sorted_points.is_empty() {
-                let nb_conn;
-                let extend_c;
-                if l == 0 {
-                    nb_conn = 2 * self.max_nb_connection;
-                    extend_c = self.extend_candidates;
+                let (nb_conn, extend_c) = if l == 0 {
+                    (2 * self.max_nb_connection, self.extend_candidates)
                 } else {
-                    nb_conn = self.max_nb_connection;
-                    extend_c = false;
-                }
+                    (self.max_nb_connection, false)
+                };
                 let mut neighbours = Vec::<Arc<PointWithOrder<T>>>::with_capacity(nb_conn);
                 self.select_neighbours(
                     data,

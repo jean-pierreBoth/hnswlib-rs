@@ -83,7 +83,7 @@ where
         dumpinit.flush()?;
         info!(
             "\n End of dump, directory : {:#?} file basename : {}\n",
-            path, &dumpname
+            path, dumpname
         );
         if res.is_ok() {
             Ok(dumpname)

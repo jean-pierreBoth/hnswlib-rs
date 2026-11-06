@@ -94,14 +94,14 @@ impl DataMap {
         //
         let meta = std::fs::metadata(&datapath);
         if meta.is_err() {
-            error!("Could not open file : {:?}", &datapath);
+            error!("Could not open file : {:?}", datapath);
             std::process::exit(1);
         }
         let fsize = meta.unwrap().len().try_into().unwrap();
         //
         let file_res = File::open(&datapath);
         if file_res.is_err() {
-            error!("Could not open file : {:?}", &datapath);
+            error!("Could not open file : {:?}", datapath);
             std::process::exit(1);
         }
         let file = file_res.unwrap();
@@ -111,12 +111,12 @@ impl DataMap {
         let mmap_opt = unsafe { mmap_opt.with_file(&file, offset) };
         let mapping_res = mmap_opt.map();
         if mapping_res.is_err() {
-            error!("Could not memory map : {:?}", &datapath);
+            error!("Could not memory map : {:?}", datapath);
             std::process::exit(1);
         }
         let mmap = mapping_res.unwrap();
         //
-        info!("Mmap done on file : {:?}", &datapath);
+        info!("Mmap done on file : {:?}", datapath);
         //
         // where are we in decoding mmap slice? at beginning
         //
