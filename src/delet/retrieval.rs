@@ -34,26 +34,32 @@ pub fn retrieval_fraction<'b, T: Sized + Clone + Send + Sync + 'b, D: Distance<T
     let unif = Uniform::<f32>::new(0., 1.).unwrap();
     // search
     let mut data_block = Vec::<Vec<T>>::with_capacity(block_size);
+    let mut dataids = Vec::<DataId>::with_capacity(block_size);
+    //
     for point in d_iter {
         if unif.sample(&mut rng) <= s_fraction {
             nb_sampled += 1;
             let p = point.get_v().to_vec();
             if data_block.len() < block_size {
                 data_block.push(p);
+                dataids.push(point.get_origin_id());
             } else {
                 // block full we search
                 log::debug!("searching block");
                 let neighbours = hnsw.parallel_search(&data_block, knbn, ef_search);
                 //
-                for n in neighbours {
-                    let dist = n[0].get_distance();
-                    if dist <= 0. {
+                for (rank, n) in neighbours.iter().enumerate() {
+                    if dataids[rank] == n[0].get_origin_id() {
                         nb_retrieved += 1;
                     }
+                    let dist = n[0].get_distance();
                     mean_dist += dist;
                     max_dist = max_dist.max(dist);
                 }
                 data_block.clear();
+                dataids.clear();
+                // prepare new block iteration
+                dataids.push(point.get_origin_id());
                 data_block.push(p);
             }
         }
@@ -63,7 +69,14 @@ pub fn retrieval_fraction<'b, T: Sized + Clone + Send + Sync + 'b, D: Distance<T
         log::info!("residual block size : {}", data_block.len());
         let neighbours = hnsw.parallel_search(&data_block, knbn, ef_search);
         //
-        nb_retrieved += neighbours.iter().filter(|v| (*v)[0].distance <= 0.).count();
+        for (rank, n) in neighbours.iter().enumerate() {
+            if dataids[rank] == n[0].get_origin_id() {
+                nb_retrieved += 1;
+            }
+            let dist = n[0].get_distance();
+            mean_dist += dist;
+            max_dist = max_dist.max(dist);
+        }
         data_block.clear();
     }
     //
@@ -126,12 +139,12 @@ mod tests {
         }
         let data_with_id = data.iter().zip(0..data.len()).collect::<Vec<_>>();
         let nb_layer = 16.min((nb_elem as f32).ln().trunc() as usize);
-        let mut hnsw = Hnsw::<f32, dist::DistL2>::new(
+        let mut hnsw = Hnsw::<f32, dist::DistDot>::new(
             max_nb_connection,
             nb_elem,
             nb_layer,
             ef_c,
-            dist::DistL2 {},
+            dist::DistDot {},
         );
         // !
         // hns.
