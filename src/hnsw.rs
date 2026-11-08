@@ -18,8 +18,6 @@ use std::sync::Arc;
 use std::sync::mpsc::channel;
 
 use hashbrown::HashMap;
-#[allow(unused)]
-use std::collections::HashSet;
 use std::collections::binary_heap::BinaryHeap;
 
 use log::trace;
@@ -600,8 +598,8 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
         (Arc::clone(&new_point), nb_point)
     } // end of insert
 
-    /// check if entry_point is modified
-    fn check_entry_point(&self, new_point: &Arc<Point<'b, T>>) {
+    /// check if entry_point is modified, return true if new_point is set to entry_point
+    fn check_entry_point(&self, new_point: &Arc<Point<'b, T>>) -> bool {
         //
         // take directly a write lock so that we are sure nobody can change anything between read and write
         // of entry_point_id
@@ -616,12 +614,16 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
                         arc_point.p_id.0, new_point.p_id.0
                     );
                     *entry_point_ref = Some(Arc::clone(new_point));
+                    true
+                } else {
+                    false
                 }
             }
             None => {
                 trace!("initializing entry point");
                 debug!("Hnsw  , inserting  entry point {:?} ", new_point.p_id);
                 *entry_point_ref = Some(Arc::clone(new_point));
+                true
             }
         }
     } // end of check_entry_point
@@ -1182,14 +1184,14 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             }
         }
         if enter_point_copy.is_none() {
-            self.layer_indexed_points.check_entry_point(&new_point);
-            return;
+            if self.layer_indexed_points.check_entry_point(&new_point) {
+                new_point.set_status(Pstatus::Live);
+                return;
+            }
             // now we are sure there is an entry point most probably new_point except if another thread put another point.
             // Cf last item in issue #44.
-            // TODO: deadlock residual
-            /*
             enter_point_copy = self.layer_indexed_points.entry_point.read().clone();
-            max_level_observed = enter_point_copy.as_ref().unwrap().p_id.0; */
+            max_level_observed = enter_point_copy.as_ref().unwrap().p_id.0;
         }
         //
         let mut dist_to_entry = self

@@ -1641,14 +1641,15 @@ mod tests {
         for n in &search_res {
             info!("neighbour: {:?}", n);
         }
-        // TODO: first point should be found ?
-        //        assert_eq!(search_res[0].d_id, 0);
-        //        assert_eq!(search_res[0].distance, 0.);
+        // TODO: This is in fact a retrieval test!
+        assert_eq!(search_res[0].d_id, 0);
+        assert_eq!(search_res[0].distance, 0.);
         let search_res = hnsw.search(&first_with_mmap, 5, ef_construct);
         info!("neighbours of first point inserted after reload with mmap");
         for n in &search_res {
             info!("neighbour {:?}", n);
         }
+        // TODO: This is in fact a retrieval test!
         if search_res[0].d_id != nb_in {
             // with very low probability it could happen that we find a very near point!
             // then distance should very small
