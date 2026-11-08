@@ -205,7 +205,7 @@ mod tests {
         let knbn = 10;
         let ef_c = 800;
         let max_nb_connection = 48;
-        let ef = 20;
+        let ef = 32;
         //
         //
         let mut data = gen_random_matrix_f32(dim, nb_elem);
@@ -222,7 +222,7 @@ mod tests {
             dist::DistDot {},
         );
         // !
-        //   hns.set_extend_candidates(true);
+        // hns.set_extend_candidates(true);
         let mut start = ProcessTime::now();
         let now = std::time::SystemTime::now();
         // parallel insertion
@@ -332,6 +332,9 @@ mod tests {
             (recalls.iter().sum::<usize>() as f32) / ((knbn * recalls.len()) as f32);
         println!("mean recall rate with point ids {:?}", mean_recall_id);
         //
-        //  assert!(1==0);
+        assert!(
+            mean_recall_id > 0.95,
+            "mean recall should greater than 0.95"
+        );
     } // end test_par
 }
