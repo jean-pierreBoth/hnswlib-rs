@@ -1,3 +1,3 @@
 //! utilities for point deletion
 
-mod retriever;
+mod retrieval;

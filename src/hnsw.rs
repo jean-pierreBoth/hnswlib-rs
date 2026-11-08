@@ -44,11 +44,11 @@ pub(crate) const NB_LAYER_MAX: u8 = 16; // so max layer is 15!!
 /// The 2-uple represent layer as u8  and rank in layer as a u32 as stored in our structure
 /// A value of i32::MIN (=  -2147483648) is used at initialization
 /// A negative value > i32::MIN means point is scheduled to be deleted.
-pub struct PointId(pub u8, pub i32, pub(crate) u8);
+pub struct PointId(pub u8, pub i32);
 impl PointId {
     #[allow(unused)]
-    pub(crate) fn to_be_deleted(&self) -> bool {
-        if self.2 > 0 { true } else { false }
+    pub(crate) fn get_layer(&self) -> u8 {
+        self.0
     }
 }
 
@@ -159,6 +159,13 @@ impl<'b, T: Clone + Send + Sync + 'b> PointData<'b, T> {
             PointData::S(s) => s,
         }
     } // end of get_v
+
+    // clear data if allocated
+    pub(crate) fn clear(&mut self) {
+        if let PointData::V(v) = self {
+            v.clear()
+        }
+    }
 } // end of impl block for PointData
 
 // we need a type that can be made atomic to modify a point within an Arc
@@ -186,7 +193,7 @@ pub struct Point<'b, T: Clone + Send + Sync> {
     origin_id: DataId,
     /// a point id identifying point as stored in our structure
     p_id: PointId,
-    ///
+    /// Init, Live or Dead
     status: Arc<RwLock<Pstatus>>,
     /// neighbours info
     pub(crate) neighbours: Arc<RwLock<Vec<Vec<Arc<PointWithOrder<'b, T>>>>>>,
@@ -238,6 +245,7 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
         self.origin_id
     }
 
+    #[allow(unused)]
     pub(crate) fn get_status(&self) -> Pstatus {
         *self.status.read()
     }
@@ -247,11 +255,7 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
     }
 
     pub(crate) fn is_live(&self) -> bool {
-        if *self.status.read() == Pstatus::Live {
-            true
-        } else {
-            false
-        }
+        *self.status.read() == Pstatus::Live
     }
 
     /// search if a point_id is found at given layer.
@@ -265,11 +269,8 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
     // TODO: implement Drop for (removed) point
     #[allow(unused)]
     pub(crate) fn remove_neigbour_at_layer(&self, layer: usize, p_id: PointId) {
-        match self.has_neighbour_at_layer(layer, p_id) {
-            Some(rank) => {
-                self.neighbours.write()[layer].remove(rank);
-            }
-            _ => {}
+        if let Some(rank) = self.has_neighbour_at_layer(layer, p_id) {
+            self.neighbours.write()[layer].remove(rank);
         }
     }
 
@@ -295,6 +296,17 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
             neighborhood.push(neighbours);
         }
         neighborhood
+    }
+
+    /// empty all neighbours info
+    pub(crate) fn clear_neighbourhood(&mut self) {
+        let mut neighbours = self.neighbours.write();
+        //
+        for nv in neighbours.iter_mut() {
+            nv.clear()
+        }
+        neighbours.clear();
+        self.data.clear();
     }
 
     /// prints minimal information on neighbours of point.
@@ -557,6 +569,7 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
     /// real insertion of point in point indexation
     // generate a new Point/ArcPoint (with neigbourhood info empty) and store it in global table
     // The function is called by Hnsw insert method
+    // Pstatus is Init by default
     fn generate_new_point(&self, data: &[T], origin_id: usize) -> (Arc<Point<'b, T>>, usize) {
         // get a write lock at the beginning of the function
         let level = self.layer_g.generate();
@@ -564,9 +577,8 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
         {
             // open a write lock on points_by_layer
             let mut points_by_layer_ref = self.points_by_layer.write();
-            let mut p_id = PointId(level as u8, -1, u8::MAX);
+            let mut p_id = PointId(level as u8, -1);
             p_id.1 = points_by_layer_ref[p_id.0 as usize].len() as i32;
-            p_id.2 = 0; // alive
             // make a Point and then an Arc<Point>
             let point = Point::new(data.to_vec(), origin_id, p_id);
             new_point = Arc::new(point);
@@ -925,6 +937,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         self.datamap_opt
     }
 
+    #[allow(unused)]
     pub(crate) fn with_deletion(&self) -> bool {
         self.with_deletion
     }
@@ -1164,7 +1177,6 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         "Hnsw  stored first point , direct return  {:?} ",
                         new_point.p_id
                     );
-                    return;
                 }
                 max_level_observed = enter_point_copy.as_ref().unwrap().p_id.0;
             }
@@ -1172,7 +1184,14 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
         if enter_point_copy.is_none() {
             self.layer_indexed_points.check_entry_point(&new_point);
             return;
+            // now we are sure there is an entry point most probably new_point except if another thread put another point.
+            // Cf last item in issue #44.
+            // TODO: deadlock residual
+            /*
+            enter_point_copy = self.layer_indexed_points.entry_point.read().clone();
+            max_level_observed = enter_point_copy.as_ref().unwrap().p_id.0; */
         }
+        //
         let mut dist_to_entry = self
             .dist_f
             .eval(data, enter_point_copy.as_ref().unwrap().data.get_v());
@@ -1238,15 +1257,11 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
             );
             sorted_points = from_positive_binaryheap_to_negative_binary_heap(&mut sorted_points);
             if !sorted_points.is_empty() {
-                let nb_conn;
-                let extend_c;
-                if l == 0 {
-                    nb_conn = 2 * self.max_nb_connection;
-                    extend_c = self.extend_candidates;
+                let (nb_conn, extend_c) = if l == 0 {
+                    (2 * self.max_nb_connection, self.extend_candidates)
                 } else {
-                    nb_conn = self.max_nb_connection;
-                    extend_c = false;
-                }
+                    (self.max_nb_connection, false)
+                };
                 let mut neighbours = Vec::<Arc<PointWithOrder<T>>>::with_capacity(nb_conn);
                 self.select_neighbours(
                     data,
@@ -1329,12 +1344,9 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                         2 * self.max_nb_connection
                     };
                     // to reduce to one read lock
-                    let q_nbn_at_l: usize;
-                    let q_neighborhood_radius: f32;
                     let q_neighbours = &mut q_point.neighbours.write()[l_n];
-
-                    q_nbn_at_l = q_neighbours.len();
-                    q_neighborhood_radius = match q_neighbours.last() {
+                    let q_nbn_at_l = q_neighbours.len();
+                    let q_neighborhood_radius = match q_neighbours.last() {
                         Some(last) => last.dist_to_ref,
                         None => -1.,
                     };
@@ -1343,7 +1355,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
                     // the distance from to q is q.dist_to_ref
                     if q_nbn_at_l < threshold_shrinking || q.dist_to_ref <= q_neighborhood_radius {
                         let n_to_add =
-                            PointWithOrder::<T>::new(&Arc::clone(&new_point), q.dist_to_ref);
+                            PointWithOrder::<T>::new(&Arc::clone(new_point), q.dist_to_ref);
                         // if q in inside neighborhood we have to insert, we search its insertion position and shift
                         let rank = q_neighbours
                             .partition_point(|point| point.dist_to_ref <= q.dist_to_ref);
@@ -1359,7 +1371,7 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
 
                         nb_reversible_edges += 1;
                         log::debug!(
-                            "reverse update for point id {:?}, old_radius = {:3.5e}, new radius = {:3.5e} nb_reversible_edges : {:?}",
+                            "reverse update for point id {:?}, old_radius = {:.5e}, new radius = {:.5e} nb_reversible_edges : {:?}",
                             new_point.p_id,
                             q_neighborhood_radius,
                             q_point.neighbours.read()[l_n].last().unwrap().dist_to_ref,
@@ -1967,7 +1979,7 @@ mod tests {
                 Hnsw::new(15, 100_000, 20, 500_000, dist::DistL1 {});
             hnsw.insert((&[1.0, 0.0, 0.0, 0.0], 0));
             let result = hnsw.search(&[1.0, 0.0, 0.0, 0.0], 2, 10);
-            assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0, 0))]);
+            assert_eq!(result, vec![Neighbour::new(0, 0.0, PointId(0, 0))]);
         }
     }
 

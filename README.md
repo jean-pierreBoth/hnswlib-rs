@@ -121,7 +121,7 @@ With a i9-13900HX 24 cores laptop we get the following results:
 
 With AMD ryzen 9 7950X 16-Core (32 threads) and feature simdeez enabled we get:
 
-1. sift1m benchmark: simdeez 3.0 with level scale modification factor 0.5 we get a recall@10 of 0.9992 at 11700 req/s
+1. sift1m benchmark: simdeez 3.0 with level scale modification factor 0.5 we get a recall@10 of 0.9992 at 11700 req/s Insertion time is 610s.
 
 Moreover a tiny crate [bigann](https://github.com/jean-pierreBoth/bigann)
 gives results on the first 10 Million points of the [BIGANN](https://big-ann-benchmarks.com/neurips21.html) benchmark. The benchmark is also described at [IRISA](http://corpus-texmex.irisa.fr/). This crate can used to play with parameters on this data. Results give a recall between 0.92 and 0.99 depending on number of requests and parameters.

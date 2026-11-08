@@ -14,6 +14,8 @@ pub mod hnswio;
 pub mod libext;
 pub mod prelude;
 
+pub(crate) mod delet;
+
 // we impose our version of anndists
 pub use anndists;
 

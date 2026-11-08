@@ -94,14 +94,14 @@ impl DataMap {
         //
         let meta = std::fs::metadata(&datapath);
         if meta.is_err() {
-            error!("Could not open file : {:?}", &datapath);
+            error!("Could not open file : {:?}", datapath);
             std::process::exit(1);
         }
         let fsize = meta.unwrap().len().try_into().unwrap();
         //
         let file_res = File::open(&datapath);
         if file_res.is_err() {
-            error!("Could not open file : {:?}", &datapath);
+            error!("Could not open file : {:?}", datapath);
             std::process::exit(1);
         }
         let file = file_res.unwrap();
@@ -111,12 +111,12 @@ impl DataMap {
         let mmap_opt = unsafe { mmap_opt.with_file(&file, offset) };
         let mapping_res = mmap_opt.map();
         if mapping_res.is_err() {
-            error!("Could not memory map : {:?}", &datapath);
+            error!("Could not memory map : {:?}", datapath);
             std::process::exit(1);
         }
         let mmap = mapping_res.unwrap();
         //
-        info!("Mmap done on file : {:?}", &datapath);
+        info!("Mmap done on file : {:?}", datapath);
         //
         // where are we in decoding mmap slice? at beginning
         //
@@ -199,7 +199,9 @@ impl DataMap {
                 &mapped_slice[current_mmap_addr..current_mmap_addr + std::mem::size_of::<u64>()],
             );
             current_mmap_addr += std::mem::size_of::<u64>();
-            let serialized_len = u64::from_ne_bytes(u64_slice) as usize;
+            // we bound serialized_len just in case (cf issue #45) ...
+            let residual = mmap.size() - current_mmap_addr;
+            let serialized_len = residual.min(u64::from_ne_bytes(u64_slice) as usize);
             if i == 0 {
                 debug!("serialized bytes len to reload {:?}", serialized_len);
             }
