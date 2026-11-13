@@ -258,6 +258,7 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
 
     /// search if a point_id is found at given layer.
     /// Returns an option containing the rank at which it is found or None.
+    // TODO: could use distance to find pos instead of whole scan
     pub fn has_neighbour_at_layer(&self, layer: usize, p_id: PointId) -> Option<usize> {
         self.neighbours.read()[layer]
             .iter()
@@ -266,9 +267,12 @@ impl<'b, T: Clone + Send + Sync> Point<'b, T> {
 
     // TODO: implement Drop for (removed) point
     #[allow(unused)]
-    pub(crate) fn remove_neigbour_at_layer(&self, layer: usize, p_id: PointId) {
+    pub(crate) fn remove_neighbour_at_layer(&self, layer: usize, p_id: PointId) -> usize {
         if let Some(rank) = self.has_neighbour_at_layer(layer, p_id) {
             self.neighbours.write()[layer].remove(rank);
+            1
+        } else {
+            0
         }
     }
 
@@ -369,6 +373,14 @@ impl<'b, T: Clone + Send + Sync> PointWithOrder<'b, T> {
             point_ref: Arc::clone(point_ref),
             dist_to_ref,
         }
+    }
+
+    pub(crate) fn get_point(&self) -> &Arc<Point<'b, T>> {
+        &self.point_ref
+    }
+
+    pub(crate) fn get_dist(&self) -> f32 {
+        self.dist_to_ref
     }
 } // end of impl block
 
@@ -1392,6 +1404,31 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
 
     pub fn get_point_indexation(&self) -> &PointIndexation<'b, T> {
         &self.layer_indexed_points
+    }
+
+    // we must scan neighbourhood for reverse edge, eliminate them, repair neighbourhood, clear point, change its status.
+    pub(crate) fn delete_repair(&self, point: &mut Point<T>) {
+        // mark dead
+        point.set_status(Pstatus::Dead);
+        // search neighbourhood at each layer
+        let p_id = point.get_point_id();
+        let p_level = p_id.get_layer() as usize;
+        let mut nb_reverse = 0;
+        for l in 0..=p_level {
+            let l_neighbours = &mut point.neighbours.write()[l];
+            for n in l_neighbours {
+                nb_reverse += n.point_ref.remove_neighbour_at_layer(l, p_id);
+            }
+        }
+        //
+        log::debug!(
+            "point : {:?}  found in nb reverse edges : {:?}",
+            p_id,
+            nb_reverse
+        );
+        // we free point neighborhood information.
+        point.clear_neighbourhood();
+        point.data.clear(); // clear data if not mmapped
     }
 
     // This is best explained in : Navarro. Searching in metric spaces by spatial approximation.

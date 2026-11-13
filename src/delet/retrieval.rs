@@ -1,4 +1,10 @@
-// This is a retrieval test: estimate how many data we will retrieve (at null distance in a search)
+//! This is a retrieval capacity estimation  : estimate how many data we will retrieve (at null distance in a search)
+//! Note that there is no theoretical guarantee that we can always retrieve all the data points if d >= c * log(n)
+//! So we need a first estimation of retrieval befor any deletion.
+//!
+//! Some publications related to the problem:
+//! - Navigable Graphs for High Dimensional Nearest Neighbor Search: Constructions and Limits [Diwan.H](https://arxiv.org/abs/2405.18680)
+//! - On worst-Case Guarantees for Graph-Based Vector Search. [Daliri.M](https://arxiv.org/pdf/2610.38133)
 
 #![allow(unused)]
 
