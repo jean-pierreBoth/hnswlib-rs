@@ -7,6 +7,7 @@ use rand::rngs::Xoshiro256PlusPlus;
 use serde::{Deserialize, Serialize};
 
 use cpu_time::ProcessTime;
+use std::sync::atomic::AtomicUsize;
 use std::time::SystemTime;
 
 use std::cmp::Ordering;
@@ -482,6 +483,8 @@ pub struct PointIndexation<'b, T: Clone + Send + Sync> {
     pub(crate) layer_g: LayerGenerator,
     /// number of points in indexed structure
     pub(crate) nb_point: Arc<RwLock<usize>>,
+    /// keep track of number of deleted point for reinitialization of live PointId during a dump
+    pub(crate) nb_deleted_point: AtomicUsize,
     /// curent enter_point: an Arc RwLock on a possible Arc Point
     pub(crate) entry_point: Arc<RwLock<Option<Arc<Point<'b, T>>>>>,
 }
@@ -545,6 +548,7 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
             points_by_layer: Arc::new(RwLock::new(points_by_layer)),
             layer_g,
             nb_point: Arc::new(RwLock::new(0)),
+            nb_deleted_point: AtomicUsize::new(0),
             entry_point: Arc::new(RwLock::new(None)),
         }
     } // end of new
@@ -643,6 +647,11 @@ impl<'b, T: Clone + Send + Sync> PointIndexation<'b, T> {
     /// returns the number of points in layered structure
     pub fn get_nb_point(&self) -> usize {
         *self.nb_point.read()
+    }
+
+    pub fn get_nb_deleted_points(&self) -> usize {
+        self.nb_deleted_point
+            .fetch_add(0, std::sync::atomic::Ordering::Relaxed)
     }
 
     /// returns the number of points in a given layer, 0 on a bad layer num
@@ -1410,6 +1419,10 @@ impl<'b, T: Clone + Send + Sync, D: Distance<T> + Send + Sync> Hnsw<'b, T, D> {
     pub(crate) fn delete_repair(&self, point: &mut Point<T>) {
         // mark dead
         point.set_status(Pstatus::Dead);
+        // update layer indexation
+        self.get_point_indexation()
+            .nb_deleted_point
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         // search neighbourhood at each layer
         let p_id = point.get_point_id();
         let p_level = p_id.get_layer() as usize;

@@ -777,6 +777,7 @@ impl HnswIo {
                 NB_LAYER_MAX as usize,
             ),
             nb_point: Arc::new(RwLock::new(nb_points_loaded)), // CAVEAT , we should increase , the whole thing is to be able to increment graph ?
+            nb_deleted_point: AtomicUsize::new(0),
             entry_point: Arc::new(RwLock::new(Some(entry_point))),
         };
         //
@@ -1063,8 +1064,13 @@ pub fn load_description(io_in: &mut dyn Read) -> Result<Description> {
 ///  2. origin_id as a u64
 ///  3. The vector of data (the length is known from Description)
 ///
-fn dump_point<T: Serialize + Clone + Sized + Send + Sync, W: Write>(
+fn dump_point<
+    Mapper: Fn(PointId) -> PointId,
+    T: Serialize + Clone + Sized + Send + Sync,
+    W: Write,
+>(
     point: &Point<T>,
+    pid_remapper: &Mapper,
     mode: DumpMode,
     graphout: &mut BufWriter<W>,
     dataout: &mut BufWriter<W>,
@@ -1073,12 +1079,20 @@ fn dump_point<T: Serialize + Clone + Sized + Send + Sync, W: Write>(
     graphout.write_all(&MAGICPOINT.to_ne_bytes())?;
     // dump ext_id: usize , layer : u8 , rank in layer : i32
     graphout.write_all(&point.get_origin_id().to_ne_bytes())?;
-    let p_id = point.get_point_id();
+    // get new_pid
+    let old_pid = point.get_point_id();
+    let p_id = pid_remapper(old_pid);
+    //
     if mode == DumpMode::Full {
         graphout.write_all(&p_id.0.to_ne_bytes())?;
         graphout.write_all(&p_id.1.to_ne_bytes())?;
     }
-    trace!(" point dump {:?} {:?}  ", p_id, point.get_origin_id());
+    trace!(
+        " point dump new pid {:?} {:?} old_pid : {:?} ",
+        p_id,
+        point.get_origin_id(),
+        point.get_point_id()
+    );
     // then dump neighborhood info : nb neighbours : u32 , then list of origin_id, layer, rank_in_layer
     let neighborhood = point.get_neighborhood_id();
     // in any case nb_layers are dumped with possibly 0 neighbours at a layer, but this does not occur by construction
@@ -1091,8 +1105,9 @@ fn dump_point<T: Serialize + Clone + Sized + Send + Sync, W: Write>(
             // dump d_id : uszie , distance : f32, layer : u8, rank in layer : i32
             graphout.write_all(&n.d_id.to_ne_bytes())?;
             if mode == DumpMode::Full {
-                graphout.write_all(&n.p_id.0.to_ne_bytes())?;
-                graphout.write_all(&n.p_id.1.to_ne_bytes())?;
+                let new_pid = pid_remapper(n.p_id);
+                graphout.write_all(&new_pid.0.to_ne_bytes())?;
+                graphout.write_all(&new_pid.1.to_ne_bytes())?;
             }
             graphout.write_all(&n.distance.to_ne_bytes())?;
             //                debug!("        voisins  {:?}  {:?}  {:?}", n.p_id,  n.d_id , n.distance);
@@ -1294,6 +1309,43 @@ fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<Poin
     Ok(point_grap_info)
 } // end of load_point_graph
 
+// we need to remap point id's to maintain contiguous id inside layers (deleted points are filter out during the dump)
+// this function is called by PointIndexation::dump to update pointid and is required in dump_point. to update neighbours id
+// It returns for each pointId its new PointId with rank in layer set to -1 if point is deleted or its new rank.
+fn build_new_pid<'b, T>(pointidx: &PointIndexation<'b, T>) -> Option<Vec<Vec<PointId>>>
+where
+    T: Clone + Send + Sync,
+{
+    let nb_deleted = pointidx.get_nb_deleted_points();
+    if nb_deleted == 0 {
+        return None;
+    }
+    // collect list by layers
+    let max_layer = pointidx.get_max_level_observed() as usize;
+    let mut remapped_id = Vec::<Vec<PointId>>::with_capacity(max_layer + 1);
+    let mut check = 0;
+    for layer in 0..=max_layer {
+        let layer_size = pointidx.get_layer_nb_point(layer);
+        let layer_iter = pointidx.get_layer_iterator(layer);
+        let mut layer_vec = Vec::<PointId>::with_capacity(layer_size);
+        let mut next_live_rank = 0;
+        for (_rank, point) in layer_iter.enumerate() {
+            if point.get_status() == Pstatus::Live {
+                layer_vec.push(PointId(layer as u8, next_live_rank));
+                next_live_rank += 1;
+            } else {
+                layer_vec.push(PointId(layer as u8, -1));
+            }
+        }
+        remapped_id.push(Vec::<PointId>::with_capacity(layer_size));
+        check += layer_size - next_live_rank as usize;
+    }
+    //
+    assert_eq!(check, nb_deleted);
+    //
+    Some(remapped_id)
+}
+
 //
 // dump and load of PointIndexation<T>
 // ===================================
@@ -1307,6 +1359,16 @@ fn load_point_graph(graph_in: &mut dyn Read, descr: &Description) -> Result<Poin
 //
 impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointIndexation<'_, T> {
     fn dump(&self, mode: DumpMode, dumpinit: &mut DumpInit) -> Result<i32> {
+        //
+        let new_indexation_opt = build_new_pid(self);
+        let pid_remapper = move |p_id: PointId| {
+            if let Some(new_indexation) = new_indexation_opt.as_ref() {
+                new_indexation[p_id.0 as usize][p_id.1 as usize]
+            } else {
+                p_id
+            }
+        };
+        //
         let graphout = &mut dumpinit.graph_out;
         let dataout = &mut dumpinit.data_out;
         // dump max_layer
@@ -1320,8 +1382,9 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
             graphout.write_all(&MAGICLAYER.to_ne_bytes())?;
             graphout.write_all(&nb_point.to_ne_bytes())?;
             for j in 0..layers[i].len() {
-                assert_eq!(layers[i][j].get_point_id(), PointId(i as u8, j as i32));
-                dump_point(&layers[i][j], mode, graphout, dataout)?;
+                let point = &layers[i][j];
+                assert_eq!(point.get_point_id(), PointId(i as u8, j as i32));
+                dump_point(point, &pid_remapper, mode, graphout, dataout)?;
             }
         }
         // dump id of entry point
@@ -1331,7 +1394,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
             .ok_or(anyhow!("entry point not initialized"))?;
         //let ep = ep_read.as_ref().unwrap();
         graphout.write_all(&ep.get_origin_id().to_ne_bytes())?;
-        let p_id = ep.get_point_id();
+        let p_id = pid_remapper(ep.get_point_id());
         if mode == DumpMode::Full {
             graphout.write_all(&p_id.0.to_ne_bytes())?;
             graphout.write_all(&p_id.1.to_ne_bytes())?;
