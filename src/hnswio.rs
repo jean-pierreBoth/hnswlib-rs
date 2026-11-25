@@ -1074,7 +1074,7 @@ fn dump_point<
     mode: DumpMode,
     graphout: &mut BufWriter<W>,
     dataout: &mut BufWriter<W>,
-) -> Result<i32> {
+) -> Result<usize> {
     //
     graphout.write_all(&MAGICPOINT.to_ne_bytes())?;
     // dump ext_id: usize , layer : u8 , rank in layer : i32
@@ -1093,15 +1093,34 @@ fn dump_point<
         point.get_origin_id(),
         point.get_point_id()
     );
+    //
+    let mut nb_neighbours = 0usize;
+    let mut nb_neighbours_dumped = 0usize;
     // then dump neighborhood info : nb neighbours : u32 , then list of origin_id, layer, rank_in_layer
     let neighborhood = point.get_neighborhood_id();
     // in any case nb_layers are dumped with possibly 0 neighbours at a layer, but this does not occur by construction
     for (l, neighbours_at_l) in neighborhood.iter().enumerate() {
         // Caution : we dump number of neighbours as a usize, even if it cannot be so large!
         let nbg_l: usize = neighbours_at_l.len();
-        trace!("\t dumping nbng : {} at l {}", nbg_l, l);
-        graphout.write_all(&nbg_l.to_ne_bytes())?;
-        for n in neighbours_at_l {
+        // how many neighbours are still live? (we must also filter out neighbours not cleaned out before)
+        let nbg_live_at_l: usize = neighbours_at_l.iter().fold(0usize, |mut acc, n| {
+            if pid_remapper(n.p_id).1 >= 0 {
+                acc += 1
+            } else {
+                acc += 0
+            };
+            acc
+        });
+        trace!(
+            "\t dumping nbng live : {} at l {}, total nbg {}",
+            nbg_live_at_l, l, nbg_l
+        );
+        graphout.write_all(&nbg_live_at_l.to_ne_bytes())?;
+        //
+        let live_neighbour_at_l = neighbours_at_l
+            .iter()
+            .filter(|n| pid_remapper(n.p_id).1 >= 0);
+        for n in live_neighbour_at_l {
             // dump d_id : uszie , distance : f32, layer : u8, rank in layer : i32
             graphout.write_all(&n.d_id.to_ne_bytes())?;
             if mode == DumpMode::Full {
@@ -1112,6 +1131,8 @@ fn dump_point<
             graphout.write_all(&n.distance.to_ne_bytes())?;
             //                debug!("        voisins  {:?}  {:?}  {:?}", n.p_id,  n.d_id , n.distance);
         }
+        nb_neighbours += nbg_l;
+        nb_neighbours_dumped += nbg_live_at_l;
     }
     // now we dump data vector!
     dataout.write_all(&MAGICDATAP.to_ne_bytes())?;
@@ -1129,7 +1150,7 @@ fn dump_point<
     dataout.write_all(&len_64.to_ne_bytes())?;
     dataout.write_all(serialized)?;
     //
-    Ok(1)
+    Ok(nb_neighbours - nb_neighbours)
 } // end of dump for Point<T>
 
 // just reload data vector for point from file where data were dumped
@@ -1369,6 +1390,9 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
             }
         };
         //
+        let mut nb_point_dumped: usize = 0;
+        let mut nb_dead_neighbours: usize = 0;
+        //
         let graphout = &mut dumpinit.graph_out;
         let dataout = &mut dumpinit.data_out;
         // dump max_layer
@@ -1384,7 +1408,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
             for j in 0..layers[i].len() {
                 let point = &layers[i][j];
                 assert_eq!(point.get_point_id(), PointId(i as u8, j as i32));
-                dump_point(point, &pid_remapper, mode, graphout, dataout)?;
+                if point.is_live() {
+                    nb_dead_neighbours +=
+                        dump_point(point, &pid_remapper, mode, graphout, dataout)?;
+                    nb_point_dumped += 1;
+                }
             }
         }
         // dump id of entry point
@@ -1403,6 +1431,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send + Sync> HnswIoT for PointInd
             "dumped entry_point origin_d {:?}, p_id {:?} ",
             ep.get_origin_id(),
             p_id
+        );
+        //
+        info!(
+            "nb neighbours missing by point : {:.3e}",
+            nb_dead_neighbours as f32 / nb_point_dumped as f32
         );
         //
         Ok(1)
